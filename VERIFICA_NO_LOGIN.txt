@@ -1,0 +1,3 @@
+loginScreen presente html: False
+appRoot hidden: False
+checkPinLogin presente js: False

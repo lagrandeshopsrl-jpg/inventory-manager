@@ -1,0 +1,1 @@
+App aggiornata v47. Carica su GitHub: index.html, style.css, app.js. setup_cloud.sql serve solo se devi ricreare le tabelle Supabase.
