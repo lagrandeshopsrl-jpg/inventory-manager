@@ -1,70 +1,11 @@
+
 let products = JSON.parse(localStorage.getItem('products') || '[]');
-let editingIndex = -1;
+
+const itemsPerPage = 100;
+let currentPage = 1;
 
 function saveStorage(){
     localStorage.setItem('products', JSON.stringify(products));
-}
-
-function clearInputs(){
-    document.getElementById('barcode').value = '';
-    document.getElementById('name').value = '';
-    document.getElementById('supplier').value = '';
-    document.getElementById('buyPrice').value = '';
-    document.getElementById('sellPrice').value = '';
-    document.getElementById('quantity').value = '';
-}
-
-function saveProduct(){
-
-    const product = {
-        barcode: document.getElementById('barcode').value.trim(),
-        name: document.getElementById('name').value.trim(),
-        supplier: document.getElementById('supplier').value.trim(),
-        buyPrice: document.getElementById('buyPrice').value,
-        sellPrice: document.getElementById('sellPrice').value,
-        quantity: document.getElementById('quantity').value
-    };
-
-    if(!product.barcode || !product.name){
-        alert('Inserisci barcode e nome prodotto');
-        return;
-    }
-
-    if(editingIndex === -1){
-        products.push(product);
-    }else{
-        products[editingIndex] = product;
-        editingIndex = -1;
-    }
-
-    saveStorage();
-    clearInputs();
-    renderProducts();
-}
-
-function editProduct(index){
-
-    const p = products[index];
-
-    document.getElementById('barcode').value = p.barcode;
-    document.getElementById('name').value = p.name;
-    document.getElementById('supplier').value = p.supplier || '';
-    document.getElementById('buyPrice').value = p.buyPrice;
-    document.getElementById('sellPrice').value = p.sellPrice;
-    document.getElementById('quantity').value = p.quantity;
-
-    editingIndex = index;
-
-    window.scrollTo({top:0,behavior:'smooth'});
-}
-
-function deleteProduct(index){
-
-    if(confirm('Eliminare prodotto?')){
-        products.splice(index,1);
-        saveStorage();
-        renderProducts();
-    }
 }
 
 function renderProducts(){
@@ -81,25 +22,67 @@ function renderProducts(){
         String(p.supplier || '').toLowerCase().includes(search)
     );
 
-    filtered.forEach((p,index)=>{
+    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+
+    if(currentPage > totalPages){
+        currentPage = totalPages;
+    }
+
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+
+    const paginated = filtered.slice(start, end);
+
+    paginated.forEach((p,index)=>{
 
         table.innerHTML += `
         <tr>
+            <td><input type="checkbox" class="product-checkbox"></td>
             <td>${p.barcode}</td>
             <td>${p.name}</td>
             <td>${p.supplier || '-'}</td>
-            <td>${p.buyPrice}</td>
-            <td>${p.sellPrice}</td>
-            <td>${p.quantity}</td>
+            <td>${p.buyPrice || ''}</td>
+            <td>${p.sellPrice || ''}</td>
+            <td>${p.quantity || ''}</td>
             <td>
                 <div class="action-buttons">
-                    <button onclick="editProduct(${index})">Modifica</button>
-                    <button onclick="deleteProduct(${index})">Elimina</button>
+                    <button onclick="deleteProduct(${start + index})">Elimina</button>
                 </div>
             </td>
         </tr>
         `;
     });
+
+    document.getElementById('pageInfo').innerText =
+        `Pagina ${currentPage} di ${totalPages}`;
+}
+
+function deleteProduct(index){
+
+    if(confirm('Eliminare prodotto?')){
+        products.splice(index,1);
+        saveStorage();
+        renderProducts();
+    }
+}
+
+function selectAllProducts(){
+
+    document.querySelectorAll('.product-checkbox').forEach(cb=>{
+        cb.checked = true;
+    });
+}
+
+function nextPage(){
+    currentPage++;
+    renderProducts();
+}
+
+function prevPage(){
+    if(currentPage > 1){
+        currentPage--;
+        renderProducts();
+    }
 }
 
 function exportCSV(){
@@ -107,7 +90,7 @@ function exportCSV(){
     let csv = "Barcode,Prodotto,Fornitore,Acquisto,Vendita,Quantita\n";
 
     products.forEach(p=>{
-        csv += `${p.barcode},${p.name},${p.supplier || ''},${p.buyPrice},${p.sellPrice},${p.quantity}\n`;
+        csv += `${p.barcode},${p.name},${p.supplier || ''},${p.buyPrice || ''},${p.sellPrice || ''},${p.quantity || ''}\n`;
     });
 
     const blob = new Blob([csv], {type:'text/csv'});
@@ -146,12 +129,12 @@ function importExcel(event){
         json.forEach(row=>{
 
             products.push({
-                barcode: row.Barcode || row.barcode || '',
-                name: row.Prodotto || row.prodotto || row.Name || '',
-                supplier: row.Fornitore || row.supplier || '',
-                buyPrice: row.Acquisto || row.buyPrice || '',
-                sellPrice: row.Vendita || row.sellPrice || '',
-                quantity: row.Quantita || row.quantity || ''
+                barcode: row.Barcode || '',
+                name: row.Prodotto || '',
+                supplier: row.Fornitore || '',
+                buyPrice: row.Acquisto || '',
+                sellPrice: row.Vendita || '',
+                quantity: row.Quantita || ''
             });
 
         });

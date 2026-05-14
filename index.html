@@ -10,20 +10,13 @@
 <body>
 
 <div class="container">
+
 <h1>Gestionale Negozio</h1>
 
-<div class="form-box">
-<input type="text" id="barcode" placeholder="Codice a barre">
-<input type="text" id="name" placeholder="Nome prodotto">
-<input type="text" id="supplier" placeholder="Nome fornitore">
-<input type="number" id="buyPrice" placeholder="Prezzo acquisto">
-<input type="number" id="sellPrice" placeholder="Prezzo vendita">
-<input type="number" id="quantity" placeholder="Quantità">
-<button onclick="saveProduct()">Salva / Modifica</button>
-</div>
+<div class="topbar">
+<input type="text" id="search" placeholder="Cerca barcode o prodotto..." onkeyup="renderProducts()">
 
-<div class="actions">
-<input type="text" id="search" placeholder="Cerca barcode o prodotto..." onfocus="this.value=''; renderProducts();" onkeyup="renderProducts()">
+<button onclick="selectAllProducts()">Seleziona tutti</button>
 
 <button onclick="exportCSV()">Esporta CSV</button>
 
@@ -36,6 +29,7 @@ Importa Excel
 <table>
 <thead>
 <tr>
+<th></th>
 <th>Barcode</th>
 <th>Prodotto</th>
 <th>Fornitore</th>
@@ -47,6 +41,12 @@ Importa Excel
 </thead>
 <tbody id="productTable"></tbody>
 </table>
+
+<div class="pagination">
+<button onclick="prevPage()">⬅ Precedente</button>
+<span id="pageInfo"></span>
+<button onclick="nextPage()">Successiva ➡</button>
+</div>
 
 </div>
 
