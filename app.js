@@ -324,6 +324,195 @@ function importExcel(event){
     reader.readAsArrayBuffer(file);
 }
 
+
+function normalizeKey(key){
+
+    return String(key || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g,'');
+}
+
+function getValue(row, possibleKeys){
+
+    const normalizedMap = {};
+
+    Object.keys(row).forEach(k=>{
+        normalizedMap[normalizeKey(k)] = row[k];
+    });
+
+    for(const key of possibleKeys){
+
+        const value = normalizedMap[normalizeKey(key)];
+
+        if(value !== undefined){
+            return value;
+        }
+    }
+
+    return '';
+}
+
+function importExcel(event){
+
+    const file = event.target.files[0];
+
+    if(!file){
+        return;
+    }
+
+    const fileName = file.name.toLowerCase();
+
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+
+        let json = [];
+
+        try{
+
+            if(fileName.endsWith('.csv')){
+
+                const text = e.target.result;
+
+                const workbook = XLSX.read(text,{type:'string'});
+
+                const sheetName = workbook.SheetNames[0];
+
+                const worksheet = workbook.Sheets[sheetName];
+
+                json = XLSX.utils.sheet_to_json(
+                    worksheet,
+                    {defval:''}
+                );
+
+            }else{
+
+                const data =
+                    new Uint8Array(e.target.result);
+
+                const workbook =
+                    XLSX.read(data,{
+                        type:'array'
+                    });
+
+                const sheetName =
+                    workbook.SheetNames[0];
+
+                const worksheet =
+                    workbook.Sheets[sheetName];
+
+                json = XLSX.utils.sheet_to_json(
+                    worksheet,
+                    {defval:''}
+                );
+            }
+
+            let imported = 0;
+            let updated = 0;
+
+            json.forEach(row=>{
+
+                const product = {
+
+                    barcode: getValue(row,[
+                        'Barcode',
+                        'Codice',
+                        'Codice Barre',
+                        'EAN',
+                        '条码'
+                    ]),
+
+                    name: getValue(row,[
+                        'Prodotto',
+                        'Nome',
+                        'Articolo',
+                        'Product',
+                        '商品'
+                    ]),
+
+                    supplier: getValue(row,[
+                        'Fornitore',
+                        'fornitore',
+                        'FORNITORE',
+                        'Supplier',
+                        'Nome Fornitore',
+                        '供应商'
+                    ]),
+
+                    buyPrice: getValue(row,[
+                        'Acquisto',
+                        'Prezzo Acquisto',
+                        'BuyPrice'
+                    ]),
+
+                    sellPrice: getValue(row,[
+                        'Vendita',
+                        'Prezzo Vendita',
+                        'SellPrice'
+                    ]),
+
+                    quantity: getValue(row,[
+                        'Quantita',
+                        'Quantità',
+                        'Qta',
+                        'Quantity'
+                    ])
+                };
+
+                if(!product.barcode) return;
+
+                const existingIndex = products.findIndex(
+                    p => String(p.barcode) === String(product.barcode)
+                );
+
+                if(existingIndex !== -1){
+
+                    products[existingIndex] = {
+                        ...products[existingIndex],
+                        ...product
+                    };
+
+                    updated++;
+
+                }else{
+
+                    products.push(product);
+
+                    imported++;
+                }
+
+            });
+
+            saveStorage();
+
+            renderProducts();
+
+            alert(
+                'Import completato!\\n' +
+                'Nuovi prodotti: ' + imported + '\\n' +
+                'Aggiornati: ' + updated
+            );
+
+        }catch(err){
+
+            console.error(err);
+
+            alert('Errore importazione file');
+        }
+    };
+
+    if(fileName.endsWith('.csv')){
+
+        reader.readAsText(file,'UTF-8');
+
+    }else{
+
+        reader.readAsArrayBuffer(file);
+    }
+}
+
+
 window.onload = function(){
 
     renderProducts();
