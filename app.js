@@ -21,8 +21,35 @@ function getSell(p){ return valueOf(p,['sellPrice','vendita','Vendita','Prezzo V
 function saveStorage(){ localStorage.setItem('products', JSON.stringify(products)); }
 
 function setActiveMenu(view){
-  document.getElementById('btnProdotti')?.classList.toggle('active', view === 'products');
-  document.getElementById('btnFornitori')?.classList.toggle('active', view === 'suppliers');
+  document.getElementById('menuProducts').classList.toggle('active', view === 'products');
+  document.getElementById('menuSuppliers').classList.toggle('active', view === 'suppliers');
+}
+
+function showProducts(){
+  currentView = 'products';
+  setActiveMenu('products');
+
+  document.getElementById('pageTitle').innerText = 'Gestione Prodotti';
+  document.getElementById('pageSubtitle').innerText = 'Gestionale Magazzino / 库存管理';
+
+  document.getElementById('productsPage').classList.remove('hidden');
+  document.getElementById('suppliersPage').classList.add('hidden');
+
+  renderProducts();
+  setTimeout(()=>document.getElementById('search')?.focus(),50);
+}
+
+function showSuppliers(){
+  currentView = 'suppliers';
+  setActiveMenu('suppliers');
+
+  document.getElementById('pageTitle').innerText = 'Fornitori';
+  document.getElementById('pageSubtitle').innerText = 'Cartelle fornitori / 供应商文件夹';
+
+  document.getElementById('productsPage').classList.add('hidden');
+  document.getElementById('suppliersPage').classList.remove('hidden');
+
+  renderSupplierFolders();
 }
 
 function renderProducts(){
@@ -66,21 +93,6 @@ function renderProducts(){
   document.getElementById('pageInfo').innerText = `Pagina ${currentPage} di ${totalPages}`;
 }
 
-function showProducts(){
-  currentView = 'products';
-  setActiveMenu('products');
-
-  document.getElementById('pageTitle').innerText = 'Gestione Prodotti';
-  document.getElementById('pageSubtitle').innerText = 'Gestionale Magazzino / 库存管理';
-
-  document.getElementById('productsToolbar').style.display = 'flex';
-  document.getElementById('productsView').style.display = 'block';
-  document.getElementById('suppliersView').style.display = 'none';
-
-  renderProducts();
-  setTimeout(()=>document.getElementById('search')?.focus(),50);
-}
-
 function supplierNameOf(p){
   const s = String(getSupplier(p) || '').trim();
   return s || 'Senza fornitore';
@@ -96,21 +108,7 @@ function groupBySuppliers(){
   return groups;
 }
 
-function showSuppliers(){
-  currentView = 'suppliers';
-  setActiveMenu('suppliers');
-
-  document.getElementById('pageTitle').innerText = 'Fornitori';
-  document.getElementById('pageSubtitle').innerText = 'Cartelle fornitori / 供应商文件夹';
-
-  document.getElementById('productsToolbar').style.display = 'none';
-  document.getElementById('productsView').style.display = 'none';
-  document.getElementById('suppliersView').style.display = 'block';
-
-  renderSuppliers();
-}
-
-function renderSuppliers(){
+function renderSupplierFolders(){
   const groups = groupBySuppliers();
   const search = (document.getElementById('supplierSearch')?.value || '').toLowerCase();
   const names = Object.keys(groups).filter(n=>n.toLowerCase().includes(search)).sort((a,b)=>a.localeCompare(b));
@@ -120,8 +118,8 @@ function renderSuppliers(){
     <div class="stat-box">Prodotti totali: ${products.length}</div>
   `;
 
-  document.getElementById('supplierProducts').style.display = 'none';
-  document.getElementById('supplierFolders').style.display = 'grid';
+  document.getElementById('supplierDetail').classList.add('hidden');
+  document.getElementById('supplierFolders').classList.remove('hidden');
 
   if(names.length === 0){
     document.getElementById('supplierFolders').innerHTML = '<p>Nessun fornitore trovato.</p>';
@@ -142,8 +140,8 @@ function openSupplierFolder(encodedName){
   const groups = groupBySuppliers();
   const items = groups[name] || [];
 
-  document.getElementById('supplierFolders').style.display = 'none';
-  document.getElementById('supplierProducts').style.display = 'block';
+  document.getElementById('supplierFolders').classList.add('hidden');
+  document.getElementById('supplierDetail').classList.remove('hidden');
 
   const rows = items.map(item=>{
     const p = item.product;
@@ -161,10 +159,10 @@ function openSupplierFolder(encodedName){
     `;
   }).join('');
 
-  document.getElementById('supplierProducts').innerHTML = `
-    <div class="supplier-products-header">
+  document.getElementById('supplierDetail').innerHTML = `
+    <div class="supplier-detail-header">
       <h2>📁 ${name}</h2>
-      <button class="back-folder" onclick="renderSuppliers()">Torna alle cartelle</button>
+      <button class="back-folder" onclick="renderSupplierFolders()">Torna alle cartelle</button>
     </div>
     <div class="table-card">
       <table>
@@ -219,7 +217,7 @@ function saveEditProduct(){
   saveStorage();
   closeEditModal();
 
-  if(currentView === 'suppliers') renderSuppliers();
+  if(currentView === 'suppliers') renderSupplierFolders();
   else renderProducts();
 }
 
@@ -227,7 +225,7 @@ function deleteProduct(index){
   if(confirm('Eliminare prodotto?')){
     products.splice(index,1);
     saveStorage();
-    if(currentView === 'suppliers') renderSuppliers();
+    if(currentView === 'suppliers') renderSupplierFolders();
     else renderProducts();
   }
 }

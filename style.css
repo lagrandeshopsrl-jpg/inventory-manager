@@ -5,15 +5,28 @@ body{
   background:#eef3fb;
   color:#0f172a;
 }
+.hidden{display:none !important;}
 .layout{display:flex;min-height:100vh}
 .sidebar{
-  width:245px;background:linear-gradient(180deg,#061d3a,#031020);
-  color:white;padding:24px 14px;display:flex;flex-direction:column;gap:12px
+  width:245px;
+  background:linear-gradient(180deg,#061d3a,#031020);
+  color:white;
+  padding:24px 14px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
 }
 .logo{font-size:17px;font-weight:800;margin-bottom:26px;color:#2481ff}
 .menu{
-  padding:14px 16px;border-radius:12px;color:#cbd5e1;background:transparent;
-  border:none;text-align:left;font:inherit;cursor:pointer;width:100%
+  padding:14px 16px;
+  border-radius:12px;
+  color:#cbd5e1;
+  background:transparent;
+  border:none;
+  text-align:left;
+  font:inherit;
+  cursor:pointer;
+  width:100%;
 }
 .menu.active{background:#0b63e5;color:white}
 .copyright{margin-top:auto;color:#94a3b8;font-size:13px}
@@ -23,91 +36,187 @@ body{
 .titlebar p{margin:6px 0 0;color:#64748b}
 .toolbar,.supplier-top{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
 .toolbar input,.supplier-top input{
-  flex:1;min-width:280px;padding:13px 16px;border-radius:13px;
-  border:1px solid #d8e0ef;outline:none;font-size:16px;background:white
+  flex:1;
+  min-width:280px;
+  padding:13px 16px;
+  border-radius:13px;
+  border:1px solid #d8e0ef;
+  outline:none;
+  font-size:16px;
+  background:white;
 }
 .toolbar button,.file-label,.supplier-top button{
-  background:#0b63e5;color:white;border:none;border-radius:12px;
-  padding:12px 16px;cursor:pointer;font-weight:700
+  background:#0b63e5;
+  color:white;
+  border:none;
+  border-radius:12px;
+  padding:12px 16px;
+  cursor:pointer;
+  font-weight:700;
 }
 .file-label input{display:none}
-.table-card{background:white;border-radius:18px;overflow:auto;box-shadow:0 8px 28px rgba(15,23,42,.08)}
+.table-card{
+  background:white;
+  border-radius:18px;
+  overflow:auto;
+  box-shadow:0 8px 28px rgba(15,23,42,.08);
+}
 table{width:100%;border-collapse:collapse}
 th{background:#f8fafc;color:#334155;text-align:center}
 th,td{padding:14px;border-bottom:1px solid #edf2f7;text-align:center}
 .action-buttons{display:flex;gap:8px;justify-content:center}
 .edit-btn,.delete-btn{
-  border:none;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700
+  border:none;
+  border-radius:10px;
+  padding:9px 12px;
+  cursor:pointer;
+  font-weight:700;
 }
 .edit-btn{background:#e8f1ff;color:#0b63e5}
 .delete-btn{background:#fee2e2;color:#dc2626}
 .pagination{display:flex;justify-content:center;gap:15px;align-items:center;margin:18px 0}
 .pagination button{border:none;background:white;border-radius:10px;padding:10px 15px;cursor:pointer}
 
-/* FORNITORI COME CARTELLE */
+/* FORNITORI PRIMA PAGINA */
 .supplier-stats{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;
+  margin-bottom:16px;
 }
 .stat-box{
-  background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;
-  padding:14px;border-radius:16px;font-weight:800
+  background:#eff6ff;
+  color:#1d4ed8;
+  border:1px solid #bfdbfe;
+  padding:14px;
+  border-radius:16px;
+  font-weight:800;
 }
 .supplier-folders{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+  gap:14px;
 }
 .folder-card{
-  background:white;border-radius:18px;padding:18px;box-shadow:0 8px 28px rgba(15,23,42,.08);
-  cursor:pointer;border:2px solid transparent;transition:.15s
+  background:white;
+  border-radius:18px;
+  padding:18px;
+  box-shadow:0 8px 28px rgba(15,23,42,.08);
+  cursor:pointer;
+  border:2px solid transparent;
+  transition:.15s;
 }
 .folder-card:hover{border-color:#0b63e5;transform:translateY(-2px)}
 .folder-icon{font-size:34px;margin-bottom:10px}
 .folder-name{font-size:20px;font-weight:900;margin-bottom:6px;word-break:break-word}
 .folder-count{color:#64748b;font-weight:700}
-.supplier-products-area{
-  background:white;border-radius:18px;padding:18px;box-shadow:0 8px 28px rgba(15,23,42,.08)
+.supplier-detail{
+  background:white;
+  border-radius:18px;
+  padding:18px;
+  box-shadow:0 8px 28px rgba(15,23,42,.08);
 }
-.supplier-products-header{
-  display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap
+.supplier-detail-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
 }
-.supplier-products-header h2{margin:0}
+.supplier-detail-header h2{margin:0}
 .back-folder{
-  background:#0b63e5;color:white;border:none;border-radius:12px;padding:10px 14px;cursor:pointer;font-weight:800
+  background:#0b63e5;
+  color:white;
+  border:none;
+  border-radius:12px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:800;
 }
 
-/* MODAL MODIFICA */
+/* MODAL */
 .modal-overlay{
-  display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);
-  backdrop-filter:blur(6px);z-index:9999;justify-content:center;align-items:center;padding:14px
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.55);
+  backdrop-filter:blur(6px);
+  z-index:9999;
+  justify-content:center;
+  align-items:center;
+  padding:14px;
 }
 .edit-box{
-  position:relative;width:100%;max-width:640px;background:white;border-radius:24px;
-  padding:28px 32px;box-shadow:0 28px 85px rgba(0,0,0,.28);animation:pop .16s ease-out
+  position:relative;
+  width:100%;
+  max-width:640px;
+  background:white;
+  border-radius:24px;
+  padding:28px 32px;
+  box-shadow:0 28px 85px rgba(0,0,0,.28);
+  animation:pop .16s ease-out;
 }
 @keyframes pop{from{opacity:.4;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
 .close-btn{
-  position:absolute;right:24px;top:22px;width:50px;height:50px;border:none;border-radius:50%;
-  background:#f1f3f6;font-size:32px;line-height:1;cursor:pointer;color:#111827
+  position:absolute;
+  right:24px;
+  top:22px;
+  width:50px;
+  height:50px;
+  border:none;
+  border-radius:50%;
+  background:#f1f3f6;
+  font-size:32px;
+  line-height:1;
+  cursor:pointer;
+  color:#111827;
 }
 .edit-title{display:flex;align-items:center;gap:18px;margin-bottom:22px}
 .big-icon,.left-icon{
-  width:56px;height:56px;border-radius:14px;background:#eaf2ff;color:#075ee8;
-  display:flex;align-items:center;justify-content:center;font-weight:900;font-size:25px;flex-shrink:0
+  width:56px;
+  height:56px;
+  border-radius:14px;
+  background:#eaf2ff;
+  color:#075ee8;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  font-size:25px;
+  flex-shrink:0;
 }
 .edit-title h2{margin:0;font-size:32px}
 .edit-title p{margin:5px 0 0;font-size:18px;color:#1e3a8a}
 .edit-row{display:grid;grid-template-columns:70px 1fr;align-items:center;margin:15px 0}
 .field label{display:block;font-size:17px;font-weight:800;margin-bottom:8px;color:#111827}
 .modern-input{
-  display:flex;align-items:center;border:2px solid #dbe3ef;border-radius:14px;background:white;overflow:hidden
+  display:flex;
+  align-items:center;
+  border:2px solid #dbe3ef;
+  border-radius:14px;
+  background:white;
+  overflow:hidden;
 }
 .modern-input input{
-  flex:1;border:none;outline:none;padding:15px 18px;font-size:22px;font-weight:700;background:white
+  flex:1;
+  border:none;
+  outline:none;
+  padding:15px 18px;
+  font-size:22px;
+  font-weight:700;
+  background:white;
 }
 .modern-input span{font-size:26px;color:#16a34a;padding:0 18px;font-weight:900}
 .modern-input:focus-within{border-color:#0b63e5;box-shadow:0 0 0 4px rgba(11,99,229,.12)}
 .info{
-  margin-top:18px;background:#eaf3ff;color:#1e3a8a;border-radius:14px;
-  padding:14px 18px;text-align:center;font-size:17px
+  margin-top:18px;
+  background:#eaf3ff;
+  color:#1e3a8a;
+  border-radius:14px;
+  padding:14px 18px;
+  text-align:center;
+  font-size:17px;
 }
 .modal-actions{display:grid;grid-template-columns:1fr 1.35fr;gap:16px;margin-top:22px}
 .modal-actions button{border:none;border-radius:16px;padding:17px 18px;font-size:20px;font-weight:900;cursor:pointer}
