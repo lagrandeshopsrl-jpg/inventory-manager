@@ -12,10 +12,10 @@
 <div class="app-shell">
   <aside class="sidebar">
     <div class="brand">▱ Inventory Manager</div>
-    <div class="menu active"><button class="menu active side-button" onclick="showProducts()">▣ Prodotti</button></div>
+    <div class="menu active"><button class="menu active side-button" type="button" onclick="showProducts()">▣ Prodotti</button></div>
     <div class="menu">＋ Nuovo Prodotto</div>
     <div class="menu">▤ Categorie</div>
-    <div class="menu"><button class="menu side-button" onclick="showSuppliers()">☷ Fornitori</button></div>
+    <div class="menu"><button class="menu side-button" type="button" onclick="showSuppliers()">☷ Fornitori</button></div>
     <div class="menu">⚙ Impostazioni</div>
     <div class="foot">© 2026 Inventory Manager</div>
   </aside>
@@ -66,14 +66,15 @@
 
 
 
-<div id="suppliersView" class="suppliers-view hidden">
+
+<div id="suppliersView" class="suppliers-view" style="display:none;">
   <div class="suppliers-card">
     <div class="suppliers-header">
       <div>
         <h2>Fornitori / 供应商</h2>
         <p>Prodotti suddivisi per fornitore</p>
       </div>
-      <button onclick="showProducts()">Torna ai prodotti</button>
+      <button type="button" onclick="showProducts()">Torna ai prodotti</button>
     </div>
     <div id="suppliersSummary" class="suppliers-summary"></div>
     <div id="suppliersList" class="suppliers-list"></div>

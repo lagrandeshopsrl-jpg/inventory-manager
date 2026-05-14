@@ -204,6 +204,13 @@ function normalizeSupplierName(name){
   return value || 'Senza fornitore';
 }
 
+
+
+function supplierNameOf(p){
+  const v = String(getSupplier(p) || '').trim();
+  return v || 'Senza fornitore';
+}
+
 function showSuppliers(){
   const tableCard = document.querySelector('.table-card');
   const pagination = document.querySelector('.pagination');
@@ -215,29 +222,33 @@ function showSuppliers(){
   if(toolbar) toolbar.style.display = 'none';
   if(tableCard) tableCard.style.display = 'none';
   if(pagination) pagination.style.display = 'none';
-  if(suppliersView) suppliersView.classList.remove('hidden');
+  if(suppliersView) suppliersView.style.display = 'block';
 
   const groups = {};
 
   products.forEach((p, index)=>{
-    const supplier = normalizeSupplierName(getSupplier(p));
-    if(!groups[supplier]) groups[supplier] = [];
-    groups[supplier].push({product:p, index});
+    const s = supplierNameOf(p);
+    if(!groups[s]) groups[s] = [];
+    groups[s].push({product:p, index:index});
   });
 
   const names = Object.keys(groups).sort((a,b)=>a.localeCompare(b));
 
-  suppliersSummary.innerHTML = `
-    <div class="summary-box">Fornitori totali: ${names.length}</div>
-    <div class="summary-box">Prodotti totali: ${products.length}</div>
-  `;
+  if(suppliersSummary){
+    suppliersSummary.innerHTML = `
+      <div class="summary-box">Fornitori totali: ${names.length}</div>
+      <div class="summary-box">Prodotti totali: ${products.length}</div>
+    `;
+  }
+
+  if(!suppliersList) return;
 
   if(names.length === 0){
     suppliersList.innerHTML = '<p>Nessun fornitore trovato.</p>';
     return;
   }
 
-  suppliersList.innerHTML = names.map((name, idx)=>{
+  suppliersList.innerHTML = names.map((name, sectionIndex)=>{
     const rows = groups[name].map(item=>{
       const p = item.product;
       return `
@@ -253,11 +264,11 @@ function showSuppliers(){
 
     return `
       <div class="supplier-section">
-        <div class="supplier-title" onclick="toggleSupplier(${idx})">
+        <div class="supplier-title" onclick="toggleSupplierSection(${sectionIndex})">
           <div>${name}</div>
           <span>${groups[name].length} prodotti</span>
         </div>
-        <div class="supplier-products" id="supplier-${idx}">
+        <div class="supplier-products" id="supplier-section-${sectionIndex}">
           <table>
             <thead>
               <tr>
@@ -276,8 +287,8 @@ function showSuppliers(){
   }).join('');
 }
 
-function toggleSupplier(id){
-  const el = document.getElementById('supplier-' + id);
+function toggleSupplierSection(id){
+  const el = document.getElementById('supplier-section-' + id);
   if(!el) return;
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
@@ -291,7 +302,7 @@ function showProducts(){
   if(toolbar) toolbar.style.display = 'flex';
   if(tableCard) tableCard.style.display = 'block';
   if(pagination) pagination.style.display = 'flex';
-  if(suppliersView) suppliersView.classList.add('hidden');
+  if(suppliersView) suppliersView.style.display = 'none';
 
   renderProducts();
 }
