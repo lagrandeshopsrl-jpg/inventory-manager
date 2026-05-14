@@ -22,7 +22,7 @@
 </div>
 
 <div class="actions">
-<input type="text" id="search" placeholder="Cerca barcode o prodotto..." onkeyup="renderProducts()">
+<input type="text" id="search" placeholder="Cerca barcode o prodotto..." onfocus="this.value=''; renderProducts();" onkeyup="renderProducts()">
 
 <button onclick="exportCSV()">Esporta CSV</button>
 
