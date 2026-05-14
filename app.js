@@ -249,3 +249,97 @@ function installClearSearchOnClick(){
 
 setInterval(installClearSearchOnClick, 500);
 document.addEventListener('DOMContentLoaded', installClearSearchOnClick);
+
+
+/* ===== DROPBOX LOCAL BACKUP ===== */
+
+function backupDropbox(){
+
+  const data = {
+    version: Date.now(),
+    exportedAt: new Date().toISOString(),
+    products: products,
+    importSessions: importSessions
+  };
+
+  const json = JSON.stringify(data, null, 2);
+
+  const blob = new Blob(
+    [json],
+    { type:'application/json' }
+  );
+
+  const a = document.createElement('a');
+
+  a.href = URL.createObjectURL(blob);
+
+  a.download = 'prodotti_backup.json';
+
+  document.body.appendChild(a);
+
+  a.click();
+
+  document.body.removeChild(a);
+
+  setCloudStatus('☁ Backup Dropbox creato','ok');
+
+  alert('Backup Dropbox creato!');
+}
+
+function restoreDropbox(){
+  document
+    .getElementById('restoreDropboxFile')
+    .click();
+}
+
+function loadDropboxBackup(event){
+
+  const file = event.target.files[0];
+
+  if(!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function(e){
+
+    try{
+
+      const data = JSON.parse(e.target.result);
+
+      products = data.products || [];
+
+      importSessions = data.importSessions || [];
+
+      localStorage.setItem(
+        'products',
+        JSON.stringify(products)
+      );
+
+      localStorage.setItem(
+        'importSessions',
+        JSON.stringify(importSessions)
+      );
+
+      renderProducts();
+
+      setCloudStatus(
+        '☁ Backup Dropbox ripristinato',
+        'ok'
+      );
+
+      alert(
+        'Backup Dropbox ripristinato!\n\n' +
+        products.length +
+        ' prodotti caricati.'
+      );
+
+    }catch(err){
+
+      console.error(err);
+
+      alert('Errore file backup');
+    }
+  };
+
+  reader.readAsText(file);
+}
