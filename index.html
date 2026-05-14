@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -9,26 +8,34 @@
 </head>
 <body>
 
-<div class="header">
+<div class="topbar">
+  <div>
     <h1>Inventory Manager</h1>
-    <p>Gestionale Prodotti</p>
+    <p>Gestionale Magazzino / 库存管理</p>
+  </div>
+
+  <div class="actions">
+    <button>➕ Aggiungi / 添加</button>
+    <button>⬆ Importa / 导入</button>
+    <button>⚙ Impostazioni</button>
+  </div>
 </div>
 
 <div class="toolbar">
-    <input type="text" id="search" placeholder="Cerca barcode o prodotto..." onkeyup="renderProducts()" autofocus>
-    <button onclick="toggleSelectProducts()" id="toggleBtn">Seleziona prodotti</button>
+  <input id="search" type="text" placeholder="Cerca per barcode o nome..." onkeyup="renderProducts()">
+  <button onclick="toggleAll()">✔ Seleziona tutto</button>
 </div>
 
-<div class="table-container">
+<div class="table-wrap">
 <table>
 <thead>
 <tr>
 <th></th>
 <th>Barcode</th>
-<th>Prodotto</th>
+<th>Nome Prodotto</th>
 <th>Fornitore</th>
-<th>Acquisto</th>
-<th>Vendita</th>
+<th>Prezzo Acquisto</th>
+<th>Prezzo Vendita</th>
 <th>Azioni</th>
 </tr>
 </thead>
@@ -36,30 +43,31 @@
 </table>
 </div>
 
-<div id="editModal" class="modal">
-    <div class="modal-box">
-        <h2>Modifica Prodotto</h2>
+<div id="modal" class="modal">
+<div class="modal-box">
+<h2>Modifica Prodotto</h2>
 
-        <label>Barcode</label>
-        <input id="editBarcode">
+<label>Barcode / 条形码</label>
+<input id="barcode">
 
-        <label>Nome prodotto</label>
-        <input id="editName">
+<label>Nome Prodotto / 产品名称</label>
+<input id="name">
 
-        <label>Fornitore</label>
-        <input id="editSupplier">
+<label>Fornitore / 供应商</label>
+<input id="supplier">
 
-        <label>Prezzo acquisto</label>
-        <input id="editBuy">
+<label>Prezzo Acquisto (€)</label>
+<input id="buy">
 
-        <label>Prezzo vendita</label>
-        <input id="editSell">
+<label>Prezzo Vendita (€)</label>
+<input id="sell">
 
-        <div class="modal-buttons">
-            <button class="cancel-btn" onclick="closeModal()">Annulla</button>
-            <button class="save-btn" onclick="saveEdit()">Salva Modifiche</button>
-        </div>
-    </div>
+<div class="modal-buttons">
+<button onclick="closeModal()">Annulla</button>
+<button class="save" onclick="saveProduct()">Salva Modifiche</button>
+</div>
+
+</div>
 </div>
 
 <script src="app.js"></script>

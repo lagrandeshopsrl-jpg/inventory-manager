@@ -1,83 +1,77 @@
-
 body{
 font-family:Arial,sans-serif;
-background:#eef2f7;
+background:#f3f5fb;
 margin:0;
 padding:20px;
 }
-
-.header{
-background:#0b57d0;
+.topbar{
+background:linear-gradient(90deg,#0052cc,#0a63ff);
 color:white;
 padding:20px;
-border-radius:18px;
-margin-bottom:20px;
+border-radius:20px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+flex-wrap:wrap;
 }
-
+.topbar h1{
+margin:0;
+}
+.actions{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+}
+.actions button,.toolbar button,.save{
+background:#0a63ff;
+color:white;
+border:none;
+padding:12px 18px;
+border-radius:14px;
+cursor:pointer;
+}
 .toolbar{
 display:flex;
 gap:10px;
-margin-bottom:20px;
+margin:20px 0;
 }
-
 .toolbar input{
 flex:1;
 padding:14px;
-border:none;
-border-radius:12px;
-font-size:16px;
+border-radius:14px;
+border:1px solid #ddd;
 }
-
-.toolbar button{
-background:#0b57d0;
-color:white;
-border:none;
-padding:14px 18px;
-border-radius:12px;
-cursor:pointer;
-}
-
-.table-container{
+.table-wrap{
 background:white;
-border-radius:18px;
+border-radius:20px;
 overflow:auto;
 box-shadow:0 4px 20px rgba(0,0,0,0.08);
 }
-
 table{
 width:100%;
 border-collapse:collapse;
 }
-
-th{
-background:#f3f6fb;
+th,td{
 padding:16px;
-}
-
-td{
-padding:14px;
 border-bottom:1px solid #eee;
 text-align:center;
 }
-
-.action-btn{
-padding:8px 12px;
+.edit{
+background:#0a63ff;
+color:white;
 border:none;
+padding:8px 12px;
 border-radius:10px;
 cursor:pointer;
-margin:2px;
 }
-
-.edit{
-background:#0b57d0;
-color:white;
-}
-
 .delete{
 background:#ff4d4f;
 color:white;
+border:none;
+padding:8px 12px;
+border-radius:10px;
+cursor:pointer;
 }
-
 .modal{
 display:none;
 position:fixed;
@@ -86,43 +80,30 @@ background:rgba(0,0,0,0.45);
 justify-content:center;
 align-items:center;
 }
-
 .modal-box{
 background:white;
-width:90%;
-max-width:450px;
 padding:25px;
-border-radius:22px;
+border-radius:24px;
+width:90%;
+max-width:500px;
 display:flex;
 flex-direction:column;
 gap:10px;
 }
-
 .modal-box input{
 padding:12px;
+border-radius:12px;
 border:1px solid #ddd;
-border-radius:10px;
 }
-
 .modal-buttons{
 display:flex;
 gap:10px;
 margin-top:10px;
 }
-
-.cancel-btn,.save-btn{
+.modal-buttons button{
 flex:1;
 padding:14px;
 border:none;
 border-radius:12px;
 cursor:pointer;
-}
-
-.cancel-btn{
-background:#ddd;
-}
-
-.save-btn{
-background:#0b57d0;
-color:white;
 }
