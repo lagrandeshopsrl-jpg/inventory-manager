@@ -1,0 +1,6 @@
+Inventory Manager v39 Hidden PIN
+
+PIN:
+0101
+
+Il PIN ora è nascosto/encoded dentro il codice.

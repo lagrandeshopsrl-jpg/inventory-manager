@@ -162,7 +162,7 @@ function importExcel(event){
 
 
 /* ===== LOGIN PIN 4 CIFRE ===== */
-const APP_PIN = "0101";
+const _p = "MDEwMQ==";
 
 function showApp(){
   document.getElementById('loginScreen').style.display = 'none';
@@ -185,7 +185,7 @@ function loginWithPin(){
   const pin = document.getElementById('pinCode').value.trim();
   const errorBox = document.getElementById('loginError');
 
-  if(pin === APP_PIN){
+  if(btoa(pin) === _p){
     errorBox.innerText = '';
     showApp();
   }else{
@@ -203,3 +203,12 @@ function logoutUser(){
 window.onload = function(){
   checkPinLogin();
 };
+
+
+/* basic hide */
+setInterval(()=>{
+  const devtoolsOpen = window.outerWidth - window.innerWidth > 160 || window.outerHeight - window.innerHeight > 160;
+  if(devtoolsOpen){
+    console.clear();
+  }
+},1000);
