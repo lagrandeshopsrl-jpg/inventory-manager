@@ -1,147 +1,185 @@
 
 let products = JSON.parse(localStorage.getItem('products') || '[]');
 
-if(products.length === 0){
-products = [
-{
-id: 1,
-barcode: '8005860854055',
-name: 'SILICONE TRASPARENTE ACETICO ML.280',
-supplier: '昌盛',
-purchasePrice: 1.6,
-salePrice: 3.0
-}
-];
-}
+const itemsPerPage = 100;
+let currentPage = 1;
+let allSelected = false;
 
 function saveStorage(){
-localStorage.setItem('products', JSON.stringify(products));
+    localStorage.setItem('products', JSON.stringify(products));
 }
 
 function renderProducts(){
 
-const search = document.getElementById('search').value.toLowerCase();
+    const search = document.getElementById('search').value.toLowerCase();
 
-const table = document.getElementById('productTable');
+    const table = document.getElementById('productTable');
 
-table.innerHTML = '';
+    table.innerHTML = '';
 
-const filtered = products.filter(p =>
-String(p.barcode || '').toLowerCase().includes(search) ||
-String(p.name || '').toLowerCase().includes(search) ||
-String(p.supplier || '').toLowerCase().includes(search)
-);
+    const filtered = products.filter(p =>
+        String(p.barcode || '').toLowerCase().includes(search) ||
+        String(p.name || '').toLowerCase().includes(search) ||
+        String(p.supplier || '').toLowerCase().includes(search)
+    );
 
-filtered.forEach(product => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
 
-const tr = document.createElement('tr');
+    if(currentPage > totalPages){
+        currentPage = totalPages;
+    }
 
-tr.innerHTML = `
-<td><input value="${product.barcode}" id="barcode-${product.id}"></td>
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
 
-<td><input value="${product.name}" id="name-${product.id}"></td>
+    const paginated = filtered.slice(start, end);
 
-<td><input value="${product.supplier}" id="supplier-${product.id}"></td>
+    paginated.forEach((p,index)=>{
 
-<td><input type="number" step="0.01" value="${product.purchasePrice}" id="purchase-${product.id}"></td>
+        table.innerHTML += `
+        <tr>
+            <td><input type="checkbox" class="product-checkbox" data-index="${start + index}"></td>
+            <td>${p.barcode || ''}</td>
+            <td>${p.name || ''}</td>
+            <td>${p.supplier || '-'}</td>
+            <td>${p.buyPrice || ''}</td>
+            <td>${p.sellPrice || ''}</td>
+            <td>
+                <div class="action-buttons">
+                    <button onclick="editProduct(${start + index})">Modifica</button>
+                    <button onclick="deleteProduct(${start + index})">Elimina</button>
+                </div>
+            </td>
+        </tr>
+        `;
+    });
 
-<td><input type="number" step="0.01" value="${product.salePrice}" id="sale-${product.id}"></td>
-
-<td>
-<div class="actions">
-<button class="save" onclick="saveEdit(${product.id})">Salva</button>
-<button class="delete" onclick="deleteProduct(${product.id})">Elimina</button>
-</div>
-</td>
-`;
-
-table.appendChild(tr);
-
-});
-
-saveStorage();
+    document.getElementById('pageInfo').innerText =
+        `Pagina ${currentPage} di ${totalPages}`;
 }
 
-function saveEdit(id){
+function editProduct(index){
 
-const product = products.find(p => p.id === id);
+    const p = products[index];
 
-product.barcode = document.getElementById(`barcode-${id}`).value;
-product.name = document.getElementById(`name-${id}`).value;
-product.supplier = document.getElementById(`supplier-${id}`).value;
-product.purchasePrice = parseFloat(document.getElementById(`purchase-${id}`).value) || 0;
-product.salePrice = parseFloat(document.getElementById(`sale-${id}`).value) || 0;
+    const nuovoBarcode = prompt('Barcode', p.barcode || '');
+    if(nuovoBarcode === null) return;
 
-saveStorage();
+    const nuovoNome = prompt('Nome prodotto', p.name || '');
+    if(nuovoNome === null) return;
 
-alert('Prodotto modificato correttamente');
+    const nuovoFornitore = prompt('Fornitore', p.supplier || '');
+    if(nuovoFornitore === null) return;
+
+    const nuovoAcquisto = prompt('Prezzo acquisto', p.buyPrice || '');
+    if(nuovoAcquisto === null) return;
+
+    const nuovoVendita = prompt('Prezzo vendita', p.sellPrice || '');
+    if(nuovoVendita === null) return;
+
+    products[index] = {
+        ...products[index],
+        barcode: nuovoBarcode,
+        name: nuovoNome,
+        supplier: nuovoFornitore,
+        buyPrice: nuovoAcquisto,
+        sellPrice: nuovoVendita
+    };
+
+    saveStorage();
+    renderProducts();
+
+    alert('Prodotto modificato!');
 }
 
-function deleteProduct(id){
+function deleteProduct(index){
 
-products = products.filter(p => p.id !== id);
+    if(confirm('Eliminare prodotto?')){
+        products.splice(index,1);
+        saveStorage();
+        renderProducts();
+    }
+}
 
-saveStorage();
+function toggleSelectProducts(){
 
-renderProducts();
+    allSelected = !allSelected;
+
+    document.querySelectorAll('.product-checkbox').forEach(cb=>{
+        cb.checked = allSelected;
+    });
+
+    document.getElementById('toggleSelectBtn').innerText =
+        allSelected ? 'Deseleziona prodotti' : 'Seleziona prodotti';
+}
+
+function deleteSelectedProducts(){
+
+    const selected = [];
+
+    document.querySelectorAll('.product-checkbox').forEach(cb=>{
+        if(cb.checked){
+            selected.push(parseInt(cb.dataset.index));
+        }
+    });
+
+    if(selected.length === 0){
+        alert('Nessun prodotto selezionato');
+        return;
+    }
+
+    if(confirm('Eliminare prodotti selezionati?')){
+
+        selected.sort((a,b)=>b-a);
+
+        selected.forEach(index=>{
+            products.splice(index,1);
+        });
+
+        saveStorage();
+        renderProducts();
+    }
+}
+
+function nextPage(){
+    currentPage++;
+    renderProducts();
+}
+
+function prevPage(){
+    if(currentPage > 1){
+        currentPage--;
+        renderProducts();
+    }
 }
 
 function exportCSV(){
 
-const headers = ['Barcode','Prodotto','Fornitore','Acquisto','Vendita'];
+    let csv = "Barcode,Prodotto,Fornitore,Acquisto,Vendita\n";
 
-const rows = products.map(p => [
-p.barcode,
-p.name,
-p.supplier,
-p.purchasePrice,
-p.salePrice
-]);
+    products.forEach(p=>{
+        csv += `${p.barcode || ''},${p.name || ''},${p.supplier || ''},${p.buyPrice || ''},${p.sellPrice || ''}\n`;
+    });
 
-const csv = [headers, ...rows]
-.map(r => r.join(','))
-.join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
 
-const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
 
-const link = document.createElement('a');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'prodotti.csv';
+    a.click();
 
-link.href = URL.createObjectURL(blob);
-link.download = 'prodotti.csv';
-link.click();
+    URL.revokeObjectURL(url);
 }
 
-function importExcel(event){
+window.onload = function(){
 
-const file = event.target.files[0];
+    renderProducts();
 
-const reader = new FileReader();
+    const search = document.getElementById('search');
 
-reader.onload = function(e){
-
-const data = new Uint8Array(e.target.result);
-
-const workbook = XLSX.read(data, {type:'array'});
-
-const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-const json = XLSX.utils.sheet_to_json(sheet);
-
-products = json.map((item,index) => ({
-id: Date.now() + index,
-barcode: item.Barcode || '',
-name: item.Prodotto || '',
-supplier: item.Fornitore || '',
-purchasePrice: Number(item.Acquisto || 0),
-salePrice: Number(item.Vendita || 0)
-}));
-
-saveStorage();
-
-renderProducts();
+    if(search){
+        search.focus();
+    }
 };
-
-reader.readAsArrayBuffer(file);
-}
-
-renderProducts();
