@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -5,38 +6,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestionale Negozio</title>
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>Gestionale Negozio</h1>
+<h1>Gestionale Negozio</h1>
 
-    <div class="form-box">
-        <input type="text" id="barcode" placeholder="Codice a barre">
-        <input type="text" id="name" placeholder="Nome prodotto">
-        <input type="number" id="buyPrice" placeholder="Prezzo acquisto">
-        <input type="number" id="sellPrice" placeholder="Prezzo vendita">
-        <input type="number" id="quantity" placeholder="Quantità">
-        <button onclick="addProduct()">Salva Prodotto</button>
-    </div>
+<div class="form-box">
+<input type="text" id="barcode" placeholder="Codice a barre">
+<input type="text" id="name" placeholder="Nome prodotto">
+<input type="number" id="buyPrice" placeholder="Prezzo acquisto">
+<input type="number" id="sellPrice" placeholder="Prezzo vendita">
+<input type="number" id="quantity" placeholder="Quantità">
+<button onclick="addProduct()">Salva Prodotto</button>
+</div>
 
-    <div class="actions">
-        <input type="text" id="search" placeholder="Cerca prodotto..." onkeyup="renderProducts()">
-        <button onclick="exportCSV()">Esporta CSV</button>
-    </div>
+<div class="actions">
+<input type="text" id="search" placeholder="Cerca prodotto..." onkeyup="renderProducts()">
+<button onclick="exportCSV()">Esporta CSV</button>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Barcode</th>
-                <th>Prodotto</th>
-                <th>Acquisto</th>
-                <th>Vendita</th>
-                <th>Quantità</th>
-                <th>Azioni</th>
-            </tr>
-        </thead>
-        <tbody id="productTable"></tbody>
-    </table>
+<label class="upload-btn">
+Importa Excel
+<input type="file" id="excelFile" accept=".xlsx,.csv" onchange="importExcel(event)">
+</label>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Barcode</th>
+<th>Prodotto</th>
+<th>Acquisto</th>
+<th>Vendita</th>
+<th>Quantità</th>
+<th>Azioni</th>
+</tr>
+</thead>
+<tbody id="productTable"></tbody>
+</table>
 </div>
 
 <script src="app.js"></script>
