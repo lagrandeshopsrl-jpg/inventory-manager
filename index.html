@@ -9,16 +9,20 @@
 <body>
 
 <div class="header">
-  <div>
-    <h1>Inventory Manager</h1>
-    <p>Gestionale Magazzino / 库存管理</p>
-  </div>
+  <h1>Inventory Manager</h1>
+  <p>Gestionale Magazzino / 库存管理</p>
 </div>
 
-<div class="content">
+<div class="toolbar">
+  <input type="text" id="search" placeholder="Cerca barcode o prodotto..." autofocus onkeyup="renderProducts()">
+  <button onclick="toggleSelectProducts()" id="toggleBtn">Seleziona prodotti</button>
+</div>
+
+<div class="table-wrap">
 <table>
 <thead>
 <tr>
+<th></th>
 <th>Barcode</th>
 <th>Prodotto</th>
 <th>Fornitore</th>
@@ -27,38 +31,39 @@
 <th>Azioni</th>
 </tr>
 </thead>
-<tbody id="tableBody"></tbody>
+<tbody id="productTable"></tbody>
 </table>
 </div>
 
-<div class="modal" id="editModal">
+<div id="editModal" class="modal">
 <div class="modal-box">
-<div class="top">
+
+<div class="modal-top">
 <div>
 <h2>Modifica Prodotto</h2>
 <p>编辑产品</p>
 </div>
-<button class="close" onclick="closeModal()">✕</button>
+<button class="close-btn" onclick="closeModal()">✕</button>
 </div>
 
 <label>Barcode / 条形码</label>
-<input id="barcode">
+<input id="editBarcode">
 
-<label>Nome Prodotto / 产品名称</label>
-<input id="name">
+<label>Nome prodotto / 产品名称</label>
+<input id="editName">
 
 <label>Fornitore / 供应商</label>
-<input id="supplier">
+<input id="editSupplier">
 
-<label>Prezzo Acquisto (€)</label>
-<input id="buy">
+<label>Prezzo acquisto (€)</label>
+<input id="editBuy">
 
-<label>Prezzo Vendita (€)</label>
-<input id="sell">
+<label>Prezzo vendita (€)</label>
+<input id="editSell">
 
-<div class="buttons">
+<div class="modal-buttons">
 <button onclick="closeModal()">Annulla</button>
-<button class="save" onclick="saveProduct()">Salva Modifiche</button>
+<button class="save-btn" onclick="saveEdit()">Salva Modifiche</button>
 </div>
 
 </div>

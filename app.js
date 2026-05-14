@@ -1,47 +1,66 @@
-
 let products = JSON.parse(localStorage.getItem('products') || '[]');
 
-if(products.length===0){
-products=[
-{barcode:'8005860854055',name:'PROSCIUTTO COTTO',supplier:'GranTerre',buyPrice:'12.50',sellPrice:'18.90'}
-];
-}
-
-let currentIndex = 0;
+let allSelected = false;
+let currentEdit = null;
 
 function saveStorage(){
-localStorage.setItem('products', JSON.stringify(products'));
+localStorage.setItem('products', JSON.stringify(products));
 }
 
-function render(){
+function renderProducts(){
 
-const body = document.getElementById('tableBody');
-body.innerHTML='';
+const search = document.getElementById('search').value.toLowerCase();
+const table = document.getElementById('productTable');
 
-products.forEach((p,index)=>{
-body.innerHTML += `
+table.innerHTML='';
+
+products.filter(p =>
+String(p.barcode||'').toLowerCase().includes(search) ||
+String(p.name||'').toLowerCase().includes(search) ||
+String(p.supplier||'').toLowerCase().includes(search)
+).forEach((p,index)=>{
+
+table.innerHTML += `
 <tr>
+<td><input type="checkbox" class="product-check"></td>
 <td>${p.barcode||''}</td>
 <td>${p.name||''}</td>
 <td>${p.supplier||''}</td>
 <td>${p.buyPrice||''}</td>
 <td>${p.sellPrice||''}</td>
-<td><button class="edit-btn" onclick="openModal(${index})">Modifica</button></td>
+<td>
+<button class="action-btn edit-btn" onclick="openModal(${index})">Modifica</button>
+<button class="action-btn delete-btn" onclick="deleteProduct(${index})">Elimina</button>
+</td>
 </tr>
 `;
+
 });
 }
 
+function toggleSelectProducts(){
+
+allSelected = !allSelected;
+
+document.querySelectorAll('.product-check').forEach(c=>{
+c.checked = allSelected;
+});
+
+document.getElementById('toggleBtn').innerText =
+allSelected ? 'Deseleziona prodotti' : 'Seleziona prodotti';
+}
+
 function openModal(index){
-currentIndex=index;
 
-const p=products[index];
+currentEdit = index;
 
-document.getElementById('barcode').value=p.barcode||'';
-document.getElementById('name').value=p.name||'';
-document.getElementById('supplier').value=p.supplier||'';
-document.getElementById('buy').value=p.buyPrice||'';
-document.getElementById('sell').value=p.sellPrice||'';
+const p = products[index];
+
+document.getElementById('editBarcode').value = p.barcode || '';
+document.getElementById('editName').value = p.name || '';
+document.getElementById('editSupplier').value = p.supplier || '';
+document.getElementById('editBuy').value = p.buyPrice || '';
+document.getElementById('editSell').value = p.sellPrice || '';
 
 document.getElementById('editModal').style.display='flex';
 }
@@ -50,18 +69,46 @@ function closeModal(){
 document.getElementById('editModal').style.display='none';
 }
 
-function saveProduct(){
+function saveEdit(){
 
-products[currentIndex].barcode=document.getElementById('barcode').value;
-products[currentIndex].name=document.getElementById('name').value;
-products[currentIndex].supplier=document.getElementById('supplier').value;
-products[currentIndex].buyPrice=document.getElementById('buy').value;
-products[currentIndex].sellPrice=document.getElementById('sell').value;
+products[currentEdit].barcode =
+document.getElementById('editBarcode').value;
 
-localStorage.setItem('products', JSON.stringify(products));
+products[currentEdit].name =
+document.getElementById('editName').value;
 
-render();
+products[currentEdit].supplier =
+document.getElementById('editSupplier').value;
+
+products[currentEdit].buyPrice =
+document.getElementById('editBuy').value;
+
+products[currentEdit].sellPrice =
+document.getElementById('editSell').value;
+
+saveStorage();
+renderProducts();
 closeModal();
+
+alert('Prodotto modificato!');
 }
 
-window.onload=render;
+function deleteProduct(index){
+
+if(confirm('Eliminare prodotto?')){
+
+products.splice(index,1);
+
+saveStorage();
+
+renderProducts();
+}
+}
+
+window.onload = function(){
+
+renderProducts();
+
+document.getElementById('search').focus();
+
+};

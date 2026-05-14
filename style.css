@@ -1,47 +1,77 @@
-
 body{
 font-family:Arial,sans-serif;
-background:#f4f6fb;
+background:#f4f7fc;
 margin:0;
 padding:20px;
 }
 .header{
-background:linear-gradient(90deg,#004dff,#005eff);
-padding:20px;
-border-radius:18px;
+background:linear-gradient(90deg,#005eff,#0a63ff);
+padding:22px;
+border-radius:20px;
 color:white;
 margin-bottom:20px;
 }
-.content{
+.toolbar{
+display:flex;
+gap:10px;
+margin-bottom:20px;
+}
+.toolbar input{
+flex:1;
+padding:14px;
+border-radius:14px;
+border:1px solid #ddd;
+font-size:16px;
+}
+.toolbar button{
+background:#0a63ff;
+color:white;
+border:none;
+padding:14px 18px;
+border-radius:14px;
+cursor:pointer;
+}
+.table-wrap{
 background:white;
-border-radius:18px;
-overflow:hidden;
+border-radius:22px;
+overflow:auto;
 box-shadow:0 4px 20px rgba(0,0,0,0.08);
 }
 table{
 width:100%;
 border-collapse:collapse;
 }
+th{
+background:#f2f5fb;
+}
 th,td{
 padding:16px;
 border-bottom:1px solid #eee;
 text-align:center;
 }
-.edit-btn{
-background:#005eff;
-color:white;
-border:none;
+.action-btn{
 padding:10px 14px;
+border:none;
 border-radius:10px;
 cursor:pointer;
+margin:2px;
+}
+.edit-btn{
+background:#0a63ff;
+color:white;
+}
+.delete-btn{
+background:#ff4d4f;
+color:white;
 }
 .modal{
 display:none;
 position:fixed;
 inset:0;
-background:rgba(0,0,0,0.4);
+background:rgba(0,0,0,0.45);
 justify-content:center;
 align-items:center;
+z-index:999;
 }
 .modal-box{
 background:white;
@@ -52,32 +82,34 @@ padding:24px;
 display:flex;
 flex-direction:column;
 gap:12px;
+box-shadow:0 10px 40px rgba(0,0,0,0.15);
 }
-.top{
+.modal-top{
 display:flex;
 justify-content:space-between;
 align-items:center;
 }
-.close{
+.close-btn{
 border:none;
 background:#f2f2f2;
 width:42px;
 height:42px;
 border-radius:50%;
 cursor:pointer;
+font-size:18px;
 }
-input{
+.modal-box input{
 padding:14px;
-border:1px solid #ddd;
 border-radius:14px;
+border:1px solid #ddd;
 font-size:16px;
 }
-.buttons{
+.modal-buttons{
 display:flex;
-gap:12px;
+gap:10px;
 margin-top:10px;
 }
-.buttons button{
+.modal-buttons button{
 flex:1;
 padding:14px;
 border:none;
@@ -85,7 +117,7 @@ border-radius:14px;
 cursor:pointer;
 font-size:16px;
 }
-.save{
-background:#005eff;
+.save-btn{
+background:#0a63ff;
 color:white;
 }
