@@ -8,6 +8,7 @@ function saveStorage(){
 function clearInputs(){
     document.getElementById('barcode').value = '';
     document.getElementById('name').value = '';
+    document.getElementById('supplier').value = '';
     document.getElementById('buyPrice').value = '';
     document.getElementById('sellPrice').value = '';
     document.getElementById('quantity').value = '';
@@ -18,6 +19,7 @@ function saveProduct(){
     const product = {
         barcode: document.getElementById('barcode').value.trim(),
         name: document.getElementById('name').value.trim(),
+        supplier: document.getElementById('supplier').value.trim(),
         buyPrice: document.getElementById('buyPrice').value,
         sellPrice: document.getElementById('sellPrice').value,
         quantity: document.getElementById('quantity').value
@@ -46,6 +48,7 @@ function editProduct(index){
 
     document.getElementById('barcode').value = p.barcode;
     document.getElementById('name').value = p.name;
+    document.getElementById('supplier').value = p.supplier || '';
     document.getElementById('buyPrice').value = p.buyPrice;
     document.getElementById('sellPrice').value = p.sellPrice;
     document.getElementById('quantity').value = p.quantity;
@@ -74,7 +77,8 @@ function renderProducts(){
 
     const filtered = products.filter(p =>
         String(p.barcode).toLowerCase().includes(search) ||
-        String(p.name).toLowerCase().includes(search)
+        String(p.name).toLowerCase().includes(search) ||
+        String(p.supplier || '').toLowerCase().includes(search)
     );
 
     filtered.forEach((p,index)=>{
@@ -83,6 +87,7 @@ function renderProducts(){
         <tr>
             <td>${p.barcode}</td>
             <td>${p.name}</td>
+            <td>${p.supplier || '-'}</td>
             <td>${p.buyPrice}</td>
             <td>${p.sellPrice}</td>
             <td>${p.quantity}</td>
@@ -99,10 +104,10 @@ function renderProducts(){
 
 function exportCSV(){
 
-    let csv = "Barcode,Prodotto,Acquisto,Vendita,Quantita\n";
+    let csv = "Barcode,Prodotto,Fornitore,Acquisto,Vendita,Quantita\n";
 
     products.forEach(p=>{
-        csv += `${p.barcode},${p.name},${p.buyPrice},${p.sellPrice},${p.quantity}\n`;
+        csv += `${p.barcode},${p.name},${p.supplier || ''},${p.buyPrice},${p.sellPrice},${p.quantity}\n`;
     });
 
     const blob = new Blob([csv], {type:'text/csv'});
@@ -143,6 +148,7 @@ function importExcel(event){
             products.push({
                 barcode: row.Barcode || row.barcode || '',
                 name: row.Prodotto || row.prodotto || row.Name || '',
+                supplier: row.Fornitore || row.supplier || '',
                 buyPrice: row.Acquisto || row.buyPrice || '',
                 sellPrice: row.Vendita || row.sellPrice || '',
                 quantity: row.Quantita || row.quantity || ''
