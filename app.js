@@ -251,7 +251,7 @@ setInterval(installClearSearchOnClick, 500);
 document.addEventListener('DOMContentLoaded', installClearSearchOnClick);
 
 
-/* ===== DROPBOX LOCAL BACKUP ===== */
+/* ===== DROPBOX BACKUP ===== */
 
 function backupDropbox(){
 
@@ -281,12 +281,11 @@ function backupDropbox(){
 
   document.body.removeChild(a);
 
-  setCloudStatus('☁ Backup Dropbox creato','ok');
-
   alert('Backup Dropbox creato!');
 }
 
 function restoreDropbox(){
+
   document
     .getElementById('restoreDropboxFile')
     .click();
@@ -321,11 +320,6 @@ function loadDropboxBackup(event){
       );
 
       renderProducts();
-
-      setCloudStatus(
-        '☁ Backup Dropbox ripristinato',
-        'ok'
-      );
 
       alert(
         'Backup Dropbox ripristinato!\n\n' +
