@@ -3,6 +3,7 @@ let products = JSON.parse(localStorage.getItem('products') || '[]');
 
 const itemsPerPage = 100;
 let currentPage = 1;
+let editingIndex = -1;
 
 function saveStorage(){
     localStorage.setItem('products', JSON.stringify(products));
@@ -37,7 +38,7 @@ function renderProducts(){
 
         table.innerHTML += `
         <tr>
-            <td><input type="checkbox" class="product-checkbox"></td>
+            <td><input type="checkbox" class="product-checkbox" data-index="${start + index}"></td>
             <td>${p.barcode}</td>
             <td>${p.name}</td>
             <td>${p.supplier || '-'}</td>
@@ -46,6 +47,7 @@ function renderProducts(){
             <td>${p.quantity || ''}</td>
             <td>
                 <div class="action-buttons">
+                    <button onclick="editProduct(${start + index})">Modifica</button>
                     <button onclick="deleteProduct(${start + index})">Elimina</button>
                 </div>
             </td>
@@ -55,6 +57,27 @@ function renderProducts(){
 
     document.getElementById('pageInfo').innerText =
         `Pagina ${currentPage} di ${totalPages}`;
+}
+
+function editProduct(index){
+
+    const p = products[index];
+
+    const nuovoNome = prompt("Modifica nome prodotto", p.name);
+    if(nuovoNome === null) return;
+
+    const nuovoPrezzo = prompt("Modifica prezzo vendita", p.sellPrice);
+    if(nuovoPrezzo === null) return;
+
+    const nuovaQuantita = prompt("Modifica quantità", p.quantity);
+    if(nuovaQuantita === null) return;
+
+    products[index].name = nuovoNome;
+    products[index].sellPrice = nuovoPrezzo;
+    products[index].quantity = nuovaQuantita;
+
+    saveStorage();
+    renderProducts();
 }
 
 function deleteProduct(index){
@@ -71,6 +94,34 @@ function selectAllProducts(){
     document.querySelectorAll('.product-checkbox').forEach(cb=>{
         cb.checked = true;
     });
+}
+
+function deleteSelectedProducts(){
+
+    const selected = [];
+
+    document.querySelectorAll('.product-checkbox').forEach(cb=>{
+        if(cb.checked){
+            selected.push(parseInt(cb.dataset.index));
+        }
+    });
+
+    if(selected.length === 0){
+        alert('Nessun prodotto selezionato');
+        return;
+    }
+
+    if(confirm('Eliminare i prodotti selezionati?')){
+
+        selected.sort((a,b)=>b-a);
+
+        selected.forEach(index=>{
+            products.splice(index,1);
+        });
+
+        saveStorage();
+        renderProducts();
+    }
 }
 
 function nextPage(){
