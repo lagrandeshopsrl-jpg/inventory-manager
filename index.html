@@ -6,7 +6,6 @@
   <title>Inventory Manager</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div id="appRoot" class="app-root">
@@ -36,8 +35,9 @@
           <p id="pageSubtitle">Gestionale Magazzino / 库存管理</p>
         </div>
         <div class="top-actions">
-          <span id="cloudStatus" class="cloud-status">☁ Cloud...</span>
-          <button tabindex="-1" class="blue-btn" onclick="syncNow()">Sincronizza</button>
+          <span id="cloudStatus" class="cloud-status">☁ Dropbox...</span>
+          <button tabindex="-1" class="blue-btn" onclick="syncNow()">☁ Sincronizza Dropbox</button>
+          <button tabindex="-1" class="blue-btn" onclick="setDropboxToken()">Token Dropbox</button>
           <button tabindex="-1" class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button>
         </div>
       </div>
@@ -115,18 +115,5 @@
   </div>
 
   <script src="app.js"></script>
-<script src="dropbox-sync.js"></script>
-
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll('input').forEach(inp => {
-    inp.addEventListener('focus', () => {
-      inp.select();
-      inp.value = '';
-    });
-  });
-});
-</script>
-
 </body>
 </html>

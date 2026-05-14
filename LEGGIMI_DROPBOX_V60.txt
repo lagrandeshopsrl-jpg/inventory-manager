@@ -1,0 +1,7 @@
+Versione corretta:
+- Base: inventory manager v60 originale con sidebar/scanner.
+- Rimosso Supabase dalla sincronizzazione.
+- Aggiunta sincronizzazione Dropbox senza sostituire l'interfaccia.
+- Il pulsante in alto è: ☁ Sincronizza Dropbox.
+- Al primo uso clicca Token Dropbox e incolla il token.
+- Se la pagina online mostra ancora 'Inventory Manager Dropbox', GitHub/Vercel sta ancora pubblicando i vecchi file: sostituire index.html, app.js e style.css con quelli di questo ZIP.
