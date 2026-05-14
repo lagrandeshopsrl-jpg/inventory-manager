@@ -4,27 +4,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestionale Negozio</title>
+<title>Inventory Manager</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="container">
-
-<h1>Gestionale Negozio</h1>
-
-<div class="topbar">
-<input type="text" id="search" placeholder="Cerca barcode o prodotto..." autofocus onkeyup="renderProducts()">
-
-<button onclick="toggleSelectProducts()" id="toggleSelectBtn">
-Seleziona prodotti
-</button>
-
-<button onclick="deleteSelectedProducts()">
-Elimina selezionati
-</button>
+<div class="header">
+    <h1>Inventory Manager</h1>
+    <p>Gestionale Prodotti</p>
 </div>
 
+<div class="toolbar">
+    <input type="text" id="search" placeholder="Cerca barcode o prodotto..." onkeyup="renderProducts()" autofocus>
+    <button onclick="toggleSelectProducts()" id="toggleBtn">Seleziona prodotti</button>
+</div>
+
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -37,44 +32,36 @@ Elimina selezionati
 <th>Azioni</th>
 </tr>
 </thead>
-
 <tbody id="productTable"></tbody>
 </table>
-
-<div class="pagination">
-<button onclick="prevPage()">⬅ Precedente</button>
-<span id="pageInfo"></span>
-<button onclick="nextPage()">Successiva ➡</button>
-</div>
-
 </div>
 
 <div id="editModal" class="modal">
+    <div class="modal-box">
+        <h2>Modifica Prodotto</h2>
 
-<div class="modal-content">
+        <label>Barcode</label>
+        <input id="editBarcode">
 
-<h2>Modifica Prodotto</h2>
+        <label>Nome prodotto</label>
+        <input id="editName">
 
-<input id="editBarcode" placeholder="Barcode">
+        <label>Fornitore</label>
+        <input id="editSupplier">
 
-<input id="editName" placeholder="Nome prodotto">
+        <label>Prezzo acquisto</label>
+        <input id="editBuy">
 
-<input id="editSupplier" placeholder="Fornitore">
+        <label>Prezzo vendita</label>
+        <input id="editSell">
 
-<input id="editBuy" placeholder="Prezzo acquisto">
-
-<input id="editSell" placeholder="Prezzo vendita">
-
-<div class="modal-buttons">
-<button onclick="closeEditModal()">Annulla</button>
-<button onclick="saveEditProduct()">Salva Modifiche</button>
-</div>
-
-</div>
-
+        <div class="modal-buttons">
+            <button class="cancel-btn" onclick="closeModal()">Annulla</button>
+            <button class="save-btn" onclick="saveEdit()">Salva Modifiche</button>
+        </div>
+    </div>
 </div>
 
 <script src="app.js"></script>
-
 </body>
 </html>
