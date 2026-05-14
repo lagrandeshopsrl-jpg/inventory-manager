@@ -99,10 +99,10 @@ function logoutUser(){ showProducts(); }
 
 
 
-/* ===== SCANNER BARCODE AUTO FOCUS ===== */
 
-function scannerFocus(){
-  const search = document.getElementById('search');
+/* ===== BARCODE SEARCH: PRIMO CAMPO SEMPRE ATTIVO ===== */
+function focusBarcodeSearch(){
+  const s = document.getElementById('search');
   const editModal = document.getElementById('editModal');
   const newModal = document.getElementById('newProductModal');
 
@@ -110,112 +110,58 @@ function scannerFocus(){
     (editModal && editModal.style.display === 'flex') ||
     (newModal && newModal.style.display === 'flex');
 
-  if(search && !modalOpen){
-    if(document.activeElement !== search){
-      search.focus();
-    }
-  }
-}
-
-// focus after every render
-const __oldRenderProducts = renderProducts;
-renderProducts = function(){
-  __oldRenderProducts();
-  setTimeout(scannerFocus, 50);
-  setTimeout(scannerFocus, 200);
-};
-
-// focus after sync
-const __oldSyncNow = syncNow;
-syncNow = async function(){
-  await __oldSyncNow();
-  setTimeout(scannerFocus, 50);
-  setTimeout(scannerFocus, 300);
-  setTimeout(scannerFocus, 1000);
-};
-
-// keep scanner focus alive continuously
-setInterval(() => {
-  scannerFocus();
-}, 1200);
-
-// startup
-
-
-
-
-
-
-
-/* ===== SCANNER BARCODE DEFINITIVO: cattura globale ===== */
-let scannerBuffer = "";
-let scannerTimer = null;
-
-function modalIsOpen(){
-  const editModal = document.getElementById('editModal');
-  const newModal = document.getElementById('newProductModal');
-  return (editModal && editModal.style.display === 'flex') ||
-         (newModal && newModal.style.display === 'flex');
-}
-
-function barcodeSearchFocus(){
-  const s = document.getElementById('search');
-  if(s && !modalIsOpen()){
+  if(s && !modalOpen){
     s.focus({preventScroll:true});
   }
 }
 
-function setSearchValueFromScanner(value){
-  const s = document.getElementById('search');
-  if(!s) return;
-  s.value = value;
-  currentPage = 1;
-  renderProducts();
-  barcodeSearchFocus();
-}
+const _renderProductsOriginal = renderProducts;
+renderProducts = function(){
+  _renderProductsOriginal();
+  setTimeout(focusBarcodeSearch, 0);
+  setTimeout(focusBarcodeSearch, 100);
+};
 
+const _showProductsOriginal = showProducts;
+showProducts = function(){
+  _showProductsOriginal();
+  setTimeout(focusBarcodeSearch, 0);
+  setTimeout(focusBarcodeSearch, 200);
+};
+
+const _syncNowOriginal = syncNow;
+syncNow = async function(){
+  await _syncNowOriginal();
+  setTimeout(focusBarcodeSearch, 0);
+  setTimeout(focusBarcodeSearch, 300);
+};
+
+/* Se lo scanner scrive quando il focus è altrove, rimanda i tasti al campo barcode */
 document.addEventListener('keydown', function(e){
-  if(modalIsOpen()) return;
-
   const s = document.getElementById('search');
   if(!s) return;
 
-  // Se scanner manda Invio, completa la lettura
-  if(e.key === 'Enter'){
-    if(scannerBuffer){
-      e.preventDefault();
-      setSearchValueFromScanner(scannerBuffer);
-      scannerBuffer = "";
-    }
-    barcodeSearchFocus();
-    return;
-  }
+  const editModal = document.getElementById('editModal');
+  const newModal = document.getElementById('newProductModal');
+  const modalOpen =
+    (editModal && editModal.style.display === 'flex') ||
+    (newModal && newModal.style.display === 'flex');
 
-  // Se è un carattere normale da scanner/tastiera
-  if(e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey){
-    // cattura anche se il cursore non è nel campo
-    if(document.activeElement !== s){
-      e.preventDefault();
-      scannerBuffer += e.key;
+  if(modalOpen) return;
 
-      clearTimeout(scannerTimer);
-      scannerTimer = setTimeout(() => {
-        if(scannerBuffer){
-          setSearchValueFromScanner(scannerBuffer);
-          scannerBuffer = "";
-        }
-      }, 120);
-    }
+  if(document.activeElement !== s && e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey){
+    e.preventDefault();
+    s.focus({preventScroll:true});
+    s.value += e.key;
+    currentPage = 1;
+    renderProducts();
   }
 }, true);
 
-// Focus continuo leggero, ma non disturba modali modifica/nuovo prodotto
-setInterval(barcodeSearchFocus, 700);
-
 window.onload = function(){
   showProducts();
-  syncNow();
-  setTimeout(barcodeSearchFocus, 100);
-  setTimeout(barcodeSearchFocus, 500);
-  setTimeout(barcodeSearchFocus, 1200);
+  setTimeout(focusBarcodeSearch, 50);
+  setTimeout(syncNow, 150);
+  setTimeout(focusBarcodeSearch, 500);
+  setTimeout(focusBarcodeSearch, 1200);
 };
