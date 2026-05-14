@@ -45,13 +45,7 @@
         <table>
           <thead>
             <tr>
-              <th></th>
-              <th>Barcode</th>
-              <th>Prodotto</th>
-              <th>Fornitore</th>
-              <th>Acquisto</th>
-              <th>Vendita</th>
-              <th>Azioni</th>
+              <th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Azioni</th>
             </tr>
           </thead>
           <tbody id="productTable"></tbody>
@@ -70,7 +64,6 @@
         <input id="supplierSearch" placeholder="Cerca fornitore..." oninput="renderSupplierFolders()">
         <button onclick="showProducts()">Torna ai prodotti</button>
       </div>
-
       <div id="supplierStats" class="supplier-stats"></div>
       <div id="supplierFolders" class="supplier-folders"></div>
       <div id="supplierDetail" class="supplier-detail hidden"></div>
@@ -78,12 +71,10 @@
 
     <section id="historyPage" class="hidden">
       <div class="history-top">
-        <input id="historySearch" placeholder="Cerca nella cronologia..." oninput="renderHistory()">
-        <button onclick="clearHistory()">Svuota cronologia</button>
+        <input id="historySearch" placeholder="Cerca importazione..." oninput="renderImportSessions()">
+        <button onclick="clearImportSessions()">Svuota cronologia</button>
       </div>
-      
-<div id="importSessionsList" class="import-sessions-list"></div>
-<div id="historyList" class="history-list"></div>
+      <div id="importSessionsList" class="import-sessions-list"></div>
     </section>
   </main>
 </div>
@@ -91,123 +82,28 @@
 <div id="editModal" class="modal-overlay">
   <div class="edit-box">
     <button class="close-btn" onclick="closeEditModal()">×</button>
-
-    <div class="edit-title">
-      <div class="big-icon">✎</div>
-      <div>
-        <h2>Modifica Prodotto</h2>
-        <p>编辑产品</p>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">▥</div>
-      <div class="field">
-        <label>Barcode / 条形码</label>
-        <div class="modern-input"><input id="editBarcode" type="text"><span>✓</span></div>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">Aa</div>
-      <div class="field">
-        <label>Nome Prodotto / 产品名称</label>
-        <div class="modern-input"><input id="editName" type="text"><span>✓</span></div>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">♟</div>
-      <div class="field">
-        <label>Fornitore / 供应商</label>
-        <div class="modern-input"><input id="editSupplier" type="text"><span>⌄</span></div>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">€</div>
-      <div class="field">
-        <label>Prezzo Acquisto (€) / 进货价</label>
-        <div class="modern-input"><input id="editBuy" type="number" step="0.01" inputmode="decimal"></div>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">◆</div>
-      <div class="field">
-        <label>Prezzo Vendita (€) / 售价</label>
-        <div class="modern-input"><input id="editSell" type="number" step="0.01" inputmode="decimal"></div>
-      </div>
-    </div>
-
+    <div class="edit-title"><div class="big-icon">✎</div><div><h2>Modifica Prodotto</h2><p>编辑产品</p></div></div>
+    <div class="edit-row"><div class="left-icon">▥</div><div class="field"><label>Barcode / 条形码</label><div class="modern-input"><input id="editBarcode"><span>✓</span></div></div></div>
+    <div class="edit-row"><div class="left-icon">Aa</div><div class="field"><label>Nome Prodotto / 产品名称</label><div class="modern-input"><input id="editName"><span>✓</span></div></div></div>
+    <div class="edit-row"><div class="left-icon">♟</div><div class="field"><label>Fornitore / 供应商</label><div class="modern-input"><input id="editSupplier"><span>⌄</span></div></div></div>
+    <div class="edit-row"><div class="left-icon">€</div><div class="field"><label>Prezzo Acquisto (€) / 进货价</label><div class="modern-input"><input id="editBuy" type="number" step="0.01" inputmode="decimal"></div></div></div>
+    <div class="edit-row"><div class="left-icon">◆</div><div class="field"><label>Prezzo Vendita (€) / 售价</label><div class="modern-input"><input id="editSell" type="number" step="0.01" inputmode="decimal"></div></div></div>
     <div class="info">ⓘ Modifica i campi e premi Salva per aggiornare</div>
-
-    <div class="modal-actions">
-      <button class="cancel" onclick="closeEditModal()">Annulla</button>
-      <button class="save" onclick="saveEditProduct()">▣ Salva Modifiche</button>
-    </div>
+    <div class="modal-actions"><button class="cancel" onclick="closeEditModal()">Annulla</button><button class="save" onclick="saveEditProduct()">▣ Salva Modifiche</button></div>
   </div>
 </div>
-
 
 <div id="newProductModal" class="modal-overlay">
   <div class="edit-box">
     <button class="close-btn" onclick="closeNewProductModal()">×</button>
-
-    <div class="edit-title">
-      <div class="big-icon">＋</div>
-      <div>
-        <h2>Nuovo Prodotto</h2>
-        <p>新增产品</p>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">▥</div>
-      <div class="field">
-        <label>Barcode / 条形码</label>
-        <div class="modern-input"><input id="newBarcode" type="text"><span>✓</span></div>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">Aa</div>
-      <div class="field">
-        <label>Nome Prodotto / 产品名称</label>
-        <div class="modern-input"><input id="newName" type="text"><span>✓</span></div>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">♟</div>
-      <div class="field">
-        <label>Fornitore / 供应商</label>
-        <div class="modern-input"><input id="newSupplier" type="text"><span>⌄</span></div>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">€</div>
-      <div class="field">
-        <label>Prezzo Acquisto (€) / 进货价</label>
-        <div class="modern-input"><input id="newBuy" type="number" step="0.01" inputmode="decimal"></div>
-      </div>
-    </div>
-
-    <div class="edit-row">
-      <div class="left-icon">◆</div>
-      <div class="field">
-        <label>Prezzo Vendita (€) / 售价</label>
-        <div class="modern-input"><input id="newSell" type="number" step="0.01" inputmode="decimal"></div>
-      </div>
-    </div>
-
+    <div class="edit-title"><div class="big-icon">＋</div><div><h2>Nuovo Prodotto</h2><p>新增产品</p></div></div>
+    <div class="edit-row"><div class="left-icon">▥</div><div class="field"><label>Barcode / 条形码</label><div class="modern-input"><input id="newBarcode"><span>✓</span></div></div></div>
+    <div class="edit-row"><div class="left-icon">Aa</div><div class="field"><label>Nome Prodotto / 产品名称</label><div class="modern-input"><input id="newName"><span>✓</span></div></div></div>
+    <div class="edit-row"><div class="left-icon">♟</div><div class="field"><label>Fornitore / 供应商</label><div class="modern-input"><input id="newSupplier"><span>⌄</span></div></div></div>
+    <div class="edit-row"><div class="left-icon">€</div><div class="field"><label>Prezzo Acquisto (€) / 进货价</label><div class="modern-input"><input id="newBuy" type="number" step="0.01" inputmode="decimal"></div></div></div>
+    <div class="edit-row"><div class="left-icon">◆</div><div class="field"><label>Prezzo Vendita (€) / 售价</label><div class="modern-input"><input id="newSell" type="number" step="0.01" inputmode="decimal"></div></div></div>
     <div class="info">ⓘ Compila i campi e premi Salva per aggiungere il prodotto</div>
-
-    <div class="modal-actions">
-      <button class="cancel" onclick="closeNewProductModal()">Annulla</button>
-      <button class="save" onclick="saveNewProduct()">▣ Salva Prodotto</button>
-    </div>
+    <div class="modal-actions"><button class="cancel" onclick="closeNewProductModal()">Annulla</button><button class="save" onclick="saveNewProduct()">▣ Salva Prodotto</button></div>
   </div>
 </div>
 
