@@ -24,8 +24,6 @@ function setCloudStatus(text,type=''){ const el=document.getElementById('cloudSt
 function rowToProduct(r){ return { barcode:String(r?.barcode||''), name:String(r?.name||''), supplier:String(r?.supplier||''), buyPrice:String(r?.buy_price||''), sellPrice:String(r?.sell_price||''), prodotto:String(r?.name||''), fornitore:String(r?.supplier||''), acquisto:String(r?.buy_price||''), vendita:String(r?.sell_price||'') }; }
 function productToRow(p){ return { barcode:String(getBarcode(p)||''), name:String(getName(p)||''), supplier:String(getSupplier(p)||''), buy_price:String(getBuy(p)||''), sell_price:String(getSell(p)||''), updated_at:new Date().toISOString() }; }
 
-
-
 function setActive(view){ document.getElementById('menuProducts')?.classList.toggle('active',view==='products'); document.getElementById('menuSuppliers')?.classList.toggle('active',view==='suppliers'); document.getElementById('menuHistory')?.classList.toggle('active',view==='history'); }
 function showProducts(){ currentView='products'; setActive('products'); document.getElementById('pageTitle').innerText='Gestione Prodotti'; document.getElementById('pageSubtitle').innerText='Gestionale Magazzino / 库存管理'; document.getElementById('productsPage').classList.remove('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderProducts(); }
 function showSuppliers(){ currentView='suppliers'; setActive('suppliers'); document.getElementById('pageTitle').innerText='Fornitori'; document.getElementById('pageSubtitle').innerText='Cartelle fornitori / 供应商文件夹'; document.getElementById('productsPage').classList.add('hidden'); document.getElementById('suppliersPage').classList.remove('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderSupplierFolders(); }
@@ -96,11 +94,6 @@ async function importExcel(event){ const file=event.target.files[0]; if(!file)re
 
 
 
-
-/* ===== NO LOGIN VERSION ===== */
-function logoutUser(){
-  showProducts();
-}
-
+function logoutUser(){ showProducts(); }
 
 window.onload = function(){ showProducts(); syncNow(); };
