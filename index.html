@@ -14,30 +14,19 @@
 <h1>Gestionale Negozio</h1>
 
 <div class="topbar">
-<input type="text" id="search" placeholder="Cerca barcode o prodotto..." autofocus onkeyup="renderProducts()">
+<input type="text" id="search" placeholder="Cerca barcode o prodotto..." onkeyup="renderProducts()">
 
-<button onclick="toggleSelectProducts()" id="toggleSelectBtn">
-Seleziona prodotti
-</button>
-
-<button onclick="deleteSelectedProducts()">
-Elimina selezionati
-</button>
-
-<button onclick="exportCSV()">
-Esporta CSV
-</button>
+<button onclick="exportCSV()">Esporta CSV</button>
 
 <label class="upload-btn">
 Importa Excel
-<input type="file" accept=".xlsx,.csv" onchange="importExcel(event)">
+<input type="file" accept=".xlsx,.xls" onchange="importExcel(event)">
 </label>
 </div>
 
 <table>
 <thead>
 <tr>
-<th></th>
 <th>Barcode</th>
 <th>Prodotto</th>
 <th>Fornitore</th>
@@ -50,14 +39,6 @@ Importa Excel
 <tbody id="productTable"></tbody>
 
 </table>
-
-<div class="pagination">
-<button onclick="prevPage()">⬅ Precedente</button>
-
-<span id="pageInfo"></span>
-
-<button onclick="nextPage()">Successiva ➡</button>
-</div>
 
 </div>
 
