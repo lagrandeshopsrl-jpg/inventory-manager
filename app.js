@@ -826,3 +826,215 @@ importExcel = function(event){
 
   originalImportExcelV31(event);
 };
+
+
+/* ===== CRONOLOGIA DEFINITIVA: SUDDIVISA PER OGNI IMPORTAZIONE ===== */
+if(typeof importSessions === 'undefined'){
+  var importSessions = JSON.parse(localStorage.getItem('importSessions') || '[]');
+}
+
+function saveImportSessions(){
+  localStorage.setItem('importSessions', JSON.stringify(importSessions));
+}
+
+function createImportSession(fileName, importedProducts){
+  if(!importedProducts || importedProducts.length === 0) return;
+
+  const session = {
+    id: 'imp_' + Date.now(),
+    fileName: fileName || 'Importazione',
+    time: new Date().toISOString(),
+    products: importedProducts.map(p=>({
+      barcode: getBarcode(p),
+      name: getName(p),
+      supplier: getSupplier(p),
+      buyPrice: getBuy(p),
+      sellPrice: getSell(p)
+    }))
+  };
+
+  importSessions.unshift(session);
+  saveImportSessions();
+}
+
+function renderImportSessions(){
+  const box = document.getElementById('importSessionsList');
+  if(!box) return;
+
+  if(importSessions.length === 0){
+    box.innerHTML = `
+      <div class="import-session">
+        <div class="import-session-header">
+          <div>
+            <div class="import-session-title">Nessuna importazione salvata</div>
+            <div class="import-session-meta">Le prossime importazioni compariranno qui come cartelle.</div>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="import-sessions-title">📁 Importazioni</div>
+    ${importSessions.map(session=>`
+      <div class="import-session">
+        <div class="import-session-header">
+          <div>
+            <div class="import-session-title">📁 ${session.fileName || 'Importazione'}</div>
+            <div class="import-session-meta">
+              ${formatDateIT(session.time)} ${formatTimeIT(session.time)} · ${session.products.length} prodotti
+            </div>
+          </div>
+          <div class="import-session-actions">
+            <button class="session-open" onclick="toggleImportSession('${session.id}')">Apri / Chiudi</button>
+            <button class="session-delete" onclick="deleteWholeImportSession('${session.id}')">Elimina importazione</button>
+          </div>
+        </div>
+
+        <div class="import-session-body" id="body-${session.id}">
+          <div class="import-selected-actions">
+            <button onclick="selectImportProducts('${session.id}')">Seleziona tutti</button>
+            <button onclick="deselectImportProducts('${session.id}')">Deseleziona</button>
+            <button class="danger" onclick="deleteSelectedImportProducts('${session.id}')">Elimina selezionati</button>
+          </div>
+
+          <table class="import-products-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Barcode</th>
+                <th>Prodotto</th>
+                <th>Fornitore</th>
+                <th>Acquisto</th>
+                <th>Vendita</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${session.products.map(p=>`
+                <tr>
+                  <td><input type="checkbox" class="import-check-${session.id}" data-barcode="${p.barcode}"></td>
+                  <td>${p.barcode || ''}</td>
+                  <td>${p.name || ''}</td>
+                  <td>${p.supplier || ''}</td>
+                  <td>${p.buyPrice || ''}</td>
+                  <td>${p.sellPrice || ''}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function toggleImportSession(id){
+  const body = document.getElementById('body-' + id);
+  if(!body) return;
+  body.style.display = body.style.display === 'block' ? 'none' : 'block';
+}
+
+function selectImportProducts(id){
+  document.querySelectorAll('.import-check-' + id).forEach(cb=>cb.checked=true);
+}
+
+function deselectImportProducts(id){
+  document.querySelectorAll('.import-check-' + id).forEach(cb=>cb.checked=false);
+}
+
+function deleteProductsByBarcodes(barcodes){
+  const set = new Set(barcodes.map(b=>String(b)));
+  products = products.filter(p => !set.has(String(getBarcode(p))));
+  saveStorage();
+}
+
+function deleteWholeImportSession(id){
+  const session = importSessions.find(s=>s.id===id);
+  if(!session) return;
+
+  if(confirm('Eliminare TUTTI i prodotti di questa importazione?')){
+    deleteProductsByBarcodes(session.products.map(p=>p.barcode));
+    importSessions = importSessions.filter(s=>s.id!==id);
+    saveImportSessions();
+    renderImportSessions();
+    if(currentView === 'products') renderProducts();
+  }
+}
+
+function deleteSelectedImportProducts(id){
+  const selected = [];
+  document.querySelectorAll('.import-check-' + id).forEach(cb=>{
+    if(cb.checked) selected.push(cb.dataset.barcode);
+  });
+
+  if(selected.length === 0){
+    alert('Nessun prodotto selezionato');
+    return;
+  }
+
+  if(confirm('Eliminare i prodotti selezionati da questa importazione?')){
+    deleteProductsByBarcodes(selected);
+
+    const session = importSessions.find(s=>s.id===id);
+    if(session){
+      const selectedSet = new Set(selected.map(String));
+      session.products = session.products.filter(p=>!selectedSet.has(String(p.barcode)));
+      if(session.products.length === 0){
+        importSessions = importSessions.filter(s=>s.id!==id);
+      }
+      saveImportSessions();
+    }
+
+    renderImportSessions();
+  }
+}
+
+/* Override cronologia: mostra SOLO le importazioni divise */
+const previousShowHistory = typeof showHistory === 'function' ? showHistory : null;
+showHistory = function(){
+  currentView = 'history';
+
+  document.getElementById('menuProducts')?.classList.remove('active');
+  document.getElementById('menuSuppliers')?.classList.remove('active');
+  document.getElementById('menuHistory')?.classList.add('active');
+
+  document.getElementById('pageTitle').innerText = 'Cronologia importazioni';
+  document.getElementById('pageSubtitle').innerText = 'Importazioni suddivise per file / 导入记录';
+
+  document.getElementById('productsPage')?.classList.add('hidden');
+  document.getElementById('suppliersPage')?.classList.add('hidden');
+  document.getElementById('historyPage')?.classList.remove('hidden');
+
+  const historyList = document.getElementById('historyList');
+  if(historyList) historyList.innerHTML = '';
+
+  renderImportSessions();
+};
+
+/* Override import: ogni file crea una cartella importazione */
+const previousImportExcel = importExcel;
+importExcel = function(event){
+  const file = event.target.files[0];
+  if(!file) return;
+
+  const beforeBarcodes = new Set(products.map(p => String(getBarcode(p))));
+  const fileName = file.name || 'Importazione';
+
+  const oldAlert = window.alert;
+
+  window.alert = function(msg){
+    window.alert = oldAlert;
+
+    const importedNow = products.filter(p=>{
+      const b = String(getBarcode(p));
+      return b && !beforeBarcodes.has(b);
+    });
+
+    createImportSession(fileName, importedNow);
+
+    oldAlert(msg);
+  };
+
+  previousImportExcel(event);
+};
