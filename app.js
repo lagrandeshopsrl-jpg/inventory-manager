@@ -1,168 +1,163 @@
-let products = JSON.parse(localStorage.getItem('products') || '[]');
 
+let products = JSON.parse(localStorage.getItem('products') || '[]');
 let editingIndex = -1;
 
-function saveProducts(){
-localStorage.setItem('products', JSON.stringify(products));
+function saveStorage(){
+    localStorage.setItem('products', JSON.stringify(products));
 }
 
-function renderProducts(){
-const search = document.getElementById('search').value.toLowerCase();
-
-const table = document.getElementById('productTable');
-
-table.innerHTML = '';
-
-products
-.filter(p =>
-(p.name || '').toLowerCase().includes(search) ||
-(p.barcode || '').toLowerCase().includes(search)
-)
-.forEach((p,index)=>{
-
-table.innerHTML += `
-<tr>
-<td>${p.barcode}</td>
-<td>${p.name}</td>
-<td>${p.buyPrice}</td>
-<td>${p.sellPrice}</td>
-<td>${p.quantity}</td>
-<td>
-<div class="action-buttons">
-<button onclick="editProduct(${index})">Modifica</button>
-<button onclick="deleteProduct(${index})">Elimina</button>
-</div>
-</td>
-</tr>
-`;
-});
+function clearInputs(){
+    document.getElementById('barcode').value = '';
+    document.getElementById('name').value = '';
+    document.getElementById('buyPrice').value = '';
+    document.getElementById('sellPrice').value = '';
+    document.getElementById('quantity').value = '';
 }
 
 function saveProduct(){
 
-const product = {
-barcode: document.getElementById('barcode').value,
-name: document.getElementById('name').value,
-buyPrice: document.getElementById('buyPrice').value,
-sellPrice: document.getElementById('sellPrice').value,
-quantity: document.getElementById('quantity').value
-};
+    const product = {
+        barcode: document.getElementById('barcode').value.trim(),
+        name: document.getElementById('name').value.trim(),
+        buyPrice: document.getElementById('buyPrice').value,
+        sellPrice: document.getElementById('sellPrice').value,
+        quantity: document.getElementById('quantity').value
+    };
 
-if(!product.barcode || !product.name){
-alert('Inserisci barcode e nome prodotto');
-return;
-}
+    if(!product.barcode || !product.name){
+        alert('Inserisci barcode e nome prodotto');
+        return;
+    }
 
-if(editingIndex === -1){
-products.push(product);
-}else{
-products[editingIndex] = product;
-editingIndex = -1;
-}
+    if(editingIndex === -1){
+        products.push(product);
+    }else{
+        products[editingIndex] = product;
+        editingIndex = -1;
+    }
 
-localStorage.setItem('products', JSON.stringify(products));
-
-clearInputs();
-
-renderProducts();
+    saveStorage();
+    clearInputs();
+    renderProducts();
 }
 
 function editProduct(index){
 
-const p = products[index];
+    const p = products[index];
 
-document.getElementById('barcode').value = p.barcode;
-document.getElementById('name').value = p.name;
-document.getElementById('buyPrice').value = p.buyPrice;
-document.getElementById('sellPrice').value = p.sellPrice;
-document.getElementById('quantity').value = p.quantity;
+    document.getElementById('barcode').value = p.barcode;
+    document.getElementById('name').value = p.name;
+    document.getElementById('buyPrice').value = p.buyPrice;
+    document.getElementById('sellPrice').value = p.sellPrice;
+    document.getElementById('quantity').value = p.quantity;
 
-editingIndex = index;
+    editingIndex = index;
 
-window.scrollTo({
-top:0,
-behavior:'smooth'
-});
+    window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function deleteProduct(index){
 
-if(confirm('Eliminare prodotto?')){
-products.splice(index,1);
-
-localStorage.setItem('products', JSON.stringify(products));
-
-renderProducts();
-}
+    if(confirm('Eliminare prodotto?')){
+        products.splice(index,1);
+        saveStorage();
+        renderProducts();
+    }
 }
 
-function clearInputs(){
-document.getElementById('barcode').value = '';
-document.getElementById('name').value = '';
-document.getElementById('buyPrice').value = '';
-document.getElementById('sellPrice').value = '';
-document.getElementById('quantity').value = '';
+function renderProducts(){
+
+    const search = document.getElementById('search').value.toLowerCase();
+
+    const table = document.getElementById('productTable');
+
+    table.innerHTML = '';
+
+    const filtered = products.filter(p =>
+        String(p.barcode).toLowerCase().includes(search) ||
+        String(p.name).toLowerCase().includes(search)
+    );
+
+    filtered.forEach((p,index)=>{
+
+        table.innerHTML += `
+        <tr>
+            <td>${p.barcode}</td>
+            <td>${p.name}</td>
+            <td>${p.buyPrice}</td>
+            <td>${p.sellPrice}</td>
+            <td>${p.quantity}</td>
+            <td>
+                <div class="action-buttons">
+                    <button onclick="editProduct(${index})">Modifica</button>
+                    <button onclick="deleteProduct(${index})">Elimina</button>
+                </div>
+            </td>
+        </tr>
+        `;
+    });
 }
 
 function exportCSV(){
 
-let csv = "Barcode,Prodotto,Acquisto,Vendita,Quantita\n";
+    let csv = "Barcode,Prodotto,Acquisto,Vendita,Quantita\n";
 
-products.forEach(p=>{
-csv += `${p.barcode},${p.name},${p.buyPrice},${p.sellPrice},${p.quantity}\n`;
-});
+    products.forEach(p=>{
+        csv += `${p.barcode},${p.name},${p.buyPrice},${p.sellPrice},${p.quantity}\n`;
+    });
 
-const blob = new Blob([csv],{type:'text/csv'});
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
 
-const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'prodotti.csv';
+    a.click();
 
-const a = document.createElement('a');
-
-a.href = url;
-a.download = 'prodotti.csv';
-a.click();
-
-URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
 }
 
 function importExcel(event){
 
-const file = event.target.files[0];
+    const file = event.target.files[0];
 
-const reader = new FileReader();
+    if(!file){
+        return;
+    }
 
-reader.onload = function(e){
+    const reader = new FileReader();
 
-const data = new Uint8Array(e.target.result);
+    reader.onload = function(e){
 
-const workbook = XLSX.read(data,{type:'array'});
+        const data = new Uint8Array(e.target.result);
 
-const sheetName = workbook.SheetNames[0];
+        const workbook = XLSX.read(data,{type:'array'});
 
-const worksheet = workbook.Sheets[sheetName];
+        const sheetName = workbook.SheetNames[0];
 
-const json = XLSX.utils.sheet_to_json(worksheet);
+        const worksheet = workbook.Sheets[sheetName];
 
-json.forEach(row=>{
+        const json = XLSX.utils.sheet_to_json(worksheet,{defval:''});
 
-products.push({
-barcode: row.Barcode || '',
-name: row.Prodotto || '',
-buyPrice: row.Acquisto || '',
-sellPrice: row.Vendita || '',
-quantity: row.Quantita || ''
-});
+        json.forEach(row=>{
 
-});
+            products.push({
+                barcode: row.Barcode || row.barcode || '',
+                name: row.Prodotto || row.prodotto || row.Name || '',
+                buyPrice: row.Acquisto || row.buyPrice || '',
+                sellPrice: row.Vendita || row.sellPrice || '',
+                quantity: row.Quantita || row.quantity || ''
+            });
 
-localStorage.setItem('products', JSON.stringify(products));
+        });
 
-renderProducts();
+        saveStorage();
+        renderProducts();
 
-alert('Importazione completata!');
-};
+        alert('Importazione completata!');
+    };
 
-reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(file);
 }
 
 renderProducts();
