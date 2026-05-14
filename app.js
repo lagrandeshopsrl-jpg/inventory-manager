@@ -226,6 +226,47 @@ function importExcel(event){
         return;
     }
 
+    const fileName = file.name.toLowerCase();
+
+    if(fileName.endsWith('.csv')){
+
+        const reader = new FileReader();
+
+        reader.onload = function(e){
+
+            const text = e.target.result;
+
+            const rows = text.split('\n');
+
+            rows.slice(1).forEach(line=>{
+
+                if(!line.trim()) return;
+
+                const cols = line.split(',');
+
+                products.push({
+                    barcode: cols[0] || '',
+                    name: cols[1] || '',
+                    supplier: cols[2] || '',
+                    buyPrice: cols[3] || '',
+                    sellPrice: cols[4] || '',
+                    quantity: cols[5] || ''
+                });
+
+            });
+
+            saveStorage();
+
+            renderProducts();
+
+            alert('CSV importato correttamente!');
+        };
+
+        reader.readAsText(file);
+
+        return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = function(e){
@@ -277,7 +318,7 @@ function importExcel(event){
 
         renderProducts();
 
-        alert('Importazione completata!');
+        alert('Excel importato correttamente!');
     };
 
     reader.readAsArrayBuffer(file);
