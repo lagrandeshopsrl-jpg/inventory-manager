@@ -378,3 +378,109 @@ th,td{padding:14px;border-bottom:1px solid #edf2f7;text-align:center}
   background:#fbfdff;
   color:#475569;
 }
+
+
+/* FIX FINALE FORNITORI */
+.side-button{
+  width:100%;
+  display:block;
+  text-align:left;
+  border:none;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  cursor:pointer;
+}
+
+.suppliers-view{
+  margin-top:18px;
+}
+
+.suppliers-card{
+  background:white;
+  border-radius:18px;
+  box-shadow:0 8px 28px rgba(15,23,42,.08);
+  padding:22px;
+}
+
+.suppliers-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:18px;
+}
+
+.suppliers-header h2{margin:0;font-size:26px;}
+.suppliers-header p{margin:5px 0 0;color:#64748b;}
+
+.suppliers-header button{
+  background:#0b63e5;
+  color:white;
+  border:none;
+  border-radius:12px;
+  padding:11px 15px;
+  cursor:pointer;
+  font-weight:700;
+}
+
+.suppliers-summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;
+  margin-bottom:18px;
+}
+
+.summary-box{
+  background:#eff6ff;
+  color:#1d4ed8;
+  border:1px solid #bfdbfe;
+  padding:14px;
+  border-radius:14px;
+  font-weight:800;
+}
+
+.supplier-section{
+  border:1px solid #e5eaf3;
+  border-radius:16px;
+  margin-bottom:14px;
+  overflow:hidden;
+  background:#fff;
+}
+
+.supplier-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:#f8fafc;
+  padding:14px 16px;
+  cursor:pointer;
+  font-weight:900;
+}
+
+.supplier-title span{
+  color:#64748b;
+  font-weight:700;
+}
+
+.supplier-products{
+  display:block;
+  overflow:auto;
+}
+
+.supplier-products table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+.supplier-products th,
+.supplier-products td{
+  padding:10px;
+  border-top:1px solid #edf2f7;
+  text-align:center;
+}
+
+.supplier-products th{
+  background:#fbfdff;
+  color:#475569;
+}

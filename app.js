@@ -206,6 +206,9 @@ function normalizeSupplierName(name){
 
 
 
+
+
+/* FIX FINALE FORNITORI */
 function supplierNameOf(p){
   const v = String(getSupplier(p) || '').trim();
   return v || 'Senza fornitore';
@@ -227,9 +230,9 @@ function showSuppliers(){
   const groups = {};
 
   products.forEach((p, index)=>{
-    const s = supplierNameOf(p);
-    if(!groups[s]) groups[s] = [];
-    groups[s].push({product:p, index:index});
+    const supplier = supplierNameOf(p);
+    if(!groups[supplier]) groups[supplier] = [];
+    groups[supplier].push({product:p, index});
   });
 
   const names = Object.keys(groups).sort((a,b)=>a.localeCompare(b));
@@ -248,7 +251,7 @@ function showSuppliers(){
     return;
   }
 
-  suppliersList.innerHTML = names.map((name, sectionIndex)=>{
+  suppliersList.innerHTML = names.map((name, idx)=>{
     const rows = groups[name].map(item=>{
       const p = item.product;
       return `
@@ -264,11 +267,11 @@ function showSuppliers(){
 
     return `
       <div class="supplier-section">
-        <div class="supplier-title" onclick="toggleSupplierSection(${sectionIndex})">
+        <div class="supplier-title" onclick="toggleSupplierSection(${idx})">
           <div>${name}</div>
           <span>${groups[name].length} prodotti</span>
         </div>
-        <div class="supplier-products" id="supplier-section-${sectionIndex}">
+        <div class="supplier-products" id="supplier-section-${idx}">
           <table>
             <thead>
               <tr>
