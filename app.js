@@ -99,15 +99,10 @@ function logoutUser(){ showProducts(); }
 
 
 
+/* ===== SCANNER BARCODE AUTO FOCUS ===== */
 
-/* ===== FOCUS BARCODE DEFINITIVO ===== */
-function isVisible(el){
-  return !!(el && el.offsetParent !== null);
-}
-
-function forceBarcodeFocus(){
+function scannerFocus(){
   const search = document.getElementById('search');
-  const productsPage = document.getElementById('productsPage');
   const editModal = document.getElementById('editModal');
   const newModal = document.getElementById('newProductModal');
 
@@ -115,44 +110,41 @@ function forceBarcodeFocus(){
     (editModal && editModal.style.display === 'flex') ||
     (newModal && newModal.style.display === 'flex');
 
-  if(search && isVisible(productsPage) && !modalOpen){
-    search.focus({ preventScroll: true });
+  if(search && !modalOpen){
+    if(document.activeElement !== search){
+      search.focus();
+    }
   }
 }
 
-function scheduleBarcodeFocus(){
-  setTimeout(forceBarcodeFocus, 100);
-  setTimeout(forceBarcodeFocus, 400);
-  setTimeout(forceBarcodeFocus, 900);
-  setTimeout(forceBarcodeFocus, 1600);
-}
-
-const _oldRenderProductsFocus = renderProducts;
+// focus after every render
+const __oldRenderProducts = renderProducts;
 renderProducts = function(){
-  _oldRenderProductsFocus();
-  scheduleBarcodeFocus();
+  __oldRenderProducts();
+  setTimeout(scannerFocus, 50);
+  setTimeout(scannerFocus, 200);
 };
 
-const _oldShowProductsFocus = showProducts;
-showProducts = function(){
-  _oldShowProductsFocus();
-  scheduleBarcodeFocus();
-};
-
-const _oldSyncNowFocus = syncNow;
+// focus after sync
+const __oldSyncNow = syncNow;
 syncNow = async function(){
-  await _oldSyncNowFocus();
-  scheduleBarcodeFocus();
+  await __oldSyncNow();
+  setTimeout(scannerFocus, 50);
+  setTimeout(scannerFocus, 300);
+  setTimeout(scannerFocus, 1000);
 };
 
-document.addEventListener('DOMContentLoaded', function(){
-  showProducts();
-  syncNow();
-  scheduleBarcodeFocus();
-});
+// keep scanner focus alive continuously
+setInterval(() => {
+  scannerFocus();
+}, 1200);
 
+// startup
 window.onload = function(){
   showProducts();
   syncNow();
-  scheduleBarcodeFocus();
+
+  setTimeout(scannerFocus, 50);
+  setTimeout(scannerFocus, 300);
+  setTimeout(scannerFocus, 1000);
 };
