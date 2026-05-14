@@ -24,10 +24,7 @@ function setCloudStatus(text,type=''){ const el=document.getElementById('cloudSt
 function rowToProduct(r){ return { barcode:String(r?.barcode||''), name:String(r?.name||''), supplier:String(r?.supplier||''), buyPrice:String(r?.buy_price||''), sellPrice:String(r?.sell_price||''), prodotto:String(r?.name||''), fornitore:String(r?.supplier||''), acquisto:String(r?.buy_price||''), vendita:String(r?.sell_price||'') }; }
 function productToRow(p){ return { barcode:String(getBarcode(p)||''), name:String(getName(p)||''), supplier:String(getSupplier(p)||''), buy_price:String(getBuy(p)||''), sell_price:String(getSell(p)||''), updated_at:new Date().toISOString() }; }
 
-function loginWithPin(){ const pin=document.getElementById('pinCode').value.trim(); if(btoa(pin)===_p){ localStorage.setItem('inventory_logged','1'); showApp(); } else { document.getElementById('loginError').innerText='Codice errato'; } }
-function checkPinLogin(){ if(localStorage.getItem('inventory_logged')==='1') showApp(); else { document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('appRoot').classList.add('hidden'); } }
-function showApp(){ document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('appRoot').classList.remove('hidden'); showProducts(); syncNow(); }
-function logoutUser(){ localStorage.removeItem('inventory_logged'); document.getElementById('pinCode').value=''; document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('appRoot').classList.add('hidden'); }
+
 
 function setActive(view){ document.getElementById('menuProducts')?.classList.toggle('active',view==='products'); document.getElementById('menuSuppliers')?.classList.toggle('active',view==='suppliers'); document.getElementById('menuHistory')?.classList.toggle('active',view==='history'); }
 function showProducts(){ currentView='products'; setActive('products'); document.getElementById('pageTitle').innerText='Gestione Prodotti'; document.getElementById('pageSubtitle').innerText='Gestionale Magazzino / 库存管理'; document.getElementById('productsPage').classList.remove('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderProducts(); }
@@ -97,4 +94,13 @@ function normalizeKey(key){ return String(key||'').trim().toLowerCase().replace(
 function getValue(row,keys){ const map={}; Object.keys(row).forEach(k=>map[normalizeKey(k)]=row[k]); for(const k of keys){ const v=map[normalizeKey(k)]; if(v!==undefined)return v; } return ''; }
 async function importExcel(event){ const file=event.target.files[0]; if(!file)return; const before=new Set(products.map(p=>String(getBarcode(p)))); const reader=new FileReader(); const fileName=file.name.toLowerCase(); reader.onload=async function(e){ try{ const wb=fileName.endsWith('.csv')?XLSX.read(e.target.result,{type:'string'}):XLSX.read(new Uint8Array(e.target.result),{type:'array'}); const sheet=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(sheet,{defval:''}); let imported=0,updated=0; for(const row of rows){ const product={barcode:getValue(row,['Barcode','Codice','EAN','条码']),name:getValue(row,['Prodotto','Nome','Product','商品']),supplier:getValue(row,['Fornitore','Supplier','Nome Fornitore','供应商']),buyPrice:getValue(row,['Acquisto','Prezzo Acquisto','BuyPrice','进价']),sellPrice:getValue(row,['Vendita','Prezzo Vendita','SellPrice','售价'])}; if(!product.barcode)continue; const full={...product,prodotto:product.name,fornitore:product.supplier,acquisto:product.buyPrice,vendita:product.sellPrice}; const existing=products.findIndex(p=>String(getBarcode(p))===String(product.barcode)); if(existing>=0){products[existing]={...products[existing],...full};updated++;} else {products.push(full);imported++;} await cloudUpsertProduct(full).catch(console.error); } saveStorage(); const importedNow=products.filter(p=>{const b=String(getBarcode(p)); return b&&!before.has(b);}); if(importedNow.length){ const session={id:'imp_'+Date.now(),fileName:file.name,time:new Date().toISOString(),products:importedNow.map(p=>({barcode:getBarcode(p),name:getName(p),supplier:getSupplier(p),buyPrice:getBuy(p),sellPrice:getSell(p)}))}; importSessions.unshift(session); saveImportSessions(); await cloudSaveImportSession(session).catch(console.error); } currentPage=1; renderProducts(); event.target.value=''; setCloudStatus('☁ Import salvato','ok'); alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}`); }catch(err){ console.error(err); setCloudStatus('☁ Errore import','err'); alert('Errore importazione'); } }; if(fileName.endsWith('.csv'))reader.readAsText(file,'UTF-8'); else reader.readAsArrayBuffer(file); }
 
-window.onload=function(){ checkPinLogin(); };
+
+
+
+/* ===== NO LOGIN VERSION ===== */
+function logoutUser(){
+  showProducts();
+}
+
+
+window.onload = function(){ showProducts(); syncNow(); };
