@@ -534,3 +534,295 @@ function deleteSelectedSupplierProducts(){
     renderSupplierFolders();
   }
 }
+
+
+/* ===== NUOVO PRODOTTO ===== */
+function openNewProductModal(){
+  const modal = document.getElementById('newProductModal');
+
+  document.getElementById('newBarcode').value = '';
+  document.getElementById('newName').value = '';
+  document.getElementById('newSupplier').value = '';
+  document.getElementById('newBuy').value = '';
+  document.getElementById('newSell').value = '';
+
+  modal.style.display = 'flex';
+
+  setTimeout(()=>document.getElementById('newBarcode')?.focus(), 100);
+}
+
+function closeNewProductModal(){
+  document.getElementById('newProductModal').style.display = 'none';
+}
+
+function saveNewProduct(){
+  const product = {
+    barcode: document.getElementById('newBarcode').value.trim(),
+    name: document.getElementById('newName').value.trim(),
+    supplier: document.getElementById('newSupplier').value.trim(),
+    buyPrice: document.getElementById('newBuy').value.trim(),
+    sellPrice: document.getElementById('newSell').value.trim()
+  };
+
+  if(!product.barcode){
+    alert('Inserisci il barcode');
+    return;
+  }
+
+  if(!product.name){
+    alert('Inserisci il nome prodotto');
+    return;
+  }
+
+  const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
+
+  if(existing >= 0){
+    if(!confirm('Questo barcode esiste già. Vuoi aggiornare il prodotto esistente?')){
+      return;
+    }
+
+    products[existing] = {
+      ...products[existing],
+      ...product,
+      prodotto: product.name,
+      fornitore: product.supplier,
+      acquisto: product.buyPrice,
+      vendita: product.sellPrice
+    };
+
+    saveStorage();
+
+    if(typeof addHistoryEntry === 'function'){
+      addHistoryEntry(products[existing], 'Aggiornato');
+    }
+
+  }else{
+    products.unshift({
+      ...product,
+      prodotto: product.name,
+      fornitore: product.supplier,
+      acquisto: product.buyPrice,
+      vendita: product.sellPrice
+    });
+
+    saveStorage();
+
+    if(typeof addHistoryEntry === 'function'){
+      addHistoryEntry(products[0], 'Aggiunto');
+    }
+  }
+
+  closeNewProductModal();
+
+  if(currentView === 'suppliers'){
+    renderSupplierFolders();
+  }else if(currentView === 'history'){
+    renderHistory();
+  }else{
+    currentPage = 1;
+    renderProducts();
+  }
+}
+
+
+/* ===== IMPORTAZIONI COME CARTELLE CON ELIMINA TUTTO ===== */
+let importSessions = JSON.parse(localStorage.getItem('importSessions') || '[]');
+
+function saveImportSessions(){
+  localStorage.setItem('importSessions', JSON.stringify(importSessions));
+}
+
+function createImportSession(fileName, importedProducts){
+  if(!importedProducts || importedProducts.length === 0) return;
+
+  const session = {
+    id: 'imp_' + Date.now(),
+    fileName: fileName || 'Importazione',
+    time: new Date().toISOString(),
+    products: importedProducts.map(p=>({
+      barcode: getBarcode(p),
+      name: getName(p),
+      supplier: getSupplier(p),
+      buyPrice: getBuy(p),
+      sellPrice: getSell(p)
+    }))
+  };
+
+  importSessions.unshift(session);
+  saveImportSessions();
+}
+
+function renderImportSessions(){
+  const box = document.getElementById('importSessionsList');
+  if(!box) return;
+
+  if(importSessions.length === 0){
+    box.innerHTML = '';
+    return;
+  }
+
+  box.innerHTML = importSessions.map(session=>{
+    return `
+      <div class="import-session">
+        <div class="import-session-header">
+          <div onclick="toggleImportSession('${session.id}')">
+            <div class="import-session-title">📁 Importazione: ${session.fileName || ''}</div>
+            <div class="import-session-meta">
+              ${formatDateIT(session.time)} ${formatTimeIT(session.time)} · ${session.products.length} prodotti
+            </div>
+          </div>
+          <div class="import-session-actions">
+            <button class="session-open" onclick="toggleImportSession('${session.id}')">Apri</button>
+            <button class="session-delete" onclick="deleteWholeImportSession('${session.id}')">Elimina importazione</button>
+          </div>
+        </div>
+        <div class="import-session-body" id="body-${session.id}">
+          <div class="import-selected-actions">
+            <button onclick="selectImportProducts('${session.id}')">Seleziona tutti</button>
+            <button onclick="deselectImportProducts('${session.id}')">Deseleziona</button>
+            <button class="danger" onclick="deleteSelectedImportProducts('${session.id}')">Elimina selezionati</button>
+          </div>
+          <table class="import-products-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Barcode</th>
+                <th>Prodotto</th>
+                <th>Fornitore</th>
+                <th>Acquisto</th>
+                <th>Vendita</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${session.products.map(p=>`
+                <tr>
+                  <td><input type="checkbox" class="import-check-${session.id}" data-barcode="${p.barcode}"></td>
+                  <td>${p.barcode || ''}</td>
+                  <td>${p.name || ''}</td>
+                  <td>${p.supplier || ''}</td>
+                  <td>${p.buyPrice || ''}</td>
+                  <td>${p.sellPrice || ''}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleImportSession(id){
+  const body = document.getElementById('body-' + id);
+  if(!body) return;
+  body.style.display = body.style.display === 'block' ? 'none' : 'block';
+}
+
+function selectImportProducts(id){
+  document.querySelectorAll('.import-check-' + id).forEach(cb=>cb.checked=true);
+}
+
+function deselectImportProducts(id){
+  document.querySelectorAll('.import-check-' + id).forEach(cb=>cb.checked=false);
+}
+
+function deleteProductsByBarcodes(barcodes){
+  const set = new Set(barcodes.map(b=>String(b)));
+  products = products.filter(p => !set.has(String(getBarcode(p))));
+  saveStorage();
+}
+
+function deleteWholeImportSession(id){
+  const session = importSessions.find(s=>s.id===id);
+  if(!session) return;
+
+  if(confirm('Eliminare tutti i prodotti di questa importazione?')){
+    deleteProductsByBarcodes(session.products.map(p=>p.barcode));
+
+    importSessions = importSessions.filter(s=>s.id!==id);
+    saveImportSessions();
+
+    productHistory.unshift({
+      action:'Eliminata importazione',
+      time:new Date().toISOString(),
+      barcode:'',
+      name: session.fileName,
+      supplier:'',
+      buyPrice:'',
+      sellPrice:''
+    });
+    saveHistory();
+
+    renderImportSessions();
+    renderHistory();
+  }
+}
+
+function deleteSelectedImportProducts(id){
+  const selected = [];
+  document.querySelectorAll('.import-check-' + id).forEach(cb=>{
+    if(cb.checked) selected.push(cb.dataset.barcode);
+  });
+
+  if(selected.length === 0){
+    alert('Nessun prodotto selezionato');
+    return;
+  }
+
+  if(confirm('Eliminare i prodotti selezionati da questa importazione?')){
+    deleteProductsByBarcodes(selected);
+
+    const session = importSessions.find(s=>s.id===id);
+    if(session){
+      const selectedSet = new Set(selected.map(String));
+      session.products = session.products.filter(p=>!selectedSet.has(String(p.barcode)));
+      if(session.products.length === 0){
+        importSessions = importSessions.filter(s=>s.id!==id);
+      }
+      saveImportSessions();
+    }
+
+    renderImportSessions();
+    renderHistory();
+  }
+}
+
+/* Sovrascrivo renderHistory per includere cartelle importazioni */
+const originalRenderHistoryV31 = renderHistory;
+renderHistory = function(){
+  renderImportSessions();
+  originalRenderHistoryV31();
+};
+
+/* Sovrascrivo importExcel: crea una cartella importazione eliminabile */
+const originalImportExcelV31 = importExcel;
+importExcel = function(event){
+  const file = event.target.files[0];
+  if(!file) return;
+
+  const beforeBarcodes = new Set(products.map(p => String(getBarcode(p))));
+  const fileName = file.name || 'Importazione';
+
+  const oldAlert = window.alert;
+
+  window.alert = function(msg){
+    window.alert = oldAlert;
+
+    const newProducts = products.filter(p => {
+      const b = String(getBarcode(p));
+      return b && !beforeBarcodes.has(b);
+    });
+
+    createImportSession(fileName, newProducts);
+
+    newProducts.forEach(p=>{
+      if(typeof addHistoryEntry === 'function'){
+        addHistoryEntry(p, 'Aggiunto');
+      }
+    });
+
+    oldAlert(msg);
+  };
+
+  originalImportExcelV31(event);
+};

@@ -322,3 +322,92 @@ th,td{padding:14px;border-bottom:1px solid #edf2f7;text-align:center}
     grid-template-columns:1fr;
   }
 }
+
+.blue-btn{
+  background:#0b63e5;
+  color:white;
+  border:none;
+  border-radius:12px;
+  padding:12px 16px;
+  cursor:pointer;
+  font-weight:700;
+}
+
+
+/* IMPORTAZIONI COME CARTELLE */
+.import-session{
+  background:white;
+  border-radius:18px;
+  box-shadow:0 8px 28px rgba(15,23,42,.08);
+  margin-bottom:16px;
+  overflow:hidden;
+  border:1px solid #edf2f7;
+}
+.import-session-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:16px;
+  background:#f8fafc;
+  cursor:pointer;
+}
+.import-session-title{
+  font-weight:900;
+  font-size:18px;
+}
+.import-session-meta{
+  color:#64748b;
+  font-size:14px;
+  margin-top:4px;
+}
+.import-session-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.import-session-actions button{
+  border:none;
+  border-radius:12px;
+  padding:10px 12px;
+  cursor:pointer;
+  font-weight:800;
+}
+.session-open{background:#0b63e5;color:white;}
+.session-delete{background:#ef4444;color:white;}
+.import-session-body{
+  padding:14px;
+  display:none;
+}
+.import-selected-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.import-selected-actions button{
+  background:#0b63e5;
+  color:white;
+  border:none;
+  border-radius:12px;
+  padding:10px 12px;
+  cursor:pointer;
+  font-weight:800;
+}
+.import-selected-actions .danger{
+  background:#ef4444;
+}
+.import-products-table{
+  width:100%;
+  border-collapse:collapse;
+}
+.import-products-table th,
+.import-products-table td{
+  padding:10px;
+  border-top:1px solid #edf2f7;
+  text-align:center;
+}
+.import-products-table th{
+  background:#fbfdff;
+  color:#475569;
+}

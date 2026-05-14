@@ -13,6 +13,7 @@
   <aside class="sidebar">
     <div class="logo">▱ Inventory Manager</div>
     <button class="menu active" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
+    <button class="menu" onclick="openNewProductModal()">＋ Nuovo prodotto</button>
     <button class="menu" id="menuSuppliers" onclick="showSuppliers()">📁 Fornitori</button>
     <button class="menu" id="menuHistory" onclick="showHistory()">🕘 Cronologia</button>
     <button class="menu">▤ Categorie</button>
@@ -26,6 +27,7 @@
         <h1 id="pageTitle">Gestione Prodotti</h1>
         <p id="pageSubtitle">Gestionale Magazzino / 库存管理</p>
       </div>
+      <button class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button>
     </div>
 
     <section id="productsPage">
@@ -79,7 +81,9 @@
         <input id="historySearch" placeholder="Cerca nella cronologia..." oninput="renderHistory()">
         <button onclick="clearHistory()">Svuota cronologia</button>
       </div>
-      <div id="historyList" class="history-list"></div>
+      
+<div id="importSessionsList" class="import-sessions-list"></div>
+<div id="historyList" class="history-list"></div>
     </section>
   </main>
 </div>
@@ -141,6 +145,68 @@
     <div class="modal-actions">
       <button class="cancel" onclick="closeEditModal()">Annulla</button>
       <button class="save" onclick="saveEditProduct()">▣ Salva Modifiche</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="newProductModal" class="modal-overlay">
+  <div class="edit-box">
+    <button class="close-btn" onclick="closeNewProductModal()">×</button>
+
+    <div class="edit-title">
+      <div class="big-icon">＋</div>
+      <div>
+        <h2>Nuovo Prodotto</h2>
+        <p>新增产品</p>
+      </div>
+    </div>
+
+    <div class="edit-row">
+      <div class="left-icon">▥</div>
+      <div class="field">
+        <label>Barcode / 条形码</label>
+        <div class="modern-input"><input id="newBarcode" type="text"><span>✓</span></div>
+      </div>
+    </div>
+
+    <div class="edit-row">
+      <div class="left-icon">Aa</div>
+      <div class="field">
+        <label>Nome Prodotto / 产品名称</label>
+        <div class="modern-input"><input id="newName" type="text"><span>✓</span></div>
+      </div>
+    </div>
+
+    <div class="edit-row">
+      <div class="left-icon">♟</div>
+      <div class="field">
+        <label>Fornitore / 供应商</label>
+        <div class="modern-input"><input id="newSupplier" type="text"><span>⌄</span></div>
+      </div>
+    </div>
+
+    <div class="edit-row">
+      <div class="left-icon">€</div>
+      <div class="field">
+        <label>Prezzo Acquisto (€) / 进货价</label>
+        <div class="modern-input"><input id="newBuy" type="number" step="0.01" inputmode="decimal"></div>
+      </div>
+    </div>
+
+    <div class="edit-row">
+      <div class="left-icon">◆</div>
+      <div class="field">
+        <label>Prezzo Vendita (€) / 售价</label>
+        <div class="modern-input"><input id="newSell" type="number" step="0.01" inputmode="decimal"></div>
+      </div>
+    </div>
+
+    <div class="info">ⓘ Compila i campi e premi Salva per aggiungere il prodotto</div>
+
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeNewProductModal()">Annulla</button>
+      <button class="save" onclick="saveNewProduct()">▣ Salva Prodotto</button>
     </div>
   </div>
 </div>
