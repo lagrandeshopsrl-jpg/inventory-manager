@@ -40,3 +40,63 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   color:#991b1b;
   border-color:#fecaca;
 }
+
+
+/* LOGIN */
+.login-screen{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(135deg,#061d3a,#0b63e5);
+  padding:20px;
+}
+.login-card{
+  background:white;
+  width:100%;
+  max-width:420px;
+  border-radius:24px;
+  padding:28px;
+  box-shadow:0 25px 80px rgba(0,0,0,.35);
+}
+.login-card h1{
+  margin:0;
+  color:#0b63e5;
+  font-size:30px;
+}
+.login-card p{
+  margin:8px 0 22px;
+  color:#64748b;
+}
+.login-card label{
+  display:block;
+  margin:12px 0 7px;
+  font-weight:800;
+}
+.login-card input{
+  width:100%;
+  padding:14px;
+  border:1px solid #d8e0ef;
+  border-radius:14px;
+  font-size:16px;
+}
+.login-card button{
+  width:100%;
+  margin-top:18px;
+  padding:15px;
+  border:none;
+  border-radius:14px;
+  background:#0b63e5;
+  color:white;
+  font-size:17px;
+  font-weight:900;
+  cursor:pointer;
+}
+.login-error{
+  margin-top:12px;
+  color:#dc2626;
+  font-weight:800;
+}
+.logout-btn{
+  background:#ef4444 !important;
+}

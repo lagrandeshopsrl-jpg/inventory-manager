@@ -9,6 +9,25 @@
 </head>
 <body>
 
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <h1>Inventory Manager</h1>
+    <p>Accesso richiesto / 需要登录</p>
+
+    <label>Email</label>
+    <input id="loginEmail" type="email" placeholder="email">
+
+    <label>Password</label>
+    <input id="loginPassword" type="password" placeholder="password">
+
+    <button onclick="loginUser()">Accedi</button>
+    <div id="loginError" class="login-error"></div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
+
 <div class="layout">
   <aside class="sidebar">
     <div class="logo">▱ Inventory Manager</div>
@@ -27,7 +46,7 @@
         <h1 id="pageTitle">Gestione Prodotti</h1>
         <p id="pageSubtitle">Gestionale Magazzino / 库存管理</p>
       </div>
-      <div class="cloud-actions"><span id="cloudStatus" class="cloud-status">☁ Cloud...</span><button class="blue-btn" onclick="syncNow()">Sincronizza</button><button class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button></div>
+      <div class="cloud-actions"><span id="cloudStatus" class="cloud-status">☁ Cloud...</span><button class="blue-btn" onclick="syncNow()">Sincronizza</button><button class="blue-btn logout-btn" onclick="logoutUser()">Esci</button><button class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button></div>
     </div>
 
     <section id="productsPage">
@@ -107,6 +126,7 @@
   </div>
 </div>
 
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
