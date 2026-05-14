@@ -25,7 +25,7 @@ function rowToProduct(r){ return { barcode:String(r?.barcode||''), name:String(r
 function productToRow(p){ return { barcode:String(getBarcode(p)||''), name:String(getName(p)||''), supplier:String(getSupplier(p)||''), buy_price:String(getBuy(p)||''), sell_price:String(getSell(p)||''), updated_at:new Date().toISOString() }; }
 
 function setActive(view){ document.getElementById('menuProducts')?.classList.toggle('active',view==='products'); document.getElementById('menuSuppliers')?.classList.toggle('active',view==='suppliers'); document.getElementById('menuHistory')?.classList.toggle('active',view==='history'); }
-function showProducts(){ currentView='products'; setActive('products'); document.getElementById('pageTitle').innerText='Gestione Prodotti'; document.getElementById('pageSubtitle').innerText='Gestionale Magazzino / 库存管理'; document.getElementById('productsPage').classList.remove('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderProducts(); }
+function showProducts(){ currentView='products'; setActive('products'); document.getElementById('pageTitle').innerText='Gestione Prodotti'; document.getElementById('pageSubtitle').innerText='Gestionale Magazzino / 库存管理'; document.getElementById('productsPage').classList.remove('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderProducts(); focusBarcodeSearch(); }
 function showSuppliers(){ currentView='suppliers'; setActive('suppliers'); document.getElementById('pageTitle').innerText='Fornitori'; document.getElementById('pageSubtitle').innerText='Cartelle fornitori / 供应商文件夹'; document.getElementById('productsPage').classList.add('hidden'); document.getElementById('suppliersPage').classList.remove('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderSupplierFolders(); }
 function showHistory(){ currentView='history'; setActive('history'); document.getElementById('pageTitle').innerText='Cronologia importazioni'; document.getElementById('pageSubtitle').innerText='Importazioni suddivise per file / 导入记录'; document.getElementById('productsPage').classList.add('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.remove('hidden'); renderImportSessions(); }
 
@@ -96,4 +96,16 @@ async function importExcel(event){ const file=event.target.files[0]; if(!file)re
 
 function logoutUser(){ showProducts(); }
 
-window.onload = function(){ showProducts(); syncNow(); };
+window.onload = function(){ showProducts(); syncNow(); focusBarcodeSearch(); };
+
+
+function focusBarcodeSearch(){
+  setTimeout(()=>{
+    const s = document.getElementById('search');
+    if(s && currentView === 'products'){
+      s.focus();
+      s.select();
+    }
+  }, 150);
+}
+
