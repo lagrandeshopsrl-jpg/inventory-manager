@@ -115,5 +115,18 @@
   </div>
 
   <script src="app.js"></script>
+<script src="dropbox-sync.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('focus', () => {
+      inp.select();
+      inp.value = '';
+    });
+  });
+});
+</script>
+
 </body>
 </html>
