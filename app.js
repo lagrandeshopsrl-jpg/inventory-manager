@@ -89,35 +89,16 @@ function deleteProduct(index){
     }
 }
 
-
 let allSelected = false;
 
-function toggleSelectProducts(){
+function selectAllProducts(){
 
     allSelected = !allSelected;
 
     document.querySelectorAll('.product-checkbox').forEach(cb=>{
         cb.checked = allSelected;
     });
-
-    const btn = document.getElementById('toggleSelectBtn');
-
-    btn.innerText = allSelected
-        ? 'Deseleziona prodotti'
-        : 'Seleziona prodotti';
 }
-
-window.onload = function(){
-
-    
-
-    const search = document.getElementById('search');
-
-    if(search){
-        search.focus();
-    }
-};
-
 
 function deleteSelectedProducts(){
 
@@ -223,3 +204,14 @@ function importExcel(event){
 }
 
 
+
+
+window.onload = function(){
+    
+
+    const search = document.getElementById('search');
+
+    if(search){
+        search.focus();
+    }
+};
