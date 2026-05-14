@@ -158,52 +158,48 @@ function importExcel(event){
 
 
 
-/* ===== AUTENTICAZIONE SUPABASE ===== */
-async function checkAuth(){
-  const { data } = await supabaseClient.auth.getSession();
 
-  if(data && data.session){
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('appRoot').style.display = 'block';
-    showProducts();
-    await syncNow();
+
+
+/* ===== LOGIN PIN 4 CIFRE ===== */
+const APP_PIN = "0101";
+
+function showApp(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+  localStorage.setItem('inventory_logged', '1');
+  showProducts();
+  syncNow();
+}
+
+function checkPinLogin(){
+  if(localStorage.getItem('inventory_logged') === '1'){
+    showApp();
   }else{
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appRoot').style.display = 'none';
   }
 }
 
-async function loginUser(){
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
+function loginWithPin(){
+  const pin = document.getElementById('pinCode').value.trim();
   const errorBox = document.getElementById('loginError');
 
-  errorBox.innerText = '';
-
-  if(!email || !password){
-    errorBox.innerText = 'Inserisci email e password';
-    return;
+  if(pin === APP_PIN){
+    errorBox.innerText = '';
+    showApp();
+  }else{
+    errorBox.innerText = 'Codice errato';
   }
-
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
-
-  if(error){
-    errorBox.innerText = 'Accesso non riuscito: ' + error.message;
-    return;
-  }
-
-  await checkAuth();
 }
 
-async function logoutUser(){
-  await supabaseClient.auth.signOut();
-  document.getElementById('loginPassword').value = '';
-  await checkAuth();
+function logoutUser(){
+  localStorage.removeItem('inventory_logged');
+  document.getElementById('pinCode').value = '';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appRoot').style.display = 'none';
 }
 
-window.onload = async function(){
-  await checkAuth();
+window.onload = function(){
+  checkPinLogin();
 };

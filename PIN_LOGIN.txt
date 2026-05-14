@@ -1,0 +1,6 @@
+Inventory Manager v38 PIN Login
+
+PIN accesso:
+0101
+
+Non serve più creare utenti Supabase.

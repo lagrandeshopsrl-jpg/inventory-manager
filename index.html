@@ -9,23 +9,22 @@
 </head>
 <body>
 
+
 <div id="loginScreen" class="login-screen">
   <div class="login-card">
     <h1>Inventory Manager</h1>
-    <p>Accesso richiesto / 需要登录</p>
+    <p>Inserisci il codice di accesso</p>
 
-    <label>Email</label>
-    <input id="loginEmail" type="email" placeholder="email">
+    <label>Codice PIN</label>
+    <input id="pinCode" type="password" maxlength="4" placeholder="0101">
 
-    <label>Password</label>
-    <input id="loginPassword" type="password" placeholder="password">
-
-    <button onclick="loginUser()">Accedi</button>
+    <button onclick="loginWithPin()">Entra</button>
     <div id="loginError" class="login-error"></div>
   </div>
 </div>
 
 <div id="appRoot" style="display:none;">
+
 
 
 <div class="layout">
