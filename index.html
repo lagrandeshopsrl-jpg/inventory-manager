@@ -9,28 +9,11 @@
 </head>
 <body>
 
-
-<div id="loginScreen" class="login-screen">
-  <div class="login-card">
-    <h1>Inventory Manager</h1>
-    <p>Inserisci il codice di accesso</p>
-
-    <label>Codice PIN</label>
-    <input id="pinCode" type="password" maxlength="4" placeholder="••••" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="pin-x" inputmode="numeric">
-
-    <button onclick="loginWithPin()">Entra</button>
-    <div id="loginError" class="login-error"></div>
-  </div>
-</div>
-
-<div id="appRoot" style="display:none;">
-
-
-
 <div class="layout">
   <aside class="sidebar">
     <div class="logo">▱ Inventory Manager</div>
     <button class="menu active" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
+    <button class="menu" onclick="openNewProductModal()">＋ Nuovo prodotto</button>
     <button class="menu" id="menuSuppliers" onclick="showSuppliers()">📁 Fornitori</button>
     <button class="menu" id="menuHistory" onclick="showHistory()">🕘 Cronologia</button>
     <button class="menu">▤ Categorie</button>
@@ -44,7 +27,7 @@
         <h1 id="pageTitle">Gestione Prodotti</h1>
         <p id="pageSubtitle">Gestionale Magazzino / 库存管理</p>
       </div>
-      <div class="cloud-actions"><span id="cloudStatus" class="cloud-status">☁ Cloud...</span><button class="blue-btn" onclick="syncNow()">Sincronizza</button><button class="blue-btn logout-btn" onclick="logoutUser()">Esci</button><button class="blue-btn" onclick="openNewProductModal()" style="display:none">＋ Nuovo Prodotto</button></div>
+      <div class="cloud-actions"><span id="cloudStatus" class="cloud-status">☁ Cloud...</span><button class="blue-btn" onclick="syncNow()">Sincronizza</button><button class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button></div>
     </div>
 
     <section id="productsPage">
@@ -124,7 +107,6 @@
   </div>
 </div>
 
-</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
