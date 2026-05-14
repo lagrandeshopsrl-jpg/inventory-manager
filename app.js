@@ -197,46 +197,101 @@ window.onload=function(){
 };
 
 
+
+
+function normalizeSupplierName(name){
+  const value = String(name || '').trim();
+  return value || 'Senza fornitore';
+}
+
 function showSuppliers(){
   const tableCard = document.querySelector('.table-card');
   const pagination = document.querySelector('.pagination');
+  const toolbar = document.querySelector('.toolbar');
   const suppliersView = document.getElementById('suppliersView');
-  const list = document.getElementById('suppliersList');
+  const suppliersList = document.getElementById('suppliersList');
+  const suppliersSummary = document.getElementById('suppliersSummary');
 
+  if(toolbar) toolbar.style.display = 'none';
   if(tableCard) tableCard.style.display = 'none';
   if(pagination) pagination.style.display = 'none';
-  if(suppliersView) suppliersView.style.display = 'block';
+  if(suppliersView) suppliersView.classList.remove('hidden');
 
-  const counts = {};
+  const groups = {};
 
-  products.forEach(p=>{
-    const name = String(getSupplier(p) || 'Senza fornitore').trim() || 'Senza fornitore';
-    counts[name] = (counts[name] || 0) + 1;
+  products.forEach((p, index)=>{
+    const supplier = normalizeSupplierName(getSupplier(p));
+    if(!groups[supplier]) groups[supplier] = [];
+    groups[supplier].push({product:p, index});
   });
 
-  const suppliers = Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]));
+  const names = Object.keys(groups).sort((a,b)=>a.localeCompare(b));
 
-  if(suppliers.length === 0){
-    list.innerHTML = '<p>Nessun fornitore trovato.</p>';
+  suppliersSummary.innerHTML = `
+    <div class="summary-box">Fornitori totali: ${names.length}</div>
+    <div class="summary-box">Prodotti totali: ${products.length}</div>
+  `;
+
+  if(names.length === 0){
+    suppliersList.innerHTML = '<p>Nessun fornitore trovato.</p>';
     return;
   }
 
-  list.innerHTML = suppliers.map(([name,count])=>`
-    <div class="supplier-item">
-      <div class="supplier-name">${name}</div>
-      <div class="supplier-count">${count} prodotti</div>
-    </div>
-  `).join('');
+  suppliersList.innerHTML = names.map((name, idx)=>{
+    const rows = groups[name].map(item=>{
+      const p = item.product;
+      return `
+        <tr>
+          <td>${getBarcode(p)}</td>
+          <td>${getName(p)}</td>
+          <td>${getBuy(p)}</td>
+          <td>${getSell(p)}</td>
+          <td><button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button></td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="supplier-section">
+        <div class="supplier-title" onclick="toggleSupplier(${idx})">
+          <div>${name}</div>
+          <span>${groups[name].length} prodotti</span>
+        </div>
+        <div class="supplier-products" id="supplier-${idx}">
+          <table>
+            <thead>
+              <tr>
+                <th>Barcode</th>
+                <th>Prodotto</th>
+                <th>Acquisto</th>
+                <th>Vendita</th>
+                <th>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleSupplier(id){
+  const el = document.getElementById('supplier-' + id);
+  if(!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function showProducts(){
   const tableCard = document.querySelector('.table-card');
   const pagination = document.querySelector('.pagination');
+  const toolbar = document.querySelector('.toolbar');
   const suppliersView = document.getElementById('suppliersView');
 
+  if(toolbar) toolbar.style.display = 'flex';
   if(tableCard) tableCard.style.display = 'block';
   if(pagination) pagination.style.display = 'flex';
-  if(suppliersView) suppliersView.style.display = 'none';
+  if(suppliersView) suppliersView.classList.add('hidden');
 
   renderProducts();
 }
