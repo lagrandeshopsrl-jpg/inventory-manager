@@ -4,6 +4,7 @@ let products = JSON.parse(localStorage.getItem('products') || '[]');
 const itemsPerPage = 100;
 let currentPage = 1;
 let allSelected = false;
+let editingIndex = null;
 
 function saveStorage(){
     localStorage.setItem('products', JSON.stringify(products));
@@ -46,7 +47,7 @@ function renderProducts(){
             <td>${p.sellPrice || ''}</td>
             <td>
                 <div class="action-buttons">
-                    <button onclick="editProduct(${start + index})">Modifica</button>
+                    <button onclick="openEditModal(${start + index})">Modifica</button>
                     <button onclick="deleteProduct(${start + index})">Elimina</button>
                 </div>
             </td>
@@ -58,36 +59,49 @@ function renderProducts(){
         `Pagina ${currentPage} di ${totalPages}`;
 }
 
-function editProduct(index){
+function openEditModal(index){
+
+    editingIndex = index;
 
     const p = products[index];
 
-    const nuovoBarcode = prompt('Barcode', p.barcode || '');
-    if(nuovoBarcode === null) return;
+    document.getElementById('editBarcode').value = p.barcode || '';
+    document.getElementById('editName').value = p.name || '';
+    document.getElementById('editSupplier').value = p.supplier || '';
+    document.getElementById('editBuy').value = p.buyPrice || '';
+    document.getElementById('editSell').value = p.sellPrice || '';
 
-    const nuovoNome = prompt('Nome prodotto', p.name || '');
-    if(nuovoNome === null) return;
+    document.getElementById('editModal').style.display = 'flex';
+}
 
-    const nuovoFornitore = prompt('Fornitore', p.supplier || '');
-    if(nuovoFornitore === null) return;
+function closeEditModal(){
+    document.getElementById('editModal').style.display = 'none';
+}
 
-    const nuovoAcquisto = prompt('Prezzo acquisto', p.buyPrice || '');
-    if(nuovoAcquisto === null) return;
+function saveEditProduct(){
 
-    const nuovoVendita = prompt('Prezzo vendita', p.sellPrice || '');
-    if(nuovoVendita === null) return;
+    if(editingIndex === null) return;
 
-    products[index] = {
-        ...products[index],
-        barcode: nuovoBarcode,
-        name: nuovoNome,
-        supplier: nuovoFornitore,
-        buyPrice: nuovoAcquisto,
-        sellPrice: nuovoVendita
-    };
+    products[editingIndex].barcode =
+        document.getElementById('editBarcode').value;
+
+    products[editingIndex].name =
+        document.getElementById('editName').value;
+
+    products[editingIndex].supplier =
+        document.getElementById('editSupplier').value;
+
+    products[editingIndex].buyPrice =
+        document.getElementById('editBuy').value;
+
+    products[editingIndex].sellPrice =
+        document.getElementById('editSell').value;
 
     saveStorage();
+
     renderProducts();
+
+    closeEditModal();
 
     alert('Prodotto modificato!');
 }
@@ -151,26 +165,6 @@ function prevPage(){
         currentPage--;
         renderProducts();
     }
-}
-
-function exportCSV(){
-
-    let csv = "Barcode,Prodotto,Fornitore,Acquisto,Vendita\n";
-
-    products.forEach(p=>{
-        csv += `${p.barcode || ''},${p.name || ''},${p.supplier || ''},${p.buyPrice || ''},${p.sellPrice || ''}\n`;
-    });
-
-    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'prodotti.csv';
-    a.click();
-
-    URL.revokeObjectURL(url);
 }
 
 window.onload = function(){

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -5,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestionale Negozio</title>
 <link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -23,15 +23,6 @@ Seleziona prodotti
 <button onclick="deleteSelectedProducts()">
 Elimina selezionati
 </button>
-
-<button onclick="exportCSV()">
-Esporta CSV
-</button>
-
-<label class="upload-btn">
-Importa Excel
-<input type="file" accept=".xlsx,.csv" onchange="importExcel(event)">
-</label>
 </div>
 
 <table>
@@ -48,15 +39,37 @@ Importa Excel
 </thead>
 
 <tbody id="productTable"></tbody>
-
 </table>
 
 <div class="pagination">
 <button onclick="prevPage()">⬅ Precedente</button>
-
 <span id="pageInfo"></span>
-
 <button onclick="nextPage()">Successiva ➡</button>
+</div>
+
+</div>
+
+<div id="editModal" class="modal">
+
+<div class="modal-content">
+
+<h2>Modifica Prodotto</h2>
+
+<input id="editBarcode" placeholder="Barcode">
+
+<input id="editName" placeholder="Nome prodotto">
+
+<input id="editSupplier" placeholder="Fornitore">
+
+<input id="editBuy" placeholder="Prezzo acquisto">
+
+<input id="editSell" placeholder="Prezzo vendita">
+
+<div class="modal-buttons">
+<button onclick="closeEditModal()">Annulla</button>
+<button onclick="saveEditProduct()">Salva Modifiche</button>
+</div>
+
 </div>
 
 </div>
