@@ -195,3 +195,48 @@ window.onload=function(){
   const search=document.getElementById('search');
   if(search) search.focus();
 };
+
+
+function showSuppliers(){
+  const tableCard = document.querySelector('.table-card');
+  const pagination = document.querySelector('.pagination');
+  const suppliersView = document.getElementById('suppliersView');
+  const list = document.getElementById('suppliersList');
+
+  if(tableCard) tableCard.style.display = 'none';
+  if(pagination) pagination.style.display = 'none';
+  if(suppliersView) suppliersView.style.display = 'block';
+
+  const counts = {};
+
+  products.forEach(p=>{
+    const name = String(getSupplier(p) || 'Senza fornitore').trim() || 'Senza fornitore';
+    counts[name] = (counts[name] || 0) + 1;
+  });
+
+  const suppliers = Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]));
+
+  if(suppliers.length === 0){
+    list.innerHTML = '<p>Nessun fornitore trovato.</p>';
+    return;
+  }
+
+  list.innerHTML = suppliers.map(([name,count])=>`
+    <div class="supplier-item">
+      <div class="supplier-name">${name}</div>
+      <div class="supplier-count">${count} prodotti</div>
+    </div>
+  `).join('');
+}
+
+function showProducts(){
+  const tableCard = document.querySelector('.table-card');
+  const pagination = document.querySelector('.pagination');
+  const suppliersView = document.getElementById('suppliersView');
+
+  if(tableCard) tableCard.style.display = 'block';
+  if(pagination) pagination.style.display = 'flex';
+  if(suppliersView) suppliersView.style.display = 'none';
+
+  renderProducts();
+}
