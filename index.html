@@ -29,17 +29,17 @@
         </div>
         <div class="top-actions">
           <span id="cloudStatus" class="cloud-status">☁ Cloud...</span>
-          <button class="blue-btn" onclick="syncNow()">Sincronizza</button>
-          <button class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button>
+          <button class="blue-btn" tabindex="-1" onclick="syncNow()">Sincronizza</button>
+          <button class="blue-btn" tabindex="-1" onclick="openNewProductModal()">＋ Nuovo Prodotto</button>
         </div>
       </div>
 
       <section id="productsPage">
         <div class="toolbar">
-          <input id="search" type="text" placeholder="Cerca barcode o prodotto..." autofocus autocomplete="off" oninput="currentPage=1; renderProducts();" />
-          <button onclick="toggleSelectProducts()" id="toggleSelectBtn">Seleziona prodotti</button>
-          <button onclick="deleteSelectedProducts()">Elimina selezionati</button>
-          <button onclick="exportExcel()">Esporta Excel</button>
+          <input id="search" type="text" placeholder="Cerca barcode o prodotto..." autofocus autocomplete="off" tabindex="1" oninput="currentPage=1; renderProducts();" />
+          <button tabindex="-1" onclick="toggleSelectProducts()" id="toggleSelectBtn">Seleziona prodotti</button>
+          <button tabindex="-1" onclick="deleteSelectedProducts()">Elimina selezionati</button>
+          <button tabindex="-1" onclick="exportExcel()">Esporta Excel</button>
           <label class="file-label">Importa
             <input type="file" accept=".csv,.xls,.xlsx,.xlsm,.ods" onchange="importExcel(event)" />
           </label>

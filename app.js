@@ -140,11 +140,17 @@ setInterval(() => {
 }, 1200);
 
 // startup
+
+
+
 window.onload = function(){
   showProducts();
   syncNow();
 
-  setTimeout(scannerFocus, 50);
-  setTimeout(scannerFocus, 300);
-  setTimeout(scannerFocus, 1000);
+  setTimeout(() => {
+    const s = document.getElementById('search');
+    if(s){
+      s.focus();
+    }
+  }, 300);
 };
