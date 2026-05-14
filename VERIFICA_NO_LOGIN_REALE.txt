@@ -1,0 +1,5 @@
+loginScreen in html: False
+loginWithPin in js: False
+checkPinLogin in js: False
+showApp in js: False
+app-root hidden in html: False

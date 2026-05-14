@@ -224,3 +224,28 @@ window.onload = function(){
   setTimeout(syncNow, 200);
   setTimeout(__focusBarcodeIfAllowed, 900);
 };
+
+
+
+/* ===== CLEAR SEARCH ON CLICK/TOUCH ===== */
+function installClearSearchOnClick(){
+  const s = document.getElementById('search');
+  if(!s || s.dataset.clearClick === '1') return;
+  s.dataset.clearClick = '1';
+
+  const clearIt = function(){
+    if(s.value){
+      s.value = '';
+      currentPage = 1;
+      renderProducts();
+    }
+  };
+
+  s.addEventListener('focus', clearIt, true);
+  s.addEventListener('click', clearIt, true);
+  s.addEventListener('touchstart', clearIt, true);
+  s.addEventListener('pointerdown', clearIt, true);
+}
+
+setInterval(installClearSearchOnClick, 500);
+document.addEventListener('DOMContentLoaded', installClearSearchOnClick);
