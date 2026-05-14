@@ -5,20 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inventory Manager</title>
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
-<div class="header">
-  <h1>Inventory Manager</h1>
-  <p>Gestionale Magazzino / 库存管理</p>
+<div class="app-header">
+  <div>
+    <h1>Inventory Manager</h1>
+    <p>Gestionale Magazzino / 库存管理</p>
+  </div>
 </div>
 
 <div class="toolbar">
-  <input type="text" id="search" placeholder="Cerca barcode o prodotto..." autofocus onkeyup="renderProducts()">
-  <button onclick="toggleSelectProducts()" id="toggleBtn">Seleziona prodotti</button>
+  <input type="text" id="search" placeholder="Cerca barcode o prodotto..." autofocus onkeyup="currentPage=1; renderProducts();">
+  <button onclick="toggleSelectProducts()" id="toggleSelectBtn">Seleziona prodotti</button>
+  <button onclick="deleteSelectedProducts()">Elimina selezionati</button>
+  <button onclick="exportCSV()">Esporta CSV</button>
+  <label class="upload-btn">Importa Excel/CSV
+    <input type="file" accept=".csv,.xls,.xlsx,.xlsm,.ods" onchange="importExcel(event)">
+  </label>
 </div>
 
-<div class="table-wrap">
+<div class="table-card">
 <table>
 <thead>
 <tr>
@@ -35,38 +43,60 @@
 </table>
 </div>
 
-<div id="editModal" class="modal">
-<div class="modal-box">
-
-<div class="modal-top">
-<div>
-<h2>Modifica Prodotto</h2>
-<p>编辑产品</p>
-</div>
-<button class="close-btn" onclick="closeModal()">✕</button>
+<div class="pagination">
+  <button onclick="prevPage()">⬅ Precedente</button>
+  <span id="pageInfo"></span>
+  <button onclick="nextPage()">Successiva ➡</button>
 </div>
 
-<label>Barcode / 条形码</label>
-<input id="editBarcode">
+<div id="editModal" class="edit-overlay">
+  <div class="edit-card">
+    <div class="edit-header">
+      <div class="edit-icon">✏️</div>
+      <div>
+        <h2>Modifica Prodotto</h2>
+        <p>编辑产品信息</p>
+      </div>
+      <button class="edit-close" onclick="closeEditModal()">×</button>
+    </div>
 
-<label>Nome prodotto / 产品名称</label>
-<input id="editName">
+    <div class="edit-info">
+      <span>✓</span>
+      Puoi modificare barcode, nome, fornitore e prezzi. Le modifiche vengono salvate subito.
+    </div>
 
-<label>Fornitore / 供应商</label>
-<input id="editSupplier">
+    <div class="edit-grid">
+      <div class="field">
+        <label>Barcode / 条形码</label>
+        <div class="input-wrap"><span>▦</span><input id="editBarcode"></div>
+      </div>
 
-<label>Prezzo acquisto (€)</label>
-<input id="editBuy">
+      <div class="field">
+        <label>Nome prodotto / 产品名称</label>
+        <div class="input-wrap"><span>📦</span><input id="editName"></div>
+      </div>
 
-<label>Prezzo vendita (€)</label>
-<input id="editSell">
+      <div class="field">
+        <label>Fornitore / 供应商</label>
+        <div class="input-wrap"><span>🏭</span><input id="editSupplier"></div>
+      </div>
 
-<div class="modal-buttons">
-<button onclick="closeModal()">Annulla</button>
-<button class="save-btn" onclick="saveEdit()">Salva Modifiche</button>
-</div>
+      <div class="field">
+        <label>Prezzo acquisto (€)</label>
+        <div class="input-wrap"><span>€</span><input id="editBuy" inputmode="decimal"></div>
+      </div>
 
-</div>
+      <div class="field">
+        <label>Prezzo vendita (€)</label>
+        <div class="input-wrap"><span>€</span><input id="editSell" inputmode="decimal"></div>
+      </div>
+    </div>
+
+    <div class="edit-actions">
+      <button class="btn-cancel" onclick="closeEditModal()">Annulla</button>
+      <button class="btn-save" onclick="saveEditProduct()">Salva Modifiche</button>
+    </div>
+  </div>
 </div>
 
 <script src="app.js"></script>
