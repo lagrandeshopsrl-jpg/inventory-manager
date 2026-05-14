@@ -1,3 +1,0 @@
-Sidebar contiene Nuovo prodotto: False
-Totale occorrenze Nuovo Prodotto/prodotto: 2
-PIN 0101 visibile in html: False
