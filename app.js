@@ -23,7 +23,7 @@ let currentPage = 1;
 let allSelected = false;
 let editingIndex = null;
 let currentView = 'products';
-
+async function rowToProduct(r){return{barcode:String(r?.barcode||''),name:String(r?.name||''),supplier:String(r?.supplier||''),buyPrice:String(r?.buy_price||r?.buyPrice||''),sellPrice:String(r?.sell_price||r?.sellPrice||''),prodotto:String(r?.name||''),fornitore:String(r?.supplier||''),acquisto:String(r?.buy_price||r?.buyPrice||''),vendita:String(r?.sell_price||r?.sellPrice||'')}}async function syncNow(){setCloudStatus('Sincronizzazione...','sync');try{const{data,error}=await supabaseClient.from('products').select('*');if(error)throw error;const rows=(data||[]).filter(r=>r&&r.barcode);if(rows.length){products=rows.map(rowToProduct);saveStorage();if(currentView==='suppliers')renderSupplierFolders();else if(currentView==='history')renderImportSessions();else renderProducts();setCloudStatus(`Cloud attivo: ${products.length} prodotti`,'ok');cloudReady=true;}else{setCloudStatus('Cloud attivo (vuoto)','ok');cloudReady=true;}}catch(e){console.error(e);setCloudStatus('Cloud errore','err');cloudReady=false;}cloudLoading=false;}
 function valueOf(p, keys){ for(const k of keys){ if(p && p[k] !== undefined && p[k] !== null && p[k] !== '') return p[k]; } return ''; }
 function getBarcode(p){ return valueOf(p,['barcode','Barcode','codice','EAN','条码']); }
 function getName(p){ return valueOf(p,['name','prodotto','Prodotto','Nome','商品']); }
