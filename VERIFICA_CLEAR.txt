@@ -1,0 +1,2 @@
+onfocus clear in html: True
+JS clear patch: True
