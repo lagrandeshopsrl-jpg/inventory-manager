@@ -143,14 +143,79 @@ setInterval(() => {
 
 
 
+
+
+
+
+/* ===== SCANNER BARCODE DEFINITIVO: cattura globale ===== */
+let scannerBuffer = "";
+let scannerTimer = null;
+
+function modalIsOpen(){
+  const editModal = document.getElementById('editModal');
+  const newModal = document.getElementById('newProductModal');
+  return (editModal && editModal.style.display === 'flex') ||
+         (newModal && newModal.style.display === 'flex');
+}
+
+function barcodeSearchFocus(){
+  const s = document.getElementById('search');
+  if(s && !modalIsOpen()){
+    s.focus({preventScroll:true});
+  }
+}
+
+function setSearchValueFromScanner(value){
+  const s = document.getElementById('search');
+  if(!s) return;
+  s.value = value;
+  currentPage = 1;
+  renderProducts();
+  barcodeSearchFocus();
+}
+
+document.addEventListener('keydown', function(e){
+  if(modalIsOpen()) return;
+
+  const s = document.getElementById('search');
+  if(!s) return;
+
+  // Se scanner manda Invio, completa la lettura
+  if(e.key === 'Enter'){
+    if(scannerBuffer){
+      e.preventDefault();
+      setSearchValueFromScanner(scannerBuffer);
+      scannerBuffer = "";
+    }
+    barcodeSearchFocus();
+    return;
+  }
+
+  // Se è un carattere normale da scanner/tastiera
+  if(e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey){
+    // cattura anche se il cursore non è nel campo
+    if(document.activeElement !== s){
+      e.preventDefault();
+      scannerBuffer += e.key;
+
+      clearTimeout(scannerTimer);
+      scannerTimer = setTimeout(() => {
+        if(scannerBuffer){
+          setSearchValueFromScanner(scannerBuffer);
+          scannerBuffer = "";
+        }
+      }, 120);
+    }
+  }
+}, true);
+
+// Focus continuo leggero, ma non disturba modali modifica/nuovo prodotto
+setInterval(barcodeSearchFocus, 700);
+
 window.onload = function(){
   showProducts();
   syncNow();
-
-  setTimeout(() => {
-    const s = document.getElementById('search');
-    if(s){
-      s.focus();
-    }
-  }, 300);
+  setTimeout(barcodeSearchFocus, 100);
+  setTimeout(barcodeSearchFocus, 500);
+  setTimeout(barcodeSearchFocus, 1200);
 };

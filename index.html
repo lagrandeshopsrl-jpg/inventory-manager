@@ -36,7 +36,7 @@
 
       <section id="productsPage">
         <div class="toolbar">
-          <input id="search" type="text" placeholder="Cerca barcode o prodotto..." autofocus autocomplete="off" tabindex="1" oninput="currentPage=1; renderProducts();" />
+          <input id="search" class="scanner-input" type="text" placeholder="Scansiona barcode qui..." autofocus autocomplete="off" tabindex="1" inputmode="numeric">
           <button tabindex="-1" onclick="toggleSelectProducts()" id="toggleSelectBtn">Seleziona prodotti</button>
           <button tabindex="-1" onclick="deleteSelectedProducts()">Elimina selezionati</button>
           <button tabindex="-1" onclick="exportExcel()">Esporta Excel</button>

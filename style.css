@@ -22,3 +22,16 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 /* NO LOGIN FIX */
 .app-root{display:flex!important;min-height:100vh;}
 #loginScreen,#removedLoginScreen{display:none!important;}
+
+
+/* SCANNER MODE */
+.scanner-input{
+  border:3px solid #0b63e5 !important;
+  box-shadow:0 0 0 5px rgba(11,99,229,.12) !important;
+  font-size:20px !important;
+  font-weight:800 !important;
+}
+.scanner-input:focus{
+  border-color:#16a34a !important;
+  box-shadow:0 0 0 5px rgba(22,163,74,.18) !important;
+}
