@@ -126,15 +126,24 @@ function deleteSelectedProducts(){
 function nextPage(){ currentPage++; renderProducts(); }
 function prevPage(){ if(currentPage>1) currentPage--; renderProducts(); }
 
+
 function exportCSV(){
-  let csv="\ufeffBarcode,Prodotto,Fornitore,Acquisto,Vendita\n";
-  products.forEach(p=> csv += `"${getBarcode(p)}","${getName(p)}","${getSupplier(p)}","${getBuy(p)}","${getSell(p)}"\n`);
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='prodotti.csv'; a.click();
-  URL.revokeObjectURL(url);
+  const rows = products.map(p => ({
+    Barcode: getBarcode(p),
+    Prodotto: getName(p),
+    Fornitore: getSupplier(p),
+    Acquisto: getBuy(p),
+    Vendita: getSell(p)
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Prodotti");
+
+  XLSX.writeFile(workbook, "prodotti.xlsx");
 }
+
 
 function normalizeKey(key){ return String(key || '').trim().toLowerCase().replace(/\s+/g,''); }
 function getValue(row, keys){
