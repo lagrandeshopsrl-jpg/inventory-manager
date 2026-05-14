@@ -97,71 +97,130 @@ async function importExcel(event){ const file=event.target.files[0]; if(!file)re
 function logoutUser(){ showProducts(); }
 
 
+/* ===== BARCODE SCANNER FINALE ===== */
+let __barcodeLastValue = "";
 
-
-
-/* ===== BARCODE SEARCH: PRIMO CAMPO SEMPRE ATTIVO ===== */
-function focusBarcodeSearch(){
-  const s = document.getElementById('search');
+function __modalOpen(){
   const editModal = document.getElementById('editModal');
   const newModal = document.getElementById('newProductModal');
-
-  const modalOpen =
-    (editModal && editModal.style.display === 'flex') ||
-    (newModal && newModal.style.display === 'flex');
-
-  if(s && !modalOpen){
-    s.focus({preventScroll:true});
-  }
+  return (editModal && editModal.style.display === 'flex') ||
+         (newModal && newModal.style.display === 'flex');
 }
 
-const _renderProductsOriginal = renderProducts;
-renderProducts = function(){
-  _renderProductsOriginal();
-  setTimeout(focusBarcodeSearch, 0);
-  setTimeout(focusBarcodeSearch, 100);
-};
+function __hasSelection(){
+  try{
+    return (window.getSelection && window.getSelection().toString().length > 0);
+  }catch(e){ return false; }
+}
 
-const _showProductsOriginal = showProducts;
-showProducts = function(){
-  _showProductsOriginal();
-  setTimeout(focusBarcodeSearch, 0);
-  setTimeout(focusBarcodeSearch, 200);
-};
+function __barcodeOnlyDigits(str){
+  return /^\d+$/.test(String(str || ''));
+}
 
-const _syncNowOriginal = syncNow;
-syncNow = async function(){
-  await _syncNowOriginal();
-  setTimeout(focusBarcodeSearch, 0);
-  setTimeout(focusBarcodeSearch, 300);
-};
+function __focusBarcodeIfAllowed(){
+  const s = document.getElementById('search');
+  const productsPage = document.getElementById('productsPage');
+  if(!s || !productsPage || __modalOpen() || __hasSelection()) return;
 
-/* Se lo scanner scrive quando il focus è altrove, rimanda i tasti al campo barcode */
+  const ae = document.activeElement;
+  const userTypingElsewhere =
+    ae && ae !== s && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+
+  if(userTypingElsewhere) return;
+  if(document.activeElement !== s) s.focus({preventScroll:true});
+}
+
+function __installBarcodeInputLogic(){
+  const s = document.getElementById('search');
+  if(!s || s.dataset.barcodeLogic === '1') return;
+  s.dataset.barcodeLogic = '1';
+  __barcodeLastValue = s.value || "";
+
+  s.addEventListener('beforeinput', function(e){
+    if(!e.data || !__barcodeOnlyDigits(e.data)) return;
+    if(s.value && s.selectionStart === s.selectionEnd){
+      s.value = "";
+      __barcodeLastValue = "";
+    }
+  }, true);
+
+  s.addEventListener('input', function(){
+    const cur = s.value || "";
+    if(cur.length <= __barcodeLastValue.length){
+      __barcodeLastValue = cur;
+      return;
+    }
+
+    let inserted = cur;
+    if(__barcodeLastValue && cur.startsWith(__barcodeLastValue)){
+      inserted = cur.slice(__barcodeLastValue.length);
+    }
+
+    if(__barcodeLastValue && inserted && __barcodeOnlyDigits(inserted)){
+      s.value = inserted;
+      currentPage = 1;
+      renderProducts();
+    }
+
+    __barcodeLastValue = s.value || "";
+  }, true);
+
+  s.addEventListener('focus', function(){
+    __barcodeLastValue = s.value || "";
+  });
+}
+
 document.addEventListener('keydown', function(e){
   const s = document.getElementById('search');
-  if(!s) return;
+  if(!s || __modalOpen()) return;
 
-  const editModal = document.getElementById('editModal');
-  const newModal = document.getElementById('newProductModal');
-  const modalOpen =
-    (editModal && editModal.style.display === 'flex') ||
-    (newModal && newModal.style.display === 'flex');
+  const ae = document.activeElement;
+  const inOtherInput = ae && ae !== s && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+  if(inOtherInput) return;
 
-  if(modalOpen) return;
-
-  if(document.activeElement !== s && e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey){
-    e.preventDefault();
-    s.focus({preventScroll:true});
-    s.value += e.key;
-    currentPage = 1;
-    renderProducts();
+  if(e.key && e.key.length === 1 && __barcodeOnlyDigits(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey){
+    if(document.activeElement !== s){
+      e.preventDefault();
+      s.value = "";
+      s.focus({preventScroll:true});
+      s.value = e.key;
+      __barcodeLastValue = s.value;
+      currentPage = 1;
+      renderProducts();
+    }
   }
 }, true);
 
+const __oldRenderProductsFinal = renderProducts;
+renderProducts = function(){
+  __oldRenderProductsFinal();
+  setTimeout(__installBarcodeInputLogic, 0);
+  setTimeout(__focusBarcodeIfAllowed, 50);
+};
+
+const __oldShowProductsFinal = showProducts;
+showProducts = function(){
+  __oldShowProductsFinal();
+  setTimeout(__installBarcodeInputLogic, 0);
+  setTimeout(__focusBarcodeIfAllowed, 100);
+};
+
+const __oldSyncNowFinal = syncNow;
+syncNow = async function(){
+  await __oldSyncNowFinal();
+  setTimeout(__installBarcodeInputLogic, 0);
+  setTimeout(__focusBarcodeIfAllowed, 150);
+};
+
+setInterval(function(){
+  __installBarcodeInputLogic();
+  __focusBarcodeIfAllowed();
+}, 1200);
+
 window.onload = function(){
   showProducts();
-  setTimeout(focusBarcodeSearch, 50);
-  setTimeout(syncNow, 150);
-  setTimeout(focusBarcodeSearch, 500);
-  setTimeout(focusBarcodeSearch, 1200);
+  setTimeout(__installBarcodeInputLogic, 50);
+  setTimeout(__focusBarcodeIfAllowed, 100);
+  setTimeout(syncNow, 200);
+  setTimeout(__focusBarcodeIfAllowed, 900);
 };

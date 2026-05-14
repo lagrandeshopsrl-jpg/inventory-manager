@@ -25,13 +25,9 @@
       <div class="scanner-bar">
         <input id="search" class="scanner-search" type="text"
           placeholder="SCANSIONA / CERCA BARCODE QUI"
-          autofocus
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false"
-          tabindex="1"
-          inputmode="numeric"
+          autofocus autocomplete="off" autocorrect="off"
+          autocapitalize="off" spellcheck="false"
+          tabindex="1" inputmode="numeric"
           oninput="currentPage=1; renderProducts();">
       </div>
       <div class="titlebar">
@@ -119,5 +115,5 @@
   </div>
 
   <script src="app.js"></script>
-<script>(function(){function focusSearch(){const s=document.getElementById('search');if(!s)return;const ae=document.activeElement,isTyping=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable);if(isTyping)return;s.focus();try{s.setSelectionRange(s.value.length,s.value.length);}catch(e){}}document.addEventListener('DOMContentLoaded',focusSearch);setInterval(focusSearch,700);})();</script></body>
+</body>
 </html>
