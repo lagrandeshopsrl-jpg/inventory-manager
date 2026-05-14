@@ -96,7 +96,29 @@ async function importExcel(event){ const file=event.target.files[0]; if(!file)re
 
 function logoutUser(){ showProducts(); }
 
-window.onload = function(){ showProducts(); syncNow(); focusBarcodeSearch(); };
+
+window.onload = function () {
+  showProducts();
+  syncNow();
+
+  function forceFocus() {
+    const search = document.getElementById('search');
+    if (search) {
+      search.focus();
+      search.click();
+      try { search.select(); } catch(e) {}
+    }
+  }
+
+  setTimeout(forceFocus, 300);
+  setTimeout(forceFocus, 800);
+  setTimeout(forceFocus, 1500);
+
+  document.addEventListener('click', () => {
+    setTimeout(forceFocus, 50);
+  });
+};
+
 
 
 function focusBarcodeSearch(){
