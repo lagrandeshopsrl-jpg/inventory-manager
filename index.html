@@ -16,10 +16,17 @@
 <div class="topbar">
 <input type="text" id="search" placeholder="Cerca barcode o prodotto..." autofocus onkeyup="renderProducts()">
 
-<button onclick="selectAllProducts()">Seleziona/Deseleziona</button>
-<button onclick="deleteSelectedProducts()">Elimina selezionati</button>
+<button onclick="toggleSelectProducts()" id="toggleSelectBtn">
+Seleziona prodotti
+</button>
 
-<button onclick="exportCSV()">Esporta CSV</button>
+<button onclick="deleteSelectedProducts()">
+Elimina selezionati
+</button>
+
+<button onclick="exportCSV()">
+Esporta CSV
+</button>
 
 <label class="upload-btn">
 Importa Excel
@@ -40,12 +47,16 @@ Importa Excel
 <th>Azioni</th>
 </tr>
 </thead>
+
 <tbody id="productTable"></tbody>
+
 </table>
 
 <div class="pagination">
 <button onclick="prevPage()">⬅ Precedente</button>
+
 <span id="pageInfo"></span>
+
 <button onclick="nextPage()">Successiva ➡</button>
 </div>
 
