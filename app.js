@@ -312,3 +312,225 @@ function importExcel(event){
 window.onload=function(){
   showProducts();
 };
+
+
+/* ===== CRONOLOGIA PRODOTTI AGGIUNTI ===== */
+let productHistory = JSON.parse(localStorage.getItem('productHistory') || '[]');
+
+function saveHistory(){
+  localStorage.setItem('productHistory', JSON.stringify(productHistory));
+}
+
+function addHistoryEntry(product, action='Aggiunto'){
+  productHistory.unshift({
+    action,
+    time: new Date().toISOString(),
+    barcode: getBarcode(product),
+    name: getName(product),
+    supplier: getSupplier(product),
+    buyPrice: getBuy(product),
+    sellPrice: getSell(product)
+  });
+  saveHistory();
+}
+
+function formatDateIT(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('it-IT');
+}
+
+function formatTimeIT(iso){
+  const d = new Date(iso);
+  return d.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+function showHistory(){
+  currentView = 'history';
+
+  document.getElementById('menuProducts')?.classList.remove('active');
+  document.getElementById('menuSuppliers')?.classList.remove('active');
+  document.getElementById('menuHistory')?.classList.add('active');
+
+  document.getElementById('pageTitle').innerText = 'Cronologia';
+  document.getElementById('pageSubtitle').innerText = 'Prodotti aggiunti di recente / 最近添加';
+
+  document.getElementById('productsPage').classList.add('hidden');
+  document.getElementById('suppliersPage').classList.add('hidden');
+  document.getElementById('historyPage').classList.remove('hidden');
+
+  renderHistory();
+}
+
+function renderHistory(){
+  const search = (document.getElementById('historySearch')?.value || '').toLowerCase();
+  const list = document.getElementById('historyList');
+
+  const filtered = productHistory.filter(h =>
+    String(h.barcode || '').toLowerCase().includes(search) ||
+    String(h.name || '').toLowerCase().includes(search) ||
+    String(h.supplier || '').toLowerCase().includes(search)
+  );
+
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="history-day"><div class="history-day-title">Nessuna cronologia trovata</div></div>';
+    return;
+  }
+
+  const groups = {};
+  filtered.forEach(h=>{
+    const day = formatDateIT(h.time);
+    if(!groups[day]) groups[day] = [];
+    groups[day].push(h);
+  });
+
+  list.innerHTML = Object.keys(groups).map(day=>{
+    const items = groups[day].map(h=>`
+      <div class="history-item">
+        <div class="history-time">${formatTimeIT(h.time)}</div>
+        <div>
+          <div class="history-product">${h.name || '-'}</div>
+          <div class="history-meta">Barcode: ${h.barcode || '-'} · Fornitore: ${h.supplier || '-'}</div>
+        </div>
+        <div class="history-badge">${h.action || 'Aggiunto'}</div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="history-day">
+        <div class="history-day-title">${day}</div>
+        ${items}
+      </div>
+    `;
+  }).join('');
+}
+
+function clearHistory(){
+  if(confirm('Svuotare tutta la cronologia?')){
+    productHistory = [];
+    saveHistory();
+    renderHistory();
+  }
+}
+
+/* Sovrascrivo setActiveMenu per includere cronologia */
+const oldSetActiveMenu = setActiveMenu;
+setActiveMenu = function(view){
+  document.getElementById('menuProducts')?.classList.toggle('active', view === 'products');
+  document.getElementById('menuSuppliers')?.classList.toggle('active', view === 'suppliers');
+  document.getElementById('menuHistory')?.classList.toggle('active', view === 'history');
+};
+
+/* Sovrascrivo showProducts/showSuppliers per nascondere cronologia */
+const oldShowProducts = showProducts;
+showProducts = function(){
+  document.getElementById('historyPage')?.classList.add('hidden');
+  oldShowProducts();
+};
+
+const oldShowSuppliers = showSuppliers;
+showSuppliers = function(){
+  document.getElementById('historyPage')?.classList.add('hidden');
+  oldShowSuppliers();
+};
+
+/* Sovrascrivo importExcel: registra nuovi prodotti in cronologia */
+const oldImportExcel = importExcel;
+importExcel = function(event){
+  const beforeBarcodes = new Set(products.map(p => String(getBarcode(p))));
+  const oldAlert = window.alert;
+
+  window.alert = function(msg){
+    window.alert = oldAlert;
+
+    products.forEach(p=>{
+      const b = String(getBarcode(p));
+      if(b && !beforeBarcodes.has(b)){
+        addHistoryEntry(p, 'Aggiunto');
+      }
+    });
+
+    oldAlert(msg);
+  };
+
+  oldImportExcel(event);
+};
+
+/* ===== SELEZIONE PRODOTTI NELLA CARTELLA FORNITORE ===== */
+function openSupplierFolder(encodedName){
+  const name = decodeURIComponent(encodedName);
+  const groups = groupBySuppliers();
+  const items = groups[name] || [];
+
+  document.getElementById('supplierFolders').classList.add('hidden');
+  document.getElementById('supplierDetail').classList.remove('hidden');
+
+  const rows = items.map(item=>{
+    const p = item.product;
+    return `
+      <tr>
+        <td><input type="checkbox" class="supplier-product-checkbox" data-index="${item.index}"></td>
+        <td>${getBarcode(p)}</td>
+        <td>${getName(p)}</td>
+        <td>${getBuy(p)}</td>
+        <td>${getSell(p)}</td>
+        <td>
+          <button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button>
+          <button class="delete-btn" onclick="deleteProduct(${item.index})">Elimina</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('supplierDetail').innerHTML = `
+    <div class="supplier-detail-header">
+      <h2>📁 ${name}</h2>
+      <div class="supplier-detail-actions">
+        <button onclick="selectAllSupplierProducts()">Seleziona tutti</button>
+        <button onclick="deselectAllSupplierProducts()">Deseleziona</button>
+        <button class="danger" onclick="deleteSelectedSupplierProducts()">Elimina selezionati</button>
+        <button class="back-folder" onclick="renderSupplierFolders()">Torna alle cartelle</button>
+      </div>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Barcode</th>
+            <th>Prodotto</th>
+            <th>Acquisto</th>
+            <th>Vendita</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function selectAllSupplierProducts(){
+  document.querySelectorAll('.supplier-product-checkbox').forEach(cb=>cb.checked=true);
+}
+
+function deselectAllSupplierProducts(){
+  document.querySelectorAll('.supplier-product-checkbox').forEach(cb=>cb.checked=false);
+}
+
+function deleteSelectedSupplierProducts(){
+  const selected = [];
+  document.querySelectorAll('.supplier-product-checkbox').forEach(cb=>{
+    if(cb.checked) selected.push(parseInt(cb.dataset.index));
+  });
+
+  if(selected.length === 0){
+    alert('Nessun prodotto selezionato');
+    return;
+  }
+
+  if(confirm('Eliminare i prodotti selezionati di questo fornitore?')){
+    selected.sort((a,b)=>b-a).forEach(i=>products.splice(i,1));
+    saveStorage();
+    renderSupplierFolders();
+  }
+}

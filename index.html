@@ -14,6 +14,7 @@
     <div class="logo">▱ Inventory Manager</div>
     <button class="menu active" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
     <button class="menu" id="menuSuppliers" onclick="showSuppliers()">📁 Fornitori</button>
+    <button class="menu" id="menuHistory" onclick="showHistory()">🕘 Cronologia</button>
     <button class="menu">▤ Categorie</button>
     <button class="menu">⚙ Impostazioni</button>
     <div class="copyright">© 2026 Inventory Manager</div>
@@ -71,6 +72,14 @@
       <div id="supplierStats" class="supplier-stats"></div>
       <div id="supplierFolders" class="supplier-folders"></div>
       <div id="supplierDetail" class="supplier-detail hidden"></div>
+    </section>
+
+    <section id="historyPage" class="hidden">
+      <div class="history-top">
+        <input id="historySearch" placeholder="Cerca nella cronologia..." oninput="renderHistory()">
+        <button onclick="clearHistory()">Svuota cronologia</button>
+      </div>
+      <div id="historyList" class="history-list"></div>
     </section>
   </main>
 </div>
