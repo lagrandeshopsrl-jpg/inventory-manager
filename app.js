@@ -1,3 +1,20 @@
+
+/* ===== SUPABASE CLOUD CONFIG ===== */
+const SUPABASE_URL = "https://kvxslzlpvzmwlqgirsrp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_JzG8DuX-hscXifyCUz9jFA_fmOOkFJ1";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let cloudReady = false;
+let cloudLoading = false;
+
+function setCloudStatus(text, type=''){
+  const el = document.getElementById('cloudStatus');
+  if(!el) return;
+  el.className = 'cloud-status ' + type;
+  el.innerText = text;
+}
+
+
 let products = JSON.parse(localStorage.getItem('products') || '[]');
 let importSessions = JSON.parse(localStorage.getItem('importSessions') || '[]');
 
@@ -138,3 +155,395 @@ function importExcel(event){
   if(fileName.endsWith('.csv'))reader.readAsText(file,'UTF-8'); else reader.readAsArrayBuffer(file);
 }
 window.onload=function(){showProducts();};
+
+
+
+
+/* ===== SUPABASE CLOUD SYNC ===== */
+async function cloudLoadProducts(){
+  const { data, error } = await supabaseClient
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending:false });
+
+  if(error) throw error;
+
+  products = (data || []).map(row => ({
+    barcode: row.barcode || '',
+    name: row.name || '',
+    supplier: row.supplier || '',
+    buyPrice: row.buy_price || '',
+    sellPrice: row.sell_price || '',
+    prodotto: row.name || '',
+    fornitore: row.supplier || '',
+    acquisto: row.buy_price || '',
+    vendita: row.sell_price || ''
+  }));
+
+  localStorage.setItem('products', JSON.stringify(products));
+}
+
+async function cloudLoadImportSessions(){
+  const { data, error } = await supabaseClient
+    .from('import_sessions')
+    .select('*')
+    .order('created_at', { ascending:false });
+
+  if(error) throw error;
+
+  importSessions = (data || []).map(row => ({
+    id: row.session_id,
+    fileName: row.file_name,
+    time: row.created_at,
+    products: row.products || []
+  }));
+
+  localStorage.setItem('importSessions', JSON.stringify(importSessions));
+}
+
+async function cloudUpsertProduct(product){
+  const row = {
+    barcode: getBarcode(product),
+    name: getName(product),
+    supplier: getSupplier(product),
+    buy_price: String(getBuy(product) || ''),
+    sell_price: String(getSell(product) || ''),
+    updated_at: new Date().toISOString()
+  };
+
+  if(!row.barcode) return;
+
+  const { error } = await supabaseClient
+    .from('products')
+    .upsert(row, { onConflict:'barcode' });
+
+  if(error) throw error;
+}
+
+async function cloudDeleteProductByBarcode(barcode){
+  if(!barcode) return;
+  const { error } = await supabaseClient
+    .from('products')
+    .delete()
+    .eq('barcode', String(barcode));
+
+  if(error) throw error;
+}
+
+async function cloudSaveImportSession(session){
+  if(!session || !session.id) return;
+
+  const { error } = await supabaseClient
+    .from('import_sessions')
+    .upsert({
+      session_id: session.id,
+      file_name: session.fileName || 'Importazione',
+      products: session.products || [],
+      created_at: session.time || new Date().toISOString()
+    }, { onConflict:'session_id' });
+
+  if(error) throw error;
+}
+
+async function cloudDeleteImportSession(id){
+  const { error } = await supabaseClient
+    .from('import_sessions')
+    .delete()
+    .eq('session_id', id);
+
+  if(error) throw error;
+}
+
+async function syncNow(){
+  try{
+    setCloudStatus('☁ Sincronizzo...', '');
+    cloudLoading = true;
+
+    await cloudLoadProducts();
+    await cloudLoadImportSessions();
+
+    cloudReady = true;
+    cloudLoading = false;
+    setCloudStatus('☁ Cloud attivo', 'ok');
+
+    if(currentView === 'suppliers') renderSupplierFolders();
+    else if(currentView === 'history') renderImportSessions();
+    else renderProducts();
+
+  }catch(err){
+    console.error(err);
+    cloudLoading = false;
+    setCloudStatus('☁ Cloud errore', 'err');
+    alert('Errore cloud: prima devi creare le tabelle Supabase con il file setup_cloud.sql');
+  }
+}
+
+/* override salvataggi per cloud */
+saveEditProduct = async function(){
+  if(editingIndex === null) return;
+
+  const oldBarcode = getBarcode(products[editingIndex]);
+
+  const barcode = document.getElementById('editBarcode').value.trim();
+  const name = document.getElementById('editName').value.trim();
+  const supplier = document.getElementById('editSupplier').value.trim();
+  const buyPrice = document.getElementById('editBuy').value.trim();
+  const sellPrice = document.getElementById('editSell').value.trim();
+
+  products[editingIndex] = {
+    ...products[editingIndex],
+    barcode, name, supplier, buyPrice, sellPrice,
+    prodotto:name, fornitore:supplier, acquisto:buyPrice, vendita:sellPrice
+  };
+
+  saveStorage();
+  closeEditModal();
+
+  try{
+    if(oldBarcode && oldBarcode !== barcode){
+      await cloudDeleteProductByBarcode(oldBarcode);
+    }
+    await cloudUpsertProduct(products[editingIndex]);
+    setCloudStatus('☁ Salvato', 'ok');
+  }catch(err){
+    console.error(err);
+    setCloudStatus('☁ Errore salvataggio', 'err');
+  }
+
+  if(currentView === 'suppliers') renderSupplierFolders();
+  else renderProducts();
+};
+
+saveNewProduct = async function(){
+  const product = {
+    barcode: document.getElementById('newBarcode').value.trim(),
+    name: document.getElementById('newName').value.trim(),
+    supplier: document.getElementById('newSupplier').value.trim(),
+    buyPrice: document.getElementById('newBuy').value.trim(),
+    sellPrice: document.getElementById('newSell').value.trim()
+  };
+
+  if(!product.barcode || !product.name){
+    alert('Inserisci barcode e nome prodotto');
+    return;
+  }
+
+  const fullProduct = {
+    ...product,
+    prodotto: product.name,
+    fornitore: product.supplier,
+    acquisto: product.buyPrice,
+    vendita: product.sellPrice
+  };
+
+  const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
+  if(existing >= 0) products[existing] = {...products[existing], ...fullProduct};
+  else products.unshift(fullProduct);
+
+  saveStorage();
+  closeNewProductModal();
+
+  try{
+    await cloudUpsertProduct(fullProduct);
+    setCloudStatus('☁ Salvato', 'ok');
+  }catch(err){
+    console.error(err);
+    setCloudStatus('☁ Errore salvataggio', 'err');
+  }
+
+  renderProducts();
+};
+
+deleteProduct = async function(index){
+  if(confirm('Eliminare prodotto?')){
+    const barcode = getBarcode(products[index]);
+    products.splice(index,1);
+    saveStorage();
+
+    try{
+      await cloudDeleteProductByBarcode(barcode);
+      setCloudStatus('☁ Eliminato', 'ok');
+    }catch(err){
+      console.error(err);
+      setCloudStatus('☁ Errore eliminazione', 'err');
+    }
+
+    if(currentView === 'suppliers') renderSupplierFolders();
+    else renderProducts();
+  }
+};
+
+deleteSelectedProducts = async function(){
+  const selected=[];
+  document.querySelectorAll('.product-checkbox').forEach(cb=>{
+    if(cb.checked) selected.push(parseInt(cb.dataset.index));
+  });
+  if(!selected.length){ alert('Nessun prodotto selezionato'); return; }
+
+  if(confirm('Eliminare prodotti selezionati?')){
+    const barcodes = selected.map(i=>getBarcode(products[i]));
+    selected.sort((a,b)=>b-a).forEach(i=>products.splice(i,1));
+    saveStorage();
+
+    try{
+      for(const b of barcodes) await cloudDeleteProductByBarcode(b);
+      setCloudStatus('☁ Eliminati', 'ok');
+    }catch(err){
+      console.error(err);
+      setCloudStatus('☁ Errore eliminazione', 'err');
+    }
+
+    renderProducts();
+  }
+};
+
+importExcel = function(event){
+  const file=event.target.files[0]; 
+  if(!file)return;
+
+  const before = new Set(products.map(p=>String(getBarcode(p))));
+  const fileName = file.name;
+  const reader = new FileReader();
+  const lower = file.name.toLowerCase();
+
+  reader.onload = async function(e){
+    try{
+      const wb = lower.endsWith('.csv')
+        ? XLSX.read(e.target.result,{type:'string'})
+        : XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet,{defval:''});
+      let imported=0, updated=0;
+
+      for(const row of rows){
+        const product={
+          barcode:getValue(row,['Barcode','Codice','EAN','条码']),
+          name:getValue(row,['Prodotto','Nome','Product','商品']),
+          supplier:getValue(row,['Fornitore','Supplier','Nome Fornitore','供应商']),
+          buyPrice:getValue(row,['Acquisto','Prezzo Acquisto','BuyPrice','进价']),
+          sellPrice:getValue(row,['Vendita','Prezzo Vendita','SellPrice','售价'])
+        };
+        if(!product.barcode) continue;
+
+        const full = {
+          ...product,
+          prodotto:product.name,
+          fornitore:product.supplier,
+          acquisto:product.buyPrice,
+          vendita:product.sellPrice
+        };
+
+        const existing=products.findIndex(p=>String(getBarcode(p))===String(product.barcode));
+        if(existing>=0){
+          products[existing]={...products[existing],...full};
+          updated++;
+        }else{
+          products.push(full);
+          imported++;
+        }
+
+        await cloudUpsertProduct(full);
+      }
+
+      saveStorage();
+
+      const importedNow=products.filter(p=>{
+        const b=String(getBarcode(p));
+        return b&&!before.has(b);
+      });
+
+      if(importedNow.length){
+        const session = {
+          id:'imp_'+Date.now(),
+          fileName:fileName,
+          time:new Date().toISOString(),
+          products:importedNow.map(p=>({
+            barcode:getBarcode(p),
+            name:getName(p),
+            supplier:getSupplier(p),
+            buyPrice:getBuy(p),
+            sellPrice:getSell(p)
+          }))
+        };
+        importSessions.unshift(session);
+        saveImportSessions();
+        await cloudSaveImportSession(session);
+      }
+
+      currentPage=1;
+      renderProducts();
+      event.target.value='';
+      setCloudStatus('☁ Import salvato', 'ok');
+      alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}`);
+
+    }catch(err){
+      console.error(err);
+      setCloudStatus('☁ Errore import', 'err');
+      alert('Errore importazione/cloud');
+    }
+  };
+
+  if(lower.endsWith('.csv')) reader.readAsText(file,'UTF-8');
+  else reader.readAsArrayBuffer(file);
+};
+
+deleteWholeImportSession = async function(id){
+  const session = importSessions.find(s=>s.id===id);
+  if(!session) return;
+
+  if(confirm('Eliminare TUTTI i prodotti di questa importazione?')){
+    const barcodes = session.products.map(p=>p.barcode);
+    deleteProductsByBarcodes(barcodes);
+    importSessions = importSessions.filter(s=>s.id!==id);
+    saveImportSessions();
+
+    try{
+      for(const b of barcodes) await cloudDeleteProductByBarcode(b);
+      await cloudDeleteImportSession(id);
+      setCloudStatus('☁ Importazione eliminata', 'ok');
+    }catch(err){
+      console.error(err);
+      setCloudStatus('☁ Errore cloud', 'err');
+    }
+
+    renderImportSessions();
+  }
+};
+
+deleteSelectedImportProducts = async function(id){
+  const selected = [];
+  document.querySelectorAll('.import-check-'+id).forEach(cb=>{
+    if(cb.checked) selected.push(cb.dataset.barcode);
+  });
+
+  if(!selected.length){ alert('Nessun prodotto selezionato'); return; }
+
+  if(confirm('Eliminare i prodotti selezionati?')){
+    deleteProductsByBarcodes(selected);
+
+    const session = importSessions.find(s=>s.id===id);
+    if(session){
+      const set = new Set(selected.map(String));
+      session.products = session.products.filter(p=>!set.has(String(p.barcode)));
+      if(!session.products.length) importSessions = importSessions.filter(s=>s.id!==id);
+      saveImportSessions();
+      try{
+        for(const b of selected) await cloudDeleteProductByBarcode(b);
+        if(session.products.length) await cloudSaveImportSession(session);
+        else await cloudDeleteImportSession(id);
+        setCloudStatus('☁ Eliminati', 'ok');
+      }catch(err){
+        console.error(err);
+        setCloudStatus('☁ Errore cloud', 'err');
+      }
+    }
+
+    renderImportSessions();
+  }
+};
+
+window.onload = async function(){
+  showProducts();
+  await syncNow();
+};

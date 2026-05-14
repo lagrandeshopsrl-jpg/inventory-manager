@@ -27,7 +27,7 @@
         <h1 id="pageTitle">Gestione Prodotti</h1>
         <p id="pageSubtitle">Gestionale Magazzino / 库存管理</p>
       </div>
-      <button class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button>
+      <div class="cloud-actions"><span id="cloudStatus" class="cloud-status">☁ Cloud...</span><button class="blue-btn" onclick="syncNow()">Sincronizza</button><button class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button></div>
     </div>
 
     <section id="productsPage">
@@ -107,6 +107,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
 </html>
