@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -9,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
+
 <div class="container">
 <h1>Gestionale Negozio</h1>
 
@@ -18,16 +18,18 @@
 <input type="number" id="buyPrice" placeholder="Prezzo acquisto">
 <input type="number" id="sellPrice" placeholder="Prezzo vendita">
 <input type="number" id="quantity" placeholder="Quantità">
-<button onclick="addProduct()">Salva Prodotto</button>
+
+<button onclick="saveProduct()">Salva / Modifica</button>
 </div>
 
 <div class="actions">
-<input type="text" id="search" placeholder="Cerca prodotto..." onkeyup="renderProducts()">
+<input type="text" id="search" placeholder="Cerca barcode o prodotto..." onkeyup="renderProducts()">
+
 <button onclick="exportCSV()">Esporta CSV</button>
 
 <label class="upload-btn">
 Importa Excel
-<input type="file" id="excelFile" accept=".xlsx,.csv" onchange="importExcel(event)">
+<input type="file" accept=".xlsx,.csv" onchange="importExcel(event)">
 </label>
 </div>
 
@@ -44,8 +46,10 @@ Importa Excel
 </thead>
 <tbody id="productTable"></tbody>
 </table>
+
 </div>
 
 <script src="app.js"></script>
+
 </body>
 </html>
