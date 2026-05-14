@@ -77,7 +77,7 @@ function editProduct(index){
     products[index].quantity = nuovaQuantita;
 
     saveStorage();
-    
+    renderProducts();
 }
 
 function deleteProduct(index){
@@ -85,18 +85,14 @@ function deleteProduct(index){
     if(confirm('Eliminare prodotto?')){
         products.splice(index,1);
         saveStorage();
-        
+        renderProducts();
     }
 }
 
-let allSelected = false;
-
 function selectAllProducts(){
 
-    allSelected = !allSelected;
-
     document.querySelectorAll('.product-checkbox').forEach(cb=>{
-        cb.checked = allSelected;
+        cb.checked = true;
     });
 }
 
@@ -124,19 +120,19 @@ function deleteSelectedProducts(){
         });
 
         saveStorage();
-        
+        renderProducts();
     }
 }
 
 function nextPage(){
     currentPage++;
-    
+    renderProducts();
 }
 
 function prevPage(){
     if(currentPage > 1){
         currentPage--;
-        
+        renderProducts();
     }
 }
 
@@ -195,7 +191,7 @@ function importExcel(event){
         });
 
         saveStorage();
-        
+        renderProducts();
 
         alert('Importazione completata!');
     };
@@ -203,15 +199,4 @@ function importExcel(event){
     reader.readAsArrayBuffer(file);
 }
 
-
-
-
-window.onload = function(){
-    
-
-    const search = document.getElementById('search');
-
-    if(search){
-        search.focus();
-    }
-};
+renderProducts();
