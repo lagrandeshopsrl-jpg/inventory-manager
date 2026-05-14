@@ -14,9 +14,9 @@
 <h1>Gestionale Negozio</h1>
 
 <div class="topbar">
-<input type="text" id="search" placeholder="Cerca barcode o prodotto..." onkeyup="renderProducts()">
+<input type="text" id="search" placeholder="Cerca barcode o prodotto..." autofocus onkeyup="renderProducts()">
 
-<button onclick="selectAllProducts()">Seleziona tutti</button>
+<button onclick="toggleSelectProducts()" id="toggleSelectBtn">Seleziona prodotti</button>
 <button onclick="deleteSelectedProducts()">Elimina selezionati</button>
 
 <button onclick="exportCSV()">Esporta CSV</button>
