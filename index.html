@@ -9,140 +9,133 @@
 </head>
 <body>
 
-<div class="app-shell">
+<div class="layout">
   <aside class="sidebar">
-    <div class="brand">▱ Inventory Manager</div>
-    <div class="menu active"><button class="menu active side-button" type="button" onclick="showProducts()">▣ Prodotti</button></div>
-    <div class="menu">＋ Nuovo Prodotto</div>
-    <div class="menu">▤ Categorie</div>
-    <div class="menu"><button class="menu side-button" type="button" onclick="showSuppliers()">☷ Fornitori</button></div>
-    <div class="menu">⚙ Impostazioni</div>
-    <div class="foot">© 2026 Inventory Manager</div>
+    <div class="logo">▱ Inventory Manager</div>
+    <button class="menu active" id="btnProdotti" onclick="showProducts()">▣ Prodotti</button>
+    <button class="menu" id="btnFornitori" onclick="showSuppliers()">📁 Fornitori</button>
+    <button class="menu">▤ Categorie</button>
+    <button class="menu">⚙ Impostazioni</button>
+    <div class="copyright">© 2026 Inventory Manager</div>
   </aside>
 
   <main class="main">
-    <div class="top">
+    <div class="titlebar">
       <div>
-        <h1>Gestione Prodotti</h1>
-        <p>Gestionale Magazzino / 库存管理</p>
+        <h1 id="pageTitle">Gestione Prodotti</h1>
+        <p id="pageSubtitle">Gestionale Magazzino / 库存管理</p>
       </div>
-      <button class="primary">＋ Nuovo Prodotto</button>
     </div>
 
-    <div class="toolbar">
-      <input id="search" placeholder="Cerca barcode o prodotto..." autofocus onkeyup="currentPage=1; renderProducts()">
+    <div id="productsToolbar" class="toolbar">
+      <input id="search" type="text" placeholder="Cerca barcode o prodotto..." autofocus oninput="currentPage=1; renderProducts();">
       <button onclick="toggleSelectProducts()" id="toggleSelectBtn">Seleziona prodotti</button>
       <button onclick="deleteSelectedProducts()">Elimina selezionati</button>
-      <button onclick="exportCSV()">Esporta Excel</button>
-      <label class="upload-btn">Importa
+      <button onclick="exportExcel()">Esporta Excel</button>
+      <label class="file-label">Importa
         <input type="file" accept=".csv,.xls,.xlsx,.xlsm,.ods" onchange="importExcel(event)">
       </label>
     </div>
 
-    <div class="table-card">
-      <table>
-        <thead>
-          <tr>
-            <th></th>
-            <th>Barcode</th>
-            <th>Prodotto</th>
-            <th>Fornitore</th>
-            <th>Acquisto</th>
-            <th>Vendita</th>
-            <th>Azioni</th>
-          </tr>
-        </thead>
-        <tbody id="productTable"></tbody>
-      </table>
-    </div>
+    <section id="productsView">
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Barcode</th>
+              <th>Prodotto</th>
+              <th>Fornitore</th>
+              <th>Acquisto</th>
+              <th>Vendita</th>
+              <th>Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="productTable"></tbody>
+        </table>
+      </div>
 
-    <div class="pagination">
-      <button onclick="prevPage()">‹</button>
-      <span id="pageInfo"></span>
-      <button onclick="nextPage()">›</button>
-    </div>
+      <div class="pagination">
+        <button onclick="prevPage()">‹ Precedente</button>
+        <span id="pageInfo"></span>
+        <button onclick="nextPage()">Successiva ›</button>
+      </div>
+    </section>
+
+    <section id="suppliersView" style="display:none;">
+      <div class="supplier-top">
+        <input id="supplierSearch" placeholder="Cerca fornitore..." oninput="renderSuppliers()">
+        <button onclick="showProducts()">Torna ai prodotti</button>
+      </div>
+
+      <div id="supplierStats" class="supplier-stats"></div>
+      <div id="supplierFolders" class="supplier-folders"></div>
+      <div id="supplierProducts" class="supplier-products-area" style="display:none;"></div>
+    </section>
   </main>
 </div>
 
-
-
-
-
-<div id="suppliersView" class="suppliers-view" style="display:none;">
-  <div class="suppliers-card">
-    <div class="suppliers-header">
-      <div>
-        <h2>Fornitori / 供应商</h2>
-        <p>Prodotti suddivisi per fornitore</p>
-      </div>
-      <button type="button" onclick="showProducts()">Torna ai prodotti</button>
-    </div>
-    <div id="suppliersSummary" class="suppliers-summary"></div>
-    <div id="suppliersList" class="suppliers-list"></div>
-  </div>
-</div>
-
 <div id="editModal" class="modal-overlay">
-  <div class="edit-modal">
-    <button class="x" onclick="closeEditModal()">×</button>
+  <div class="edit-box">
+    <button class="close-btn" onclick="closeEditModal()">×</button>
 
-    <div class="modal-title-row">
-      <div class="title-icon">✎</div>
+    <div class="edit-title">
+      <div class="big-icon">✎</div>
       <div>
         <h2>Modifica Prodotto</h2>
         <p>编辑产品</p>
       </div>
     </div>
 
-    <div class="form-row">
-      <div class="side-icon">▥</div>
+    <div class="edit-row">
+      <div class="left-icon">▥</div>
       <div class="field">
         <label>Barcode / 条形码</label>
-        <div class="input-check">
-          <input id="editBarcode">
-          <span>✓</span>
+        <div class="modern-input">
+          <input id="editBarcode" type="text">
+          <span class="ok">✓</span>
         </div>
       </div>
     </div>
 
-    <div class="form-row">
-      <div class="side-icon">Aa</div>
+    <div class="edit-row">
+      <div class="left-icon">Aa</div>
       <div class="field">
         <label>Nome Prodotto / 产品名称</label>
-        <div class="input-check">
-          <input id="editName">
-          <span>✓</span>
+        <div class="modern-input">
+          <input id="editName" type="text">
+          <span class="ok">✓</span>
         </div>
       </div>
     </div>
 
-    <div class="form-row">
-      <div class="side-icon">♟</div>
+    <div class="edit-row">
+      <div class="left-icon">♟</div>
       <div class="field">
         <label>Fornitore / 供应商</label>
-        <div class="input-check">
-          <input id="editSupplier">
-          <span>⌄</span>
+        <div class="modern-input">
+          <input id="editSupplier" type="text">
+          <span class="arrow">⌄</span>
         </div>
       </div>
     </div>
 
-    <div class="form-row">
-      <div class="side-icon">€</div>
+    <div class="edit-row">
+      <div class="left-icon">€</div>
       <div class="field">
         <label>Prezzo Acquisto (€) / 进货价</label>
-        <div class="input-check">
-          <input id="editBuy" inputmode="decimal">
+        <div class="modern-input">
+          <input id="editBuy" type="number" step="0.01" inputmode="decimal">
         </div>
       </div>
     </div>
 
-    <div class="form-row">
-      <div class="side-icon">◆</div>
+    <div class="edit-row">
+      <div class="left-icon">◆</div>
       <div class="field">
         <label>Prezzo Vendita (€) / 售价</label>
-        <div class="input-check">
-          <input id="editSell" inputmode="decimal">
+        <div class="modern-input">
+          <input id="editSell" type="number" step="0.01" inputmode="decimal">
         </div>
       </div>
     </div>

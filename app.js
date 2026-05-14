@@ -4,6 +4,7 @@ const itemsPerPage = 100;
 let currentPage = 1;
 let allSelected = false;
 let editingIndex = null;
+let currentView = 'products';
 
 function valueOf(p, keys){
   for(const k of keys){
@@ -18,6 +19,11 @@ function getBuy(p){ return valueOf(p,['buyPrice','acquisto','Acquisto','Prezzo A
 function getSell(p){ return valueOf(p,['sellPrice','vendita','Vendita','Prezzo Vendita','售价']); }
 
 function saveStorage(){ localStorage.setItem('products', JSON.stringify(products)); }
+
+function setActiveMenu(view){
+  document.getElementById('btnProdotti')?.classList.toggle('active', view === 'products');
+  document.getElementById('btnFornitori')?.classList.toggle('active', view === 'suppliers');
+}
 
 function renderProducts(){
   const search = (document.getElementById('search')?.value || '').toLowerCase();
@@ -60,6 +66,123 @@ function renderProducts(){
   document.getElementById('pageInfo').innerText = `Pagina ${currentPage} di ${totalPages}`;
 }
 
+function showProducts(){
+  currentView = 'products';
+  setActiveMenu('products');
+
+  document.getElementById('pageTitle').innerText = 'Gestione Prodotti';
+  document.getElementById('pageSubtitle').innerText = 'Gestionale Magazzino / 库存管理';
+
+  document.getElementById('productsToolbar').style.display = 'flex';
+  document.getElementById('productsView').style.display = 'block';
+  document.getElementById('suppliersView').style.display = 'none';
+
+  renderProducts();
+  setTimeout(()=>document.getElementById('search')?.focus(),50);
+}
+
+function supplierNameOf(p){
+  const s = String(getSupplier(p) || '').trim();
+  return s || 'Senza fornitore';
+}
+
+function groupBySuppliers(){
+  const groups = {};
+  products.forEach((p, index)=>{
+    const s = supplierNameOf(p);
+    if(!groups[s]) groups[s] = [];
+    groups[s].push({product:p,index});
+  });
+  return groups;
+}
+
+function showSuppliers(){
+  currentView = 'suppliers';
+  setActiveMenu('suppliers');
+
+  document.getElementById('pageTitle').innerText = 'Fornitori';
+  document.getElementById('pageSubtitle').innerText = 'Cartelle fornitori / 供应商文件夹';
+
+  document.getElementById('productsToolbar').style.display = 'none';
+  document.getElementById('productsView').style.display = 'none';
+  document.getElementById('suppliersView').style.display = 'block';
+
+  renderSuppliers();
+}
+
+function renderSuppliers(){
+  const groups = groupBySuppliers();
+  const search = (document.getElementById('supplierSearch')?.value || '').toLowerCase();
+  const names = Object.keys(groups).filter(n=>n.toLowerCase().includes(search)).sort((a,b)=>a.localeCompare(b));
+
+  document.getElementById('supplierStats').innerHTML = `
+    <div class="stat-box">Fornitori totali: ${Object.keys(groups).length}</div>
+    <div class="stat-box">Prodotti totali: ${products.length}</div>
+  `;
+
+  document.getElementById('supplierProducts').style.display = 'none';
+  document.getElementById('supplierFolders').style.display = 'grid';
+
+  if(names.length === 0){
+    document.getElementById('supplierFolders').innerHTML = '<p>Nessun fornitore trovato.</p>';
+    return;
+  }
+
+  document.getElementById('supplierFolders').innerHTML = names.map(name=>`
+    <div class="folder-card" onclick="openSupplierFolder('${encodeURIComponent(name)}')">
+      <div class="folder-icon">📁</div>
+      <div class="folder-name">${name}</div>
+      <div class="folder-count">${groups[name].length} prodotti</div>
+    </div>
+  `).join('');
+}
+
+function openSupplierFolder(encodedName){
+  const name = decodeURIComponent(encodedName);
+  const groups = groupBySuppliers();
+  const items = groups[name] || [];
+
+  document.getElementById('supplierFolders').style.display = 'none';
+  document.getElementById('supplierProducts').style.display = 'block';
+
+  const rows = items.map(item=>{
+    const p = item.product;
+    return `
+      <tr>
+        <td>${getBarcode(p)}</td>
+        <td>${getName(p)}</td>
+        <td>${getBuy(p)}</td>
+        <td>${getSell(p)}</td>
+        <td>
+          <button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button>
+          <button class="delete-btn" onclick="deleteProduct(${item.index})">Elimina</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('supplierProducts').innerHTML = `
+    <div class="supplier-products-header">
+      <h2>📁 ${name}</h2>
+      <button class="back-folder" onclick="renderSuppliers()">Torna alle cartelle</button>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Barcode</th>
+            <th>Prodotto</th>
+            <th>Acquisto</th>
+            <th>Vendita</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function openEditModal(index){
   editingIndex = index;
   const p = products[index];
@@ -94,15 +217,18 @@ function saveEditProduct(){
   };
 
   saveStorage();
-  renderProducts();
   closeEditModal();
+
+  if(currentView === 'suppliers') renderSuppliers();
+  else renderProducts();
 }
 
 function deleteProduct(index){
   if(confirm('Eliminare prodotto?')){
     products.splice(index,1);
     saveStorage();
-    renderProducts();
+    if(currentView === 'suppliers') renderSuppliers();
+    else renderProducts();
   }
 }
 
@@ -126,24 +252,19 @@ function deleteSelectedProducts(){
 function nextPage(){ currentPage++; renderProducts(); }
 function prevPage(){ if(currentPage>1) currentPage--; renderProducts(); }
 
-
-function exportCSV(){
+function exportExcel(){
   const rows = products.map(p => ({
-    Barcode: getBarcode(p),
-    Prodotto: getName(p),
-    Fornitore: getSupplier(p),
-    Acquisto: getBuy(p),
-    Vendita: getSell(p)
+    Barcode:getBarcode(p),
+    Prodotto:getName(p),
+    Fornitore:getSupplier(p),
+    Acquisto:getBuy(p),
+    Vendita:getSell(p)
   }));
-
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Prodotti");
-
-  XLSX.writeFile(workbook, "prodotti.xlsx");
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Prodotti');
+  XLSX.writeFile(wb, 'prodotti.xlsx');
 }
-
 
 function normalizeKey(key){ return String(key || '').trim().toLowerCase().replace(/\s+/g,''); }
 function getValue(row, keys){
@@ -191,121 +312,5 @@ function importExcel(event){
 }
 
 window.onload=function(){
-  renderProducts();
-  const search=document.getElementById('search');
-  if(search) search.focus();
+  showProducts();
 };
-
-
-
-
-function normalizeSupplierName(name){
-  const value = String(name || '').trim();
-  return value || 'Senza fornitore';
-}
-
-
-
-
-
-/* FIX FINALE FORNITORI */
-function supplierNameOf(p){
-  const v = String(getSupplier(p) || '').trim();
-  return v || 'Senza fornitore';
-}
-
-function showSuppliers(){
-  const tableCard = document.querySelector('.table-card');
-  const pagination = document.querySelector('.pagination');
-  const toolbar = document.querySelector('.toolbar');
-  const suppliersView = document.getElementById('suppliersView');
-  const suppliersList = document.getElementById('suppliersList');
-  const suppliersSummary = document.getElementById('suppliersSummary');
-
-  if(toolbar) toolbar.style.display = 'none';
-  if(tableCard) tableCard.style.display = 'none';
-  if(pagination) pagination.style.display = 'none';
-  if(suppliersView) suppliersView.style.display = 'block';
-
-  const groups = {};
-
-  products.forEach((p, index)=>{
-    const supplier = supplierNameOf(p);
-    if(!groups[supplier]) groups[supplier] = [];
-    groups[supplier].push({product:p, index});
-  });
-
-  const names = Object.keys(groups).sort((a,b)=>a.localeCompare(b));
-
-  if(suppliersSummary){
-    suppliersSummary.innerHTML = `
-      <div class="summary-box">Fornitori totali: ${names.length}</div>
-      <div class="summary-box">Prodotti totali: ${products.length}</div>
-    `;
-  }
-
-  if(!suppliersList) return;
-
-  if(names.length === 0){
-    suppliersList.innerHTML = '<p>Nessun fornitore trovato.</p>';
-    return;
-  }
-
-  suppliersList.innerHTML = names.map((name, idx)=>{
-    const rows = groups[name].map(item=>{
-      const p = item.product;
-      return `
-        <tr>
-          <td>${getBarcode(p)}</td>
-          <td>${getName(p)}</td>
-          <td>${getBuy(p)}</td>
-          <td>${getSell(p)}</td>
-          <td><button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button></td>
-        </tr>
-      `;
-    }).join('');
-
-    return `
-      <div class="supplier-section">
-        <div class="supplier-title" onclick="toggleSupplierSection(${idx})">
-          <div>${name}</div>
-          <span>${groups[name].length} prodotti</span>
-        </div>
-        <div class="supplier-products" id="supplier-section-${idx}">
-          <table>
-            <thead>
-              <tr>
-                <th>Barcode</th>
-                <th>Prodotto</th>
-                <th>Acquisto</th>
-                <th>Vendita</th>
-                <th>Azioni</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function toggleSupplierSection(id){
-  const el = document.getElementById('supplier-section-' + id);
-  if(!el) return;
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-function showProducts(){
-  const tableCard = document.querySelector('.table-card');
-  const pagination = document.querySelector('.pagination');
-  const toolbar = document.querySelector('.toolbar');
-  const suppliersView = document.getElementById('suppliersView');
-
-  if(toolbar) toolbar.style.display = 'flex';
-  if(tableCard) tableCard.style.display = 'block';
-  if(pagination) pagination.style.display = 'flex';
-  if(suppliersView) suppliersView.style.display = 'none';
-
-  renderProducts();
-}
