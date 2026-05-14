@@ -25,7 +25,7 @@ function rowToProduct(r){ return { barcode:String(r?.barcode||''), name:String(r
 function productToRow(p){ return { barcode:String(getBarcode(p)||''), name:String(getName(p)||''), supplier:String(getSupplier(p)||''), buy_price:String(getBuy(p)||''), sell_price:String(getSell(p)||''), updated_at:new Date().toISOString() }; }
 
 function setActive(view){ document.getElementById('menuProducts')?.classList.toggle('active',view==='products'); document.getElementById('menuSuppliers')?.classList.toggle('active',view==='suppliers'); document.getElementById('menuHistory')?.classList.toggle('active',view==='history'); }
-function showProducts(){ currentView='products'; setActive('products'); document.getElementById('pageTitle').innerText='Gestione Prodotti'; document.getElementById('pageSubtitle').innerText='Gestionale Magazzino / 库存管理'; document.getElementById('productsPage').classList.remove('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderProducts(); focusBarcodeSearch(); }
+function showProducts(){ currentView='products'; setActive('products'); document.getElementById('pageTitle').innerText='Gestione Prodotti'; document.getElementById('pageSubtitle').innerText='Gestionale Magazzino / 库存管理'; document.getElementById('productsPage').classList.remove('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderProducts(); }
 function showSuppliers(){ currentView='suppliers'; setActive('suppliers'); document.getElementById('pageTitle').innerText='Fornitori'; document.getElementById('pageSubtitle').innerText='Cartelle fornitori / 供应商文件夹'; document.getElementById('productsPage').classList.add('hidden'); document.getElementById('suppliersPage').classList.remove('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderSupplierFolders(); }
 function showHistory(){ currentView='history'; setActive('history'); document.getElementById('pageTitle').innerText='Cronologia importazioni'; document.getElementById('pageSubtitle').innerText='Importazioni suddivise per file / 导入记录'; document.getElementById('productsPage').classList.add('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.remove('hidden'); renderImportSessions(); }
 
@@ -97,37 +97,62 @@ async function importExcel(event){ const file=event.target.files[0]; if(!file)re
 function logoutUser(){ showProducts(); }
 
 
-window.onload = function () {
-  showProducts();
-  syncNow();
-
-  function forceFocus() {
-    const search = document.getElementById('search');
-    if (search) {
-      search.focus();
-      search.click();
-      try { search.select(); } catch(e) {}
-    }
-  }
-
-  setTimeout(forceFocus, 300);
-  setTimeout(forceFocus, 800);
-  setTimeout(forceFocus, 1500);
-
-  document.addEventListener('click', () => {
-    setTimeout(forceFocus, 50);
-  });
-};
 
 
 
-function focusBarcodeSearch(){
-  setTimeout(()=>{
-    const s = document.getElementById('search');
-    if(s && currentView === 'products'){
-      s.focus();
-      s.select();
-    }
-  }, 150);
+/* ===== FOCUS BARCODE DEFINITIVO ===== */
+function isVisible(el){
+  return !!(el && el.offsetParent !== null);
 }
 
+function forceBarcodeFocus(){
+  const search = document.getElementById('search');
+  const productsPage = document.getElementById('productsPage');
+  const editModal = document.getElementById('editModal');
+  const newModal = document.getElementById('newProductModal');
+
+  const modalOpen =
+    (editModal && editModal.style.display === 'flex') ||
+    (newModal && newModal.style.display === 'flex');
+
+  if(search && isVisible(productsPage) && !modalOpen){
+    search.focus({ preventScroll: true });
+  }
+}
+
+function scheduleBarcodeFocus(){
+  setTimeout(forceBarcodeFocus, 100);
+  setTimeout(forceBarcodeFocus, 400);
+  setTimeout(forceBarcodeFocus, 900);
+  setTimeout(forceBarcodeFocus, 1600);
+}
+
+const _oldRenderProductsFocus = renderProducts;
+renderProducts = function(){
+  _oldRenderProductsFocus();
+  scheduleBarcodeFocus();
+};
+
+const _oldShowProductsFocus = showProducts;
+showProducts = function(){
+  _oldShowProductsFocus();
+  scheduleBarcodeFocus();
+};
+
+const _oldSyncNowFocus = syncNow;
+syncNow = async function(){
+  await _oldSyncNowFocus();
+  scheduleBarcodeFocus();
+};
+
+document.addEventListener('DOMContentLoaded', function(){
+  showProducts();
+  syncNow();
+  scheduleBarcodeFocus();
+});
+
+window.onload = function(){
+  showProducts();
+  syncNow();
+  scheduleBarcodeFocus();
+};
