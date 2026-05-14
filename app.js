@@ -65,8 +65,6 @@ function renderProducts(){
 
             <td>${p.sellPrice || ''}</td>
 
-            <td>${p.quantity || ''}</td>
-
             <td>
                 <div class="action-buttons">
 
@@ -136,24 +134,36 @@ function editProduct(index){
 
     const p = products[index];
 
+    const nuovoBarcode =
+        prompt('Modifica barcode', p.barcode);
+
+    if(nuovoBarcode === null) return;
+
     const nuovoNome =
         prompt('Modifica nome prodotto', p.name);
 
     if(nuovoNome === null) return;
 
-    const nuovoPrezzo =
-        prompt('Modifica prezzo vendita', p.sellPrice);
+    const nuovoFornitore =
+        prompt('Modifica fornitore', p.supplier || '');
 
-    if(nuovoPrezzo === null) return;
+    if(nuovoFornitore === null) return;
 
-    const nuovaQuantita =
-        prompt('Modifica quantità', p.quantity);
+    const nuovoAcquisto =
+        prompt('Modifica prezzo acquisto', p.buyPrice || '');
 
-    if(nuovaQuantita === null) return;
+    if(nuovoAcquisto === null) return;
 
+    const nuovoVendita =
+        prompt('Modifica prezzo vendita', p.sellPrice || '');
+
+    if(nuovoVendita === null) return;
+
+    products[index].barcode = nuovoBarcode;
     products[index].name = nuovoNome;
-    products[index].sellPrice = nuovoPrezzo;
-    products[index].quantity = nuovaQuantita;
+    products[index].supplier = nuovoFornitore;
+    products[index].buyPrice = nuovoAcquisto;
+    products[index].sellPrice = nuovoVendita;
 
     saveStorage();
 
