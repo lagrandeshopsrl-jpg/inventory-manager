@@ -101,7 +101,15 @@
         <div class="settings-panel">
           <div class="settings-row">
             <label for="dropboxAppKey">App Key Dropbox</label>
-            <input id="dropboxAppKey" type="password" autocomplete="off" placeholder="App key" />
+            <input id="dropboxAppKey" type="password" autocomplete="off" placeholder="App key per collegare Dropbox" />
+          </div>
+          <div class="settings-row">
+            <label>Account Dropbox</label>
+            <div class="oauth-box">
+              <button type="button" onclick="startDropboxOAuth()">Collega Dropbox</button>
+              <button type="button" class="danger" onclick="clearDropboxToken()">Scollega</button>
+              <div id="dropboxAccountStatus" class="oauth-status">Non collegato</div>
+            </div>
           </div>
           <div class="settings-row">
             <label for="dropboxRefreshToken">Refresh Token</label>
@@ -127,17 +135,18 @@
               </select>
               <div id="dropboxFolderCurrent" class="folder-current">/</div>
               <div class="folder-picker-actions">
-                <button onclick="loadDropboxFolderPicker()">Carica</button>
-                <button onclick="openSelectedDropboxFolder()">Apri</button>
-                <button onclick="goUpDropboxFolder()">Su</button>
-                <button onclick="useSelectedDropboxFolder()">Usa cartella</button>
+                <button type="button" onclick="loadDropboxFolderPicker()">Carica</button>
+                <button type="button" onclick="openSelectedDropboxFolder()">Apri</button>
+                <button type="button" onclick="goUpDropboxFolder()">Su</button>
+                <button type="button" onclick="useSelectedDropboxFolder()">Usa cartella</button>
               </div>
+              <div id="dropboxFolderPickerStatus" class="folder-picker-status">Collega Dropbox e poi carica le cartelle.</div>
             </div>
           </div>
           <div class="settings-actions">
-            <button onclick="saveDropboxSettings()">Salva</button>
-            <button onclick="syncNow()">Sincronizza</button>
-            <button class="danger" onclick="clearDropboxToken()">Rimuovi token</button>
+            <button type="button" onclick="saveDropboxSettings()">Salva</button>
+            <button type="button" onclick="syncNow()">Sincronizza</button>
+            <button type="button" class="danger" onclick="clearDropboxToken()">Rimuovi token</button>
           </div>
         </div>
       </section>
