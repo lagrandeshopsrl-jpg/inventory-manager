@@ -1,4 +1,0 @@
-inline focus scripts in html removed: True
-search id present: True
-beforeinput logic present: True
-modal aware: True
