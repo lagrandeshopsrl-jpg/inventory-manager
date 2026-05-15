@@ -100,12 +100,39 @@
       <section id="settingsPage" class="hidden">
         <div class="settings-panel">
           <div class="settings-row">
-            <label for="dropboxToken">Token Dropbox</label>
-            <input id="dropboxToken" type="password" autocomplete="off" placeholder="Token accesso Dropbox" />
+            <label for="dropboxAppKey">App Key Dropbox</label>
+            <input id="dropboxAppKey" type="password" autocomplete="off" placeholder="App key" />
+          </div>
+          <div class="settings-row">
+            <label for="dropboxRefreshToken">Refresh Token</label>
+            <input id="dropboxRefreshToken" type="password" autocomplete="off" placeholder="Token lungo per rinnovo automatico" />
+          </div>
+          <div class="settings-row">
+            <label for="dropboxToken">Access Token</label>
+            <input id="dropboxToken" type="password" autocomplete="off" placeholder="Token temporaneo opzionale" />
           </div>
           <div class="settings-row">
             <label for="dropboxPath">File Dropbox</label>
             <input id="dropboxPath" type="text" autocomplete="off" />
+          </div>
+          <div class="settings-row">
+            <label for="dropboxBackupFolder">Cartella backup</label>
+            <input id="dropboxBackupFolder" type="text" autocomplete="off" />
+          </div>
+          <div class="settings-row">
+            <label for="dropboxFolderSelect">Seleziona cartella</label>
+            <div class="folder-picker">
+              <select id="dropboxFolderSelect">
+                <option value="">Carica cartelle Dropbox</option>
+              </select>
+              <div id="dropboxFolderCurrent" class="folder-current">/</div>
+              <div class="folder-picker-actions">
+                <button onclick="loadDropboxFolderPicker()">Carica</button>
+                <button onclick="openSelectedDropboxFolder()">Apri</button>
+                <button onclick="goUpDropboxFolder()">Su</button>
+                <button onclick="useSelectedDropboxFolder()">Usa cartella</button>
+              </div>
+            </div>
           </div>
           <div class="settings-actions">
             <button onclick="saveDropboxSettings()">Salva</button>

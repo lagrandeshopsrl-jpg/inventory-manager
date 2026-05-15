@@ -2,9 +2,14 @@ const STORAGE_PRODUCTS_KEY = 'products';
 const STORAGE_IMPORTS_KEY = 'importSessions';
 const LAST_MODIFIED_KEY = 'inventory_lastModified';
 const DROPBOX_TOKEN_KEY = 'inventory_dropbox_token';
+const DROPBOX_TOKEN_EXPIRES_KEY = 'inventory_dropbox_token_expires_at';
+const DROPBOX_APP_KEY_KEY = 'inventory_dropbox_app_key';
+const DROPBOX_REFRESH_TOKEN_KEY = 'inventory_dropbox_refresh_token';
 const DROPBOX_PATH_KEY = 'inventory_dropbox_path';
+const DROPBOX_BACKUP_FOLDER_KEY = 'inventory_dropbox_backup_folder';
 const SYNC_FIX_VERSION_KEY = 'inventory_sync_fix_version';
 const DEFAULT_DROPBOX_PATH = '/inventory_manager_snapshot.json';
+const DEFAULT_DROPBOX_BACKUP_FOLDER = '/inventory_manager_backups';
 const itemsPerPage = 100;
 
 let products = normalizeProductList(readJson(STORAGE_PRODUCTS_KEY, []));
@@ -15,6 +20,7 @@ let editingIndex = null;
 let currentView = 'products';
 let cloudLoading = false;
 let __barcodeLastValue = '';
+let dropboxFolderPickerPath = '';
 
 function readJson(key, fallback){
   try{
@@ -162,6 +168,91 @@ function getDropboxToken(){
   return textValue(localStorage.getItem(DROPBOX_TOKEN_KEY));
 }
 
+function getDropboxAppKey(){
+  return textValue(localStorage.getItem(DROPBOX_APP_KEY_KEY));
+}
+
+function getDropboxRefreshToken(){
+  return textValue(localStorage.getItem(DROPBOX_REFRESH_TOKEN_KEY));
+}
+
+function canRefreshDropboxToken(){
+  return Boolean(getDropboxAppKey() && getDropboxRefreshToken());
+}
+
+function hasDropboxCredentials(){
+  return Boolean(getDropboxToken() || canRefreshDropboxToken());
+}
+
+function tokenNeedsRefresh(){
+  const expiresAt = Number(localStorage.getItem(DROPBOX_TOKEN_EXPIRES_KEY) || '0') || 0;
+  return !getDropboxToken() || (expiresAt > 0 && Date.now() > expiresAt - 120000);
+}
+
+async function refreshDropboxAccessToken(){
+  const appKey = getDropboxAppKey();
+  const refreshToken = getDropboxRefreshToken();
+  if(!appKey || !refreshToken) throw new Error('NO_DROPBOX_TOKEN');
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    client_id: appKey
+  });
+
+  const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  });
+
+  if(response.status === 400 || response.status === 401) throw new Error('DROPBOX_REFRESH_AUTH');
+  if(!response.ok) throw new Error('DROPBOX_REFRESH_' + response.status);
+
+  const data = await response.json();
+  if(!data.access_token) throw new Error('DROPBOX_REFRESH_BAD_RESPONSE');
+
+  localStorage.setItem(DROPBOX_TOKEN_KEY, data.access_token);
+  if(data.expires_in){
+    localStorage.setItem(DROPBOX_TOKEN_EXPIRES_KEY, String(Date.now() + Number(data.expires_in) * 1000));
+  }else{
+    localStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
+  }
+  return data.access_token;
+}
+
+async function getValidDropboxToken(forceRefresh = false){
+  if((forceRefresh || tokenNeedsRefresh()) && canRefreshDropboxToken()){
+    return refreshDropboxAccessToken();
+  }
+  const token = getDropboxToken();
+  if(token) return token;
+  throw new Error('NO_DROPBOX_TOKEN');
+}
+
+async function dropboxFetch(url, options, retry = true){
+  const token = await getValidDropboxToken(false);
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: 'Bearer ' + token
+    }
+  });
+
+  if(response.status === 401 && retry && canRefreshDropboxToken()){
+    const refreshedToken = await getValidDropboxToken(true);
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: 'Bearer ' + refreshedToken
+      }
+    });
+  }
+
+  return response;
+}
+
 function getDropboxPath(){
   const path = textValue(localStorage.getItem(DROPBOX_PATH_KEY)) || DEFAULT_DROPBOX_PATH;
   return path.startsWith('/') ? path : '/' + path;
@@ -172,23 +263,76 @@ function setDropboxPath(path){
   localStorage.setItem(DROPBOX_PATH_KEY, cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath);
 }
 
-function buildSnapshot(timestamp = Date.now()){
+function getDropboxBackupFolder(){
+  const folder = textValue(localStorage.getItem(DROPBOX_BACKUP_FOLDER_KEY)) || DEFAULT_DROPBOX_BACKUP_FOLDER;
+  const cleanFolder = folder.startsWith('/') ? folder : '/' + folder;
+  return cleanFolder.replace(/\/+$/g, '') || DEFAULT_DROPBOX_BACKUP_FOLDER;
+}
+
+function setDropboxBackupFolder(folder){
+  const cleanFolder = textValue(folder) || DEFAULT_DROPBOX_BACKUP_FOLDER;
+  localStorage.setItem(DROPBOX_BACKUP_FOLDER_KEY, cleanFolder.startsWith('/') ? cleanFolder : '/' + cleanFolder);
+}
+
+function normalizeDropboxFolderPath(path){
+  const cleanPath = textValue(path);
+  if(!cleanPath || cleanPath === '/') return '';
+  return cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath;
+}
+
+function displayDropboxFolderPath(path){
+  return normalizeDropboxFolderPath(path) || '/';
+}
+
+function setFolderPickerCurrent(path){
+  dropboxFolderPickerPath = normalizeDropboxFolderPath(path);
+  const current = document.getElementById('dropboxFolderCurrent');
+  if(current) current.innerText = displayDropboxFolderPath(dropboxFolderPickerPath);
+}
+
+function setFolderPickerOptions(folders, placeholder){
+  const select = document.getElementById('dropboxFolderSelect');
+  if(!select) return;
+  const options = [`<option value="">${escapeHTML(placeholder || 'Seleziona cartella')}</option>`];
+  folders.forEach(folder => {
+    const path = folder.path_display || folder.path_lower || '';
+    options.push(`<option value="${escapeAttr(path)}">${escapeHTML(folder.name)} - ${escapeHTML(path || '/')}</option>`);
+  });
+  select.innerHTML = options.join('');
+}
+
+function backupTimestamp(date = new Date()){
+  const pad = value => String(value).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hour = pad(date.getHours());
+  const minute = pad(date.getMinutes());
+  const second = pad(date.getSeconds());
+  const millisecond = String(date.getMilliseconds()).padStart(3, '0');
+  return `${year}-${month}-${day}_${hour}-${minute}-${second}-${millisecond}`;
+}
+
+function buildBackupPath(timestamp){
+  return `${getDropboxBackupFolder()}/inventory_backup_${timestamp}.json`;
+}
+
+function buildSnapshot(timestamp = Date.now(), meta = {}){
   return {
     version: 60,
     lastModified: timestamp,
+    backupCreatedAt: meta.backupCreatedAt || new Date(timestamp).toISOString(),
+    backupLabel: meta.backupLabel || '',
+    backupPath: meta.backupPath || '',
     products: normalizeProductList(products),
     importSessions: normalizeImportSessions(importSessions)
   };
 }
 
 async function dropboxDownloadSnapshot(){
-  const token = getDropboxToken();
-  if(!token) throw new Error('NO_DROPBOX_TOKEN');
-
-  const response = await fetch('https://content.dropboxapi.com/2/files/download', {
+  const response = await dropboxFetch('https://content.dropboxapi.com/2/files/download', {
     method: 'POST',
     headers: {
-      Authorization: 'Bearer ' + token,
       'Dropbox-API-Arg': JSON.stringify({ path: getDropboxPath() })
     }
   });
@@ -224,26 +368,54 @@ async function dropboxDownloadSnapshot(){
   return data;
 }
 
-async function dropboxUploadSnapshot(){
-  const token = getDropboxToken();
-  if(!token) throw new Error('NO_DROPBOX_TOKEN');
+async function dropboxListFolders(path = ''){
+  const folders = [];
+  let response = await dropboxFetch('https://api.dropboxapi.com/2/files/list_folder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path: normalizeDropboxFolderPath(path),
+      recursive: false,
+      include_deleted: false,
+      include_mounted_folders: true
+    })
+  });
 
-  const timestamp = Date.now();
-  const snapshot = buildSnapshot(timestamp);
-  const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
+  if(response.status === 401) throw new Error('DROPBOX_AUTH');
+  if(!response.ok) throw new Error('DROPBOX_LIST_' + response.status);
+
+  let data = await response.json();
+  folders.push(...data.entries.filter(entry => entry['.tag'] === 'folder'));
+
+  while(data.has_more){
+    response = await dropboxFetch('https://api.dropboxapi.com/2/files/list_folder/continue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cursor: data.cursor })
+    });
+    if(response.status === 401) throw new Error('DROPBOX_AUTH');
+    if(!response.ok) throw new Error('DROPBOX_LIST_' + response.status);
+    data = await response.json();
+    folders.push(...data.entries.filter(entry => entry['.tag'] === 'folder'));
+  }
+
+  return folders.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+async function dropboxUploadJson(path, data, mode = 'overwrite'){
+  const response = await dropboxFetch('https://content.dropboxapi.com/2/files/upload', {
     method: 'POST',
     headers: {
-      Authorization: 'Bearer ' + token,
       'Content-Type': 'application/octet-stream',
       'Dropbox-API-Arg': JSON.stringify({
-        path: getDropboxPath(),
-        mode: 'overwrite',
-        autorename: false,
+        path,
+        mode,
+        autorename: mode !== 'overwrite',
         mute: true,
         strict_conflict: false
       })
     },
-    body: JSON.stringify(snapshot)
+    body: JSON.stringify(data, null, 2)
   });
 
   if(response.status === 401) throw new Error('DROPBOX_AUTH');
@@ -255,9 +427,24 @@ async function dropboxUploadSnapshot(){
   }catch(e){
     meta = {};
   }
-  const serverModified = parseDropboxTime(meta.server_modified);
-  const savedTime = Math.max(timestamp, serverModified);
+  return meta;
+}
 
+async function dropboxUploadSnapshot(){
+  const timestamp = Date.now();
+  const backupNameTime = backupTimestamp(new Date(timestamp));
+  const backupPath = buildBackupPath(backupNameTime);
+  const snapshot = buildSnapshot(timestamp, {
+    backupCreatedAt: new Date(timestamp).toISOString(),
+    backupLabel: backupNameTime,
+    backupPath
+  });
+
+  const mainMeta = await dropboxUploadJson(getDropboxPath(), snapshot, 'overwrite');
+  await dropboxUploadJson(backupPath, snapshot, 'add');
+
+  const serverModified = parseDropboxTime(mainMeta.server_modified);
+  const savedTime = Math.max(timestamp, serverModified);
   products = snapshot.products;
   importSessions = snapshot.importSessions;
   persistAll(false);
@@ -269,9 +456,13 @@ function dropboxErrorMessage(error){
   const code = String(error?.message || '');
   if(code === 'NO_DROPBOX_TOKEN') return 'Token Dropbox mancante';
   if(code === 'DROPBOX_AUTH') return 'Token Dropbox non valido';
+  if(code === 'DROPBOX_REFRESH_AUTH') return 'Refresh token Dropbox non valido';
+  if(code === 'DROPBOX_REFRESH_BAD_RESPONSE') return 'Risposta Dropbox non valida';
+  if(code.startsWith('DROPBOX_REFRESH_')) return 'Errore rinnovo token Dropbox';
   if(code === 'DROPBOX_BAD_JSON') return 'File Dropbox non leggibile';
   if(code.startsWith('DROPBOX_UPLOAD_')) return 'Errore upload Dropbox';
   if(code.startsWith('DROPBOX_DOWNLOAD_')) return 'Errore download Dropbox';
+  if(code.startsWith('DROPBOX_LIST_')) return 'Errore lettura cartelle Dropbox';
   return 'Errore Dropbox';
 }
 
@@ -283,13 +474,13 @@ function handleDropboxError(error, showAlert = true){
 }
 
 async function saveCloudAfterChange(label){
-  if(!getDropboxToken()){
+  if(!hasDropboxCredentials()){
     setCloudStatus('☁ ' + label + ' locale', 'ok');
     return false;
   }
   try{
     await dropboxUploadSnapshot();
-    setCloudStatus('☁ ' + label + ' su Dropbox', 'ok');
+    setCloudStatus('☁ ' + label + ' su Dropbox + backup', 'ok');
     return true;
   }catch(error){
     handleDropboxError(error, false);
@@ -301,11 +492,11 @@ async function saveCloudAfterChange(label){
 async function syncNow(options = {}){
   if(cloudLoading) return;
 
-  if(!getDropboxToken()){
+  if(!hasDropboxCredentials()){
     setCloudStatus('☁ Token Dropbox mancante', 'err');
     if(!options.silentMissingToken){
       showSettings();
-      alert('Inserisci il token Dropbox in Impostazioni.');
+      alert('Inserisci in Impostazioni un access token Dropbox oppure App Key + Refresh Token.');
     }
     return;
   }
@@ -322,7 +513,7 @@ async function syncNow(options = {}){
 
     if(!remote){
       await dropboxUploadSnapshot();
-      setCloudStatus('☁ Dropbox creato: ' + products.length + ' prodotti', 'ok');
+      setCloudStatus('☁ Dropbox creato + backup: ' + products.length + ' prodotti', 'ok');
     }else if(localProducts === 0 && remoteProducts > 0){
       products = remote.products;
       importSessions = remote.importSessions;
@@ -337,7 +528,7 @@ async function syncNow(options = {}){
       setCloudStatus('☁ Ultimo file Dropbox scaricato: ' + products.length + ' prodotti', 'ok');
     }else if(localTime === 0 && localProducts > 0 && remoteProducts === 0){
       await dropboxUploadSnapshot();
-      setCloudStatus('☁ Locale caricato su Dropbox: ' + products.length + ' prodotti', 'ok');
+      setCloudStatus('☁ Locale caricato + backup: ' + products.length + ' prodotti', 'ok');
     }else if(remoteTime > localTime){
       products = remote.products;
       importSessions = remote.importSessions;
@@ -346,7 +537,7 @@ async function syncNow(options = {}){
       setCloudStatus('☁ Scaricato da Dropbox: ' + products.length + ' prodotti', 'ok');
     }else{
       await dropboxUploadSnapshot();
-      setCloudStatus('☁ Caricato su Dropbox: ' + products.length + ' prodotti', 'ok');
+      setCloudStatus('☁ Caricato su Dropbox + backup: ' + products.length + ' prodotti', 'ok');
     }
 
     renderCurrentView();
@@ -420,10 +611,17 @@ function showSettings(){
   setActive('settings');
   setPageVisibility('settings');
   setTitle('Impostazioni', 'Dropbox / 云端设置');
+  const appKeyInput = document.getElementById('dropboxAppKey');
+  const refreshInput = document.getElementById('dropboxRefreshToken');
   const tokenInput = document.getElementById('dropboxToken');
   const pathInput = document.getElementById('dropboxPath');
+  const backupFolderInput = document.getElementById('dropboxBackupFolder');
+  if(appKeyInput) appKeyInput.value = getDropboxAppKey();
+  if(refreshInput) refreshInput.value = getDropboxRefreshToken();
   if(tokenInput) tokenInput.value = getDropboxToken();
   if(pathInput) pathInput.value = getDropboxPath();
+  if(backupFolderInput) backupFolderInput.value = getDropboxBackupFolder();
+  setFolderPickerCurrent(getDropboxBackupFolder());
 }
 
 function renderCurrentView(){
@@ -958,18 +1156,85 @@ async function importExcel(event){
   else reader.readAsArrayBuffer(file);
 }
 
-function saveDropboxSettings(){
+function saveDropboxSettings(options = {}){
+  const appKey = textValue(document.getElementById('dropboxAppKey')?.value);
+  const refreshToken = textValue(document.getElementById('dropboxRefreshToken')?.value);
   const token = textValue(document.getElementById('dropboxToken')?.value);
   const path = textValue(document.getElementById('dropboxPath')?.value);
+  const backupFolder = textValue(document.getElementById('dropboxBackupFolder')?.value);
+  if(appKey) localStorage.setItem(DROPBOX_APP_KEY_KEY, appKey);
+  else localStorage.removeItem(DROPBOX_APP_KEY_KEY);
+  if(refreshToken) localStorage.setItem(DROPBOX_REFRESH_TOKEN_KEY, refreshToken);
+  else localStorage.removeItem(DROPBOX_REFRESH_TOKEN_KEY);
   if(token) localStorage.setItem(DROPBOX_TOKEN_KEY, token);
   else localStorage.removeItem(DROPBOX_TOKEN_KEY);
+  localStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
   setDropboxPath(path);
-  setCloudStatus(token ? '☁ Token Dropbox salvato' : '☁ Token Dropbox rimosso', token ? 'ok' : 'err');
+  setDropboxBackupFolder(backupFolder);
+  if(!options.silent){
+    setCloudStatus(hasDropboxCredentials() ? '☁ Dropbox salvato' : '☁ Token Dropbox rimosso', hasDropboxCredentials() ? 'ok' : 'err');
+  }
+}
+
+async function loadDropboxFolderPicker(path = dropboxFolderPickerPath){
+  saveDropboxSettings({ silent: true });
+  if(!hasDropboxCredentials()){
+    setCloudStatus('☁ Token Dropbox mancante', 'err');
+    alert('Prima inserisci Access Token oppure App Key + Refresh Token.');
+    return;
+  }
+
+  try{
+    setCloudStatus('☁ Carico cartelle Dropbox...', '');
+    const cleanPath = normalizeDropboxFolderPath(path);
+    const folders = await dropboxListFolders(cleanPath);
+    setFolderPickerCurrent(cleanPath);
+    setFolderPickerOptions(folders, folders.length ? 'Seleziona cartella' : 'Nessuna sottocartella');
+    setCloudStatus('☁ Cartelle caricate', 'ok');
+  }catch(error){
+    handleDropboxError(error, true);
+  }
+}
+
+async function openSelectedDropboxFolder(){
+  const selected = textValue(document.getElementById('dropboxFolderSelect')?.value);
+  if(!selected){
+    alert('Seleziona prima una cartella.');
+    return;
+  }
+  await loadDropboxFolderPicker(selected);
+}
+
+function useSelectedDropboxFolder(){
+  const selected = textValue(document.getElementById('dropboxFolderSelect')?.value) || dropboxFolderPickerPath;
+  const folder = displayDropboxFolderPath(selected);
+  const input = document.getElementById('dropboxBackupFolder');
+  if(input) input.value = folder;
+  setDropboxBackupFolder(folder);
+  setFolderPickerCurrent(folder);
+  setCloudStatus('☁ Cartella backup selezionata', 'ok');
+}
+
+async function goUpDropboxFolder(){
+  const current = normalizeDropboxFolderPath(dropboxFolderPickerPath);
+  if(!current){
+    await loadDropboxFolderPicker('');
+    return;
+  }
+  const parent = current.split('/').slice(0, -1).join('/');
+  await loadDropboxFolderPicker(parent);
 }
 
 function clearDropboxToken(){
   localStorage.removeItem(DROPBOX_TOKEN_KEY);
+  localStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
+  localStorage.removeItem(DROPBOX_APP_KEY_KEY);
+  localStorage.removeItem(DROPBOX_REFRESH_TOKEN_KEY);
+  const appKeyInput = document.getElementById('dropboxAppKey');
+  const refreshInput = document.getElementById('dropboxRefreshToken');
   const tokenInput = document.getElementById('dropboxToken');
+  if(appKeyInput) appKeyInput.value = '';
+  if(refreshInput) refreshInput.value = '';
   if(tokenInput) tokenInput.value = '';
   setCloudStatus('☁ Token Dropbox rimosso', 'err');
 }
