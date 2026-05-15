@@ -1,8 +1,10 @@
 FIX DEFINITIVO DROPBOX
 
 Problema risolto:
+- le funzioni Dropbox mancanti sono state aggiunte
 - su nuovi dispositivi non cancella più tutti i prodotti
 - se Dropbox contiene dati, vengono scaricati automaticamente
-- protezione anti upload database vuoto
+- se il locale contiene dati e Dropbox è vuoto, viene caricato il locale
+- senza token l'app mostra stato chiaro e salva solo in locale
 
-Carica tutti i file nella root del repository GitHub.
+Carica index.html, app.js e style.css nella root del repository GitHub.

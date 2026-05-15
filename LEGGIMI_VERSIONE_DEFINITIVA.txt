@@ -1,19 +1,27 @@
-VERSIONE DEFINITIVA - Inventory Manager v60
+VERSIONE DEFINITIVA - Inventory Manager v60 Dropbox
 
 Contenuto:
 - v60 completa con sidebar/scanner
-- NON è la mini app "Inventory Manager Dropbox"
-- campo cerca barcode si svuota automaticamente quando clicchi/tocchi/fai focus
-- quando scansioni un nuovo barcode dopo una pausa, il campo si pulisce per evitare che il nuovo codice si attacchi al precedente
-- supporto Dropbox presente tramite token nel browser
+- sincronizzazione Dropbox reale tramite snapshot JSON
+- niente dipendenza Supabase nella web app
+- campo barcode che si svuota su click/touch/focus
+- protezione anti upload database vuoto su nuovi dispositivi
+- Fornitori, Categorie, Cronologia e Impostazioni operative
+- rendering dati importati protetto da HTML/script inseriti nei campi
 
-File principali da caricare nella root di GitHub:
+File principali da caricare nella root GitHub/Vercel:
 - index.html
 - app.js
 - style.css
-- eventuali altri file presenti nello ZIP
 
-Importante per Vercel:
-- carica i file nella root del repository, non dentro una cartella
-- non fare redeploy di deployment vecchi
-- fai commit su main e aspetta il nuovo deployment automatico
+Uso:
+- apri Impostazioni
+- inserisci token Dropbox
+- lascia il file predefinito /inventory_manager_snapshot.json oppure scegli un altro percorso
+- premi Salva e poi Sincronizza
+
+Importante:
+- usa un token Dropbox revocabile
+- non caricare token dentro GitHub
+- carica i file nella root del repository, non dentro una sottocartella
+- dopo il commit su main aspetta il nuovo deployment automatico
