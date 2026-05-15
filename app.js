@@ -233,15 +233,25 @@ function isStorageQuotaError(error){
     || String(error?.message || '').toLowerCase().includes('quota');
 }
 
+function safeSetStorage(key, value){
+  try{
+    localStorage.setItem(key, value);
+  }catch(error){
+    if(!isStorageQuotaError(error)) throw error;
+    localStorage.removeItem(key);
+    localStorage.setItem(key, value);
+  }
+}
+
 function persistProducts(touch = true){
   products = normalizeProductList(products);
   try{
-    localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
+    safeSetStorage(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
   }catch(error){
     if(!isStorageQuotaError(error)) throw error;
     localStorage.removeItem(STORAGE_IMPORTS_KEY);
     importSessions = [];
-    localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
+    safeSetStorage(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
     setCloudStatus('☁ Memoria liberata: cronologia importazioni svuotata', 'err');
   }
   if(touch) setLocalModified();
@@ -250,11 +260,12 @@ function persistProducts(touch = true){
 function persistImportSessions(touch = true){
   importSessions = normalizeImportSessions(importSessions);
   try{
-    localStorage.setItem(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
+    safeSetStorage(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
   }catch(error){
     if(!isStorageQuotaError(error)) throw error;
+    localStorage.removeItem(STORAGE_IMPORTS_KEY);
     importSessions = importSessions.slice(0, 10);
-    localStorage.setItem(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
+    safeSetStorage(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
     setCloudStatus('☁ Cronologia importazioni alleggerita', 'err');
   }
   if(touch) setLocalModified();
@@ -1263,6 +1274,17 @@ async function clearImportSessions(){
   renderImportSessions();
 }
 
+function freeBrowserMemory(){
+  if(!confirm('Liberare memoria? Verrà svuotata solo la cronologia importazioni. I prodotti restano salvati.')) return;
+  importSessions = [];
+  importSessionPages = {};
+  localStorage.removeItem(STORAGE_IMPORTS_KEY);
+  persistProducts(true);
+  setCloudStatus('☁ Memoria liberata', 'ok');
+  if(currentView === 'history') renderImportSessions();
+  alert('Memoria liberata. I prodotti sono rimasti salvati; la cronologia importazioni è stata svuotata.');
+}
+
 function openEditModal(index){
   if(index < 0 || index >= products.length) return;
   editingIndex = index;
@@ -1744,7 +1766,18 @@ document.addEventListener('click', function(event){
 window.onload = async function(){
   ensureLocalModified();
   applySyncTimestampMigration();
-  persistAll(false);
+  try{
+    persistAll(false);
+  }catch(error){
+    if(isStorageQuotaError(error)){
+      importSessions = [];
+      localStorage.removeItem(STORAGE_IMPORTS_KEY);
+      persistProducts(false);
+      setCloudStatus('☁ Memoria liberata: cronologia svuotata', 'err');
+    }else{
+      throw error;
+    }
+  }
   if(!localStorage.getItem(DROPBOX_PATH_KEY)) setDropboxPath(DEFAULT_DROPBOX_PATH);
   showProducts();
   __installBarcodeInputLogic();
