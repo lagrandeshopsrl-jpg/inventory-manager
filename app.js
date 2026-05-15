@@ -625,6 +625,7 @@ async function dropboxUploadSnapshot(){
 
 function dropboxErrorMessage(error){
   const code = String(error?.message || '');
+  if(error?.name === 'QuotaExceededError') return 'Memoria del browser piena';
   if(code === 'NO_DROPBOX_TOKEN') return 'Token Dropbox mancante';
   if(code === 'DROPBOX_AUTH') return 'Token Dropbox non valido';
   if(code === 'DROPBOX_REFRESH_AUTH') return 'Refresh token Dropbox non valido';
@@ -638,29 +639,48 @@ function dropboxErrorMessage(error){
   if(code.startsWith('DROPBOX_UPLOAD_')) return 'Errore upload Dropbox';
   if(code.startsWith('DROPBOX_DOWNLOAD_')) return 'Errore download Dropbox';
   if(code.startsWith('DROPBOX_LIST_')) return 'Errore lettura cartelle Dropbox';
+  if(code.includes('Failed to fetch') || code.includes('NetworkError')) return 'Dropbox non raggiungibile';
   return 'Errore Dropbox';
+}
+
+function dropboxErrorAdvice(error){
+  const code = String(error?.message || '');
+  if(location.protocol === 'file:') return 'Stai usando l\'app come file locale: per Dropbox usa il sito online o localhost.';
+  if(code === 'NO_DROPBOX_TOKEN') return 'Collega Dropbox dalle Impostazioni.';
+  if(code === 'DROPBOX_AUTH') return 'Ricollega Dropbox: il token non e piu valido.';
+  if(code === 'DROPBOX_REFRESH_AUTH') return 'Ricollega Dropbox: il rinnovo automatico non e piu valido.';
+  if(code === 'DROPBOX_NETWORK') return 'Controlla internet e riprova Sincronizza dati.';
+  if(code.startsWith('DROPBOX_UPLOAD_')) return 'I dati sono salvati sul dispositivo. Riprova Sincronizza dati tra poco.';
+  if(error?.name === 'QuotaExceededError') return 'Riduci la cronologia importazioni o svuota dati vecchi.';
+  return 'I dati restano salvati sul dispositivo; riprova Sincronizza dati.';
+}
+
+function dropboxAlertMessage(error){
+  return dropboxErrorMessage(error) + '. ' + dropboxErrorAdvice(error);
 }
 
 function handleDropboxError(error, showAlert = true){
   const message = dropboxErrorMessage(error);
   console.error(error);
   setCloudStatus('☁ ' + message, 'err');
-  if(showAlert) alert(message + '. Controlla token, file e connessione.');
+  if(showAlert) alert(dropboxAlertMessage(error));
 }
 
-async function saveCloudAfterChange(label){
+async function saveCloudAfterChange(label, options = {}){
   if(!hasDropboxCredentials()){
     setCloudStatus('☁ ' + label + ' locale', 'ok');
-    return false;
+    return { synced: false, skipped: true, message: 'Dropbox non collegato' };
   }
   try{
     await dropboxUploadSnapshot();
     setCloudStatus('☁ ' + label + ' su Dropbox + backup', 'ok');
-    return true;
+    return { synced: true };
   }catch(error){
     handleDropboxError(error, false);
-    alert(label + ' salvato in locale, ma Dropbox non è aggiornato.');
-    return false;
+    if(!options.silentDropboxError){
+      alert(label + ' salvato sul dispositivo.\nDropbox non aggiornato: ' + dropboxAlertMessage(error));
+    }
+    return { synced: false, error, message: dropboxAlertMessage(error) };
   }
 }
 
@@ -1330,8 +1350,11 @@ async function importExcel(event){
       currentPage = 1;
       renderProducts();
       event.target.value = '';
-      await saveCloudAfterChange('Import salvato');
-      alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}`);
+      const cloudResult = await saveCloudAfterChange('Import salvato', { silentDropboxError: true });
+      const syncMessage = cloudResult.synced
+        ? 'Dropbox aggiornato.'
+        : 'Salvato sul dispositivo. Dropbox non aggiornato: ' + (cloudResult.message || 'riprova Sincronizza dati.');
+      alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}\n${syncMessage}`);
     }catch(err){
       console.error(err);
       setCloudStatus('☁ Errore import', 'err');
