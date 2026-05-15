@@ -93,12 +93,12 @@ function valueOf(p, keys){
   return '';
 }
 
-function getBarcode(p){ return textValue(valueOf(p, ['barcode','Barcode','codice','Codice','EAN','条码'])); }
-function getName(p){ return textValue(valueOf(p, ['name','prodotto','Prodotto','Nome','Product','商品'])); }
-function getSupplier(p){ return textValue(valueOf(p, ['supplier','fornitore','Fornitore','Supplier','Nome Fornitore','供应商'])); }
-function getCategory(p){ return textValue(valueOf(p, ['category','categoria','Categoria','Category','类别'])); }
-function getBuy(p){ return textValue(valueOf(p, ['buyPrice','buy_price','acquisto','Acquisto','Prezzo Acquisto','BuyPrice','进价'])); }
-function getSell(p){ return textValue(valueOf(p, ['sellPrice','sell_price','vendita','Vendita','Prezzo Vendita','SellPrice','售价'])); }
+function getBarcode(p){ return textValue(valueOf(p, ['barcode','Barcode','codice','Codice','EAN','条码','b'])); }
+function getName(p){ return textValue(valueOf(p, ['name','prodotto','Prodotto','Nome','Product','商品','n'])); }
+function getSupplier(p){ return textValue(valueOf(p, ['supplier','fornitore','Fornitore','Supplier','Nome Fornitore','供应商','s'])); }
+function getCategory(p){ return textValue(valueOf(p, ['category','categoria','Categoria','Category','类别','c'])); }
+function getBuy(p){ return textValue(valueOf(p, ['buyPrice','buy_price','acquisto','Acquisto','Prezzo Acquisto','BuyPrice','进价','a'])); }
+function getSell(p){ return textValue(valueOf(p, ['sellPrice','sell_price','vendita','Vendita','Prezzo Vendita','SellPrice','售价','v'])); }
 
 function canonicalProduct(p){
   const barcode = getBarcode(p);
@@ -126,6 +126,22 @@ function normalizeProductList(list){
   return Array.isArray(list) ? list.map(canonicalProduct).filter(p => p.barcode || p.name) : [];
 }
 
+function compactProduct(p){
+  const product = canonicalProduct(p);
+  return {
+    b: product.barcode,
+    n: product.name,
+    s: product.supplier,
+    c: product.category,
+    a: product.buyPrice,
+    v: product.sellPrice
+  };
+}
+
+function compactProductList(list){
+  return normalizeProductList(list).map(compactProduct);
+}
+
 function importSessionProduct(p){
   const product = canonicalProduct(p);
   return {
@@ -138,14 +154,48 @@ function importSessionProduct(p){
   };
 }
 
+function sessionBarcodes(session){
+  const fromBarcodes = Array.isArray(session?.barcodes) ? session.barcodes : [];
+  const fromProducts = Array.isArray(session?.products) ? session.products.map(p => p?.barcode || getBarcode(p)) : [];
+  return Array.from(new Set([...fromBarcodes, ...fromProducts].map(textValue).filter(Boolean)));
+}
+
+function productByBarcode(barcode){
+  const code = String(barcode);
+  return products.find(p => String(getBarcode(p)) === code);
+}
+
+function displayProductForSession(session, barcode){
+  const stored = Array.isArray(session?.products)
+    ? session.products.find(p => String(p.barcode || getBarcode(p)) === String(barcode))
+    : null;
+  return importSessionProduct(productByBarcode(barcode) || stored || { barcode });
+}
+
 function normalizeImportSessions(list){
   if(!Array.isArray(list)) return [];
-  return list.map((session, index) => ({
-    id: textValue(session?.id || session?.session_id || `imp_${Date.now()}_${index}`),
-    fileName: textValue(session?.fileName || session?.file_name || 'Importazione'),
-    time: textValue(session?.time || session?.created_at || new Date().toISOString()),
-    products: Array.isArray(session?.products) ? session.products.map(importSessionProduct) : []
-  })).filter(session => session.id);
+  return list.map((session, index) => {
+    const sessionProducts = Array.isArray(session?.products) ? session.products.map(importSessionProduct) : [];
+    const barcodes = sessionBarcodes({ ...session, products: sessionProducts });
+    return {
+      id: textValue(session?.id || session?.session_id || `imp_${Date.now()}_${index}`),
+      fileName: textValue(session?.fileName || session?.file_name || 'Importazione'),
+      time: textValue(session?.time || session?.created_at || new Date().toISOString()),
+      count: Number(session?.count || session?.total || barcodes.length || sessionProducts.length) || 0,
+      barcodes,
+      products: sessionProducts
+    };
+  }).filter(session => session.id);
+}
+
+function compactImportSessions(list){
+  return normalizeImportSessions(list).map(session => ({
+    id: session.id,
+    fileName: session.fileName,
+    time: session.time,
+    count: session.count || sessionBarcodes(session).length,
+    barcodes: sessionBarcodes(session)
+  }));
 }
 
 function escapeHTML(value){
@@ -175,15 +225,36 @@ function parseDropboxTime(value){
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isStorageQuotaError(error){
+  return error?.name === 'QuotaExceededError'
+    || error?.code === 22
+    || String(error?.message || '').toLowerCase().includes('quota');
+}
+
 function persistProducts(touch = true){
   products = normalizeProductList(products);
-  localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(products));
+  try{
+    localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
+  }catch(error){
+    if(!isStorageQuotaError(error)) throw error;
+    localStorage.removeItem(STORAGE_IMPORTS_KEY);
+    importSessions = [];
+    localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
+    setCloudStatus('☁ Memoria liberata: cronologia importazioni svuotata', 'err');
+  }
   if(touch) setLocalModified();
 }
 
 function persistImportSessions(touch = true){
   importSessions = normalizeImportSessions(importSessions);
-  localStorage.setItem(STORAGE_IMPORTS_KEY, JSON.stringify(importSessions));
+  try{
+    localStorage.setItem(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
+  }catch(error){
+    if(!isStorageQuotaError(error)) throw error;
+    importSessions = importSessions.slice(0, 10);
+    localStorage.setItem(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
+    setCloudStatus('☁ Cronologia importazioni alleggerita', 'err');
+  }
   if(touch) setLocalModified();
 }
 
@@ -495,8 +566,8 @@ function buildSnapshot(timestamp = Date.now(), meta = {}){
     backupCreatedAt: meta.backupCreatedAt || new Date(timestamp).toISOString(),
     backupLabel: meta.backupLabel || '',
     backupPath: meta.backupPath || '',
-    products: normalizeProductList(products),
-    importSessions: normalizeImportSessions(importSessions)
+    products: compactProductList(products),
+    importSessions: compactImportSessions(importSessions)
   };
 }
 
@@ -1038,11 +1109,14 @@ function renderImportSessions(){
     return;
   }
 
-  box.innerHTML = sessions.map(session => `<div class="import-session">
+  box.innerHTML = sessions.map(session => {
+    const barcodes = sessionBarcodes(session);
+    const sessionCount = session.count || barcodes.length;
+    return `<div class="import-session">
     <div class="import-session-header">
       <div>
         <div class="import-session-title">📁 ${escapeHTML(session.fileName || 'Importazione')}</div>
-        <div class="import-session-meta">${escapeHTML(formatDate(session.time))} · ${session.products.length} prodotti</div>
+        <div class="import-session-meta">${escapeHTML(formatDate(session.time))} · ${sessionCount} prodotti</div>
       </div>
       <div class="import-session-actions">
         <button class="session-open" data-history-action="toggle" data-session-id="${escapeAttr(session.id)}">Apri / Chiudi</button>
@@ -1056,7 +1130,9 @@ function renderImportSessions(){
         <button class="danger" data-history-action="delete-selected" data-session-id="${escapeAttr(session.id)}">Elimina selezionati</button>
       </div>
       <table class="import-products-table"><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th>Vendita</th></tr></thead><tbody>
-        ${session.products.map(p => `<tr>
+        ${barcodes.map(barcode => {
+          const p = displayProductForSession(session, barcode);
+          return `<tr>
           <td><input type="checkbox" class="import-product-checkbox" data-session-id="${escapeAttr(session.id)}" data-barcode="${escapeAttr(p.barcode)}"></td>
           <td>${escapeHTML(p.barcode || '')}</td>
           <td>${escapeHTML(p.name || '')}</td>
@@ -1064,10 +1140,12 @@ function renderImportSessions(){
           <td>${escapeHTML(p.category || '')}</td>
           <td>${escapeHTML(p.buyPrice || '')}</td>
           <td>${escapeHTML(p.sellPrice || '')}</td>
-        </tr>`).join('')}
+        </tr>`;
+        }).join('')}
       </tbody></table>
     </div>
-  </div>`).join('');
+  </div>`;
+  }).join('');
 }
 
 function formatDate(value){
@@ -1107,7 +1185,7 @@ async function deleteWholeImportSession(id){
   const session = importSessions.find(s => s.id === String(id));
   if(!session) return;
   if(!confirm('Eliminare TUTTI i prodotti di questa importazione?')) return;
-  const barcodes = session.products.map(p => p.barcode);
+  const barcodes = sessionBarcodes(session);
   deleteProductsByBarcodes(barcodes);
   importSessions = importSessions.filter(s => s.id !== String(id));
   persistAll(true);
@@ -1127,8 +1205,10 @@ async function deleteSelectedImportProducts(id){
   const session = importSessions.find(s => s.id === String(id));
   if(session){
     const set = new Set(selected.map(String));
+    session.barcodes = sessionBarcodes(session).filter(barcode => !set.has(String(barcode)));
     session.products = session.products.filter(p => !set.has(String(p.barcode)));
-    if(!session.products.length) importSessions = importSessions.filter(s => s.id !== String(id));
+    session.count = session.barcodes.length;
+    if(!session.barcodes.length) importSessions = importSessions.filter(s => s.id !== String(id));
   }
   persistAll(true);
   await saveCloudAfterChange('Prodotti eliminati');
@@ -1342,7 +1422,8 @@ async function importExcel(event){
           id: 'imp_' + Date.now(),
           fileName: file.name,
           time: new Date().toISOString(),
-          products: importedNow.map(importSessionProduct)
+          count: importedNow.length,
+          barcodes: importedNow.map(p => p.barcode)
         });
         persistImportSessions(true);
       }
@@ -1357,8 +1438,13 @@ async function importExcel(event){
       alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}\n${syncMessage}`);
     }catch(err){
       console.error(err);
-      setCloudStatus('☁ Errore import', 'err');
-      alert('Errore importazione');
+      if(isStorageQuotaError(err)){
+        setCloudStatus('☁ Memoria del browser piena', 'err');
+        alert('Memoria del browser piena. Ho alleggerito il salvataggio, ma questo import e troppo grande per questa memoria locale. Usa il sito online, oppure svuota la cronologia importazioni e riprova.');
+      }else{
+        setCloudStatus('☁ Errore import', 'err');
+        alert('Errore importazione');
+      }
     }
   };
 
