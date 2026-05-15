@@ -6,6 +6,7 @@
   <title>Inventory Manager</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div id="appRoot" class="app-root">
@@ -35,9 +36,8 @@
           <p id="pageSubtitle">Gestionale Magazzino / 库存管理</p>
         </div>
         <div class="top-actions">
-          <span id="cloudStatus" class="cloud-status">☁ Dropbox...</span>
-          <button tabindex="-1" class="blue-btn" onclick="syncNow()">☁ Sincronizza Dropbox</button>
-          <button tabindex="-1" class="blue-btn" onclick="setDropboxToken()">Token Dropbox</button>
+          <span id="cloudStatus" class="cloud-status">☁ Cloud...</span>
+          <button tabindex="-1" class="blue-btn" onclick="syncNow()">Sincronizza</button>
           <button tabindex="-1" class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button>
         </div>
       </div>
@@ -117,5 +117,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
-<!-- bump -->

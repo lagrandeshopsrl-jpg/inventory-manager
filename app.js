@@ -1,3 +1,6 @@
+const SUPABASE_URL = "https://kvxslzlpvzmwlqgirsrp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_JzG8DuX-hscXifyCUz9jFA_fmOOkFJ1";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const _p = "MDEwMQ==";
 
 let products = JSON.parse(localStorage.getItem('products') || '[]');
@@ -8,7 +11,6 @@ let editingIndex = null;
 let currentView = 'products';
 let cloudLoading = false;
 const itemsPerPage = 100;
-if(!localStorage.getItem('inventory_lastModified')) localStorage.setItem('inventory_lastModified', String(Date.now()));
 
 function valueOf(p, keys){ for(const k of keys){ if(p && p[k] !== undefined && p[k] !== null && p[k] !== '') return p[k]; } return ''; }
 function getBarcode(p){ return valueOf(p,['barcode','Barcode','codice','EAN','条码']); }
@@ -16,7 +18,7 @@ function getName(p){ return valueOf(p,['name','prodotto','Prodotto','Nome','商�
 function getSupplier(p){ return valueOf(p,['supplier','fornitore','Fornitore','Supplier','供应商']); }
 function getBuy(p){ return valueOf(p,['buyPrice','buy_price','acquisto','Acquisto','Prezzo Acquisto','进价']); }
 function getSell(p){ return valueOf(p,['sellPrice','sell_price','vendita','Vendita','Prezzo Vendita','售价']); }
-function saveStorage(){ localStorage.setItem('products', JSON.stringify(products)); localStorage.setItem('inventory_lastModified', String(Date.now())); }
+function saveStorage(){ localStorage.setItem('products', JSON.stringify(products)); }
 function saveImportSessions(){ localStorage.setItem('importSessions', JSON.stringify(importSessions)); }
 function setCloudStatus(text,type=''){ const el=document.getElementById('cloudStatus'); if(!el)return; el.className='cloud-status '+type; el.innerText=text; }
 function rowToProduct(r){ return { barcode:String(r?.barcode||''), name:String(r?.name||''), supplier:String(r?.supplier||''), buyPrice:String(r?.buy_price||''), sellPrice:String(r?.sell_price||''), prodotto:String(r?.name||''), fornitore:String(r?.supplier||''), acquisto:String(r?.buy_price||''), vendita:String(r?.sell_price||'') }; }
@@ -27,101 +29,65 @@ function showProducts(){ currentView='products'; setActive('products'); document
 function showSuppliers(){ currentView='suppliers'; setActive('suppliers'); document.getElementById('pageTitle').innerText='Fornitori'; document.getElementById('pageSubtitle').innerText='Cartelle fornitori / 供应商文件夹'; document.getElementById('productsPage').classList.add('hidden'); document.getElementById('suppliersPage').classList.remove('hidden'); document.getElementById('historyPage').classList.add('hidden'); renderSupplierFolders(); }
 function showHistory(){ currentView='history'; setActive('history'); document.getElementById('pageTitle').innerText='Cronologia importazioni'; document.getElementById('pageSubtitle').innerText='Importazioni suddivise per file / 导入记录'; document.getElementById('productsPage').classList.add('hidden'); document.getElementById('suppliersPage').classList.add('hidden'); document.getElementById('historyPage').classList.remove('hidden'); renderImportSessions(); }
 
-function getLocalModified(){
-  const v = Number(localStorage.getItem('inventory_lastModified') || '0');
-  if(!v && products.length){
-    const now = Date.now();
-    localStorage.setItem('inventory_lastModified', String(now));
-    return now;
-  }
-  return v || Date.now();
-}
-
-function setDropboxToken(){
-  const old = localStorage.getItem('dropbox_token') || '';
-  const token = prompt('Incolla qui il token Dropbox. Verrà salvato solo in questo browser.', old);
-  if(token !== null){
-    localStorage.setItem('dropbox_token', token.trim());
-    setCloudStatus(token.trim() ? '☁ Token Dropbox salvato' : '☁ Token Dropbox vuoto', token.trim() ? 'ok' : 'err');
-  }
-}
-
-function getDropboxToken(){
-  let token = localStorage.getItem('dropbox_token') || '';
-  if(!token){
-    setDropboxToken();
-    token = localStorage.getItem('dropbox_token') || '';
-  }
-  return token;
-}
-
-const DROPBOX_PATH = '/inventory-manager-v60-data.json';
-
-async function dropboxUploadSnapshot(){
-  const token = getDropboxToken();
-  if(!token) throw new Error('Token Dropbox mancante');
-  const payload = {
-    app: 'inventory-manager-v60',
-    lastModified: getLocalModified(),
-    savedAt: new Date().toISOString(),
-    products,
-    importSessions
-  };
-  const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Dropbox-API-Arg': JSON.stringify({ path: DROPBOX_PATH, mode: 'overwrite', autorename: false, mute: true }),
-      'Content-Type': 'application/octet-stream'
-    },
-    body: JSON.stringify(payload)
-  });
-  if(!res.ok) throw new Error(await res.text());
-  return payload;
-}
-
-async function dropboxDownloadSnapshot(){
-  const token = getDropboxToken();
-  if(!token) throw new Error('Token Dropbox mancante');
-  const res = await fetch('https://content.dropboxapi.com/2/files/download', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Dropbox-API-Arg': JSON.stringify({ path: DROPBOX_PATH })
-    }
-  });
-  if(res.status === 409) return null; // file non esiste ancora
-  if(!res.ok) throw new Error(await res.text());
-  return await res.json();
-}
-
 async function syncNow(){
   if(cloudLoading) return;
   cloudLoading = true;
   setCloudStatus('☁ Sincronizzo Dropbox...', '');
+
   try{
     const remote = await dropboxDownloadSnapshot();
     const localTime = getLocalModified();
     const remoteTime = remote && Number(remote.lastModified || 0);
 
-    if(!remote){
+    const localProducts = Array.isArray(products) ? products.length : 0;
+    const remoteProducts = remote && Array.isArray(remote.products)
+      ? remote.products.length
+      : 0;
+
+    // Protezione anti-sovrascrittura cloud vuoto
+    if(localProducts === 0 && remoteProducts > 0){
+      products = remote.products || [];
+      importSessions = remote.importSessions || [];
+
+      localStorage.setItem('products', JSON.stringify(products));
+      localStorage.setItem('importSessions', JSON.stringify(importSessions));
+      localStorage.setItem('inventory_lastModified', String(remoteTime || Date.now()));
+
+      setCloudStatus('☁ Database scaricato da Dropbox', 'ok');
+    }
+
+    // Dropbox non esiste ancora
+    else if(!remote){
       await dropboxUploadSnapshot();
       setCloudStatus('☁ Dropbox creato: ' + products.length + ' prodotti', 'ok');
-    }else if(remoteTime > localTime){
+    }
+
+    // Cloud più recente
+    else if(remoteTime > localTime){
       products = Array.isArray(remote.products) ? remote.products : [];
       importSessions = Array.isArray(remote.importSessions) ? remote.importSessions : [];
+
       localStorage.setItem('products', JSON.stringify(products));
       localStorage.setItem('importSessions', JSON.stringify(importSessions));
       localStorage.setItem('inventory_lastModified', String(remoteTime));
+
       setCloudStatus('☁ Scaricato da Dropbox: ' + products.length + ' prodotti', 'ok');
-    }else{
-      await dropboxUploadSnapshot();
-      setCloudStatus('☁ Caricato su Dropbox: ' + products.length + ' prodotti', 'ok');
+    }
+
+    // Locale più recente
+    else {
+      if(localProducts === 0 && remoteProducts > 0){
+        setCloudStatus('☁ Protezione cloud attiva', 'ok');
+      } else {
+        await dropboxUploadSnapshot();
+        setCloudStatus('☁ Caricato su Dropbox: ' + products.length + ' prodotti', 'ok');
+      }
     }
 
     if(currentView==='suppliers') renderSupplierFolders();
     else if(currentView==='history') renderImportSessions();
     else renderProducts();
+
   }catch(e){
     console.error(e);
     setCloudStatus('☁ Errore Dropbox', 'err');
@@ -130,24 +96,10 @@ async function syncNow(){
     cloudLoading = false;
   }
 }
-
-async function cloudUpsertProduct(p){
-  // Dropbox salva tutto il database con il tasto Sincronizza Dropbox.
-  // Questo mantiene la v60 veloce e non rompe scanner/sidebar.
-}
-
-async function cloudDeleteProduct(barcode){
-  // Dopo eliminazione premi Sincronizza Dropbox: l’ultimo file sovrascrive il cloud.
-}
-
-async function cloudSaveImportSession(s){
-  // Salvato localmente; sincronizzato nel file Dropbox.
-}
-
-async function cloudDeleteImportSession(id){
-  // Salvato localmente; sincronizzato nel file Dropbox.
-}
-
+async function cloudUpsertProduct(p){ const row=productToRow(p); if(!row.barcode) return; const {error}=await supabaseClient.from('products').upsert(row,{onConflict:'barcode'}); if(error) throw error; }
+async function cloudDeleteProduct(barcode){ if(!barcode)return; const {error}=await supabaseClient.from('products').delete().eq('barcode',String(barcode)); if(error) throw error; }
+async function cloudSaveImportSession(s){ if(!s||!s.id)return; await supabaseClient.from('import_sessions').upsert({session_id:s.id,file_name:s.fileName,products:s.products||[],created_at:s.time||new Date().toISOString()},{onConflict:'session_id'}); }
+async function cloudDeleteImportSession(id){ await supabaseClient.from('import_sessions').delete().eq('session_id',id); }
 
 function renderProducts(){ const search=(document.getElementById('search')?.value||'').toLowerCase(); const table=document.getElementById('productTable'); table.innerHTML=''; const matches=[]; products.forEach((p,idx)=>{ if(String(getBarcode(p)).toLowerCase().includes(search)||String(getName(p)).toLowerCase().includes(search)||String(getSupplier(p)).toLowerCase().includes(search)) matches.push(idx); }); const totalPages=Math.max(1,Math.ceil(matches.length/itemsPerPage)); if(currentPage>totalPages)currentPage=totalPages; matches.slice((currentPage-1)*itemsPerPage,currentPage*itemsPerPage).forEach(realIndex=>{ const p=products[realIndex]; table.innerHTML+=`<tr><td><input type="checkbox" class="product-checkbox" data-index="${realIndex}"></td><td>${getBarcode(p)}</td><td>${getName(p)}</td><td>${getSupplier(p)||'-'}</td><td>${getBuy(p)}</td><td>${getSell(p)}</td><td><div class="action-buttons"><button class="edit-btn" onclick="openEditModal(${realIndex})">✎</button><button class="delete-btn" onclick="deleteProduct(${realIndex})">🗑</button></div></td></tr>`; }); document.getElementById('pageInfo').innerText=`Pagina ${currentPage} di ${totalPages}`; }
 function supplierNameOf(p){ const s=String(getSupplier(p)||'').trim(); return s||'Senza fornitore'; }
@@ -341,26 +293,53 @@ function installClearSearchOnClick(){
 setInterval(installClearSearchOnClick, 500);
 document.addEventListener('DOMContentLoaded', installClearSearchOnClick);
 
-function installClearSearchOnScan(){
-  const s=document.getElementById('search');
-  if(!s||s.dataset.clearScan==='1')return;
-  s.dataset.clearScan='1';
-  let lastKey=0;
-  const onKeydown=function(e){
-    const now=Date.now();
-    const isChar=e&&typeof e.key==='string'&&e.key.length===1;
-    if(!isChar){
-      lastKey=now;
-      return;
-    }
-    if(s.value && now-lastKey>1200){
-      s.value='';
-      currentPage=1;
+/* ===== CLEAR SEARCH ON CLICK/TOUCH/SCAN - VERSIONE DEFINITIVA ===== */
+function installClearSearchOnClick(){
+  const s = document.getElementById('search');
+  if(!s || s.dataset.clearClick === '1') return;
+  s.dataset.clearClick = '1';
+
+  const clearIt = function(){
+    if(s.value){
+      s.value = '';
+      currentPage = 1;
       renderProducts();
     }
-    lastKey=now;
   };
-  s.addEventListener('keydown',onKeydown,true);
+
+  s.addEventListener('focus', clearIt, true);
+  s.addEventListener('click', clearIt, true);
+  s.addEventListener('touchstart', clearIt, true);
+  s.addEventListener('pointerdown', clearIt, true);
 }
-setInterval(installClearSearchOnScan,500);
-document.addEventListener('DOMContentLoaded',installClearSearchOnScan);
+
+function installClearSearchOnScan(){
+  const s = document.getElementById('search');
+  if(!s || s.dataset.clearScan === '1') return;
+  s.dataset.clearScan = '1';
+
+  let lastKey = 0;
+  const onKeydown = function(e){
+    const now = Date.now();
+    const isChar = e && typeof e.key === 'string' && e.key.length === 1;
+    if(!isChar){
+      lastKey = now;
+      return;
+    }
+    // Se passa più di 1.2 secondi, considera il prossimo input come nuova scansione
+    if(s.value && now - lastKey > 1200){
+      s.value = '';
+      currentPage = 1;
+      renderProducts();
+    }
+    lastKey = now;
+  };
+
+  s.addEventListener('keydown', onKeydown, true);
+}
+
+setInterval(installClearSearchOnClick, 500);
+setInterval(installClearSearchOnScan, 500);
+document.addEventListener('DOMContentLoaded', installClearSearchOnClick);
+document.addEventListener('DOMContentLoaded', installClearSearchOnScan);
+
