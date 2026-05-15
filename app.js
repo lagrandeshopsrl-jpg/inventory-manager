@@ -1028,32 +1028,7 @@ function __installBarcodeInputLogic(){
   s.dataset.barcodeLogic = '1';
   __barcodeLastValue = s.value || '';
 
-  s.addEventListener('beforeinput', function(e){
-    if(!e.data || !__barcodeOnlyDigits(e.data)) return;
-    if(s.value && s.selectionStart === s.selectionEnd){
-      s.value = '';
-      __barcodeLastValue = '';
-    }
-  }, true);
-
   s.addEventListener('input', function(){
-    const cur = s.value || '';
-    if(cur.length <= __barcodeLastValue.length){
-      __barcodeLastValue = cur;
-      return;
-    }
-
-    let inserted = cur;
-    if(__barcodeLastValue && cur.startsWith(__barcodeLastValue)){
-      inserted = cur.slice(__barcodeLastValue.length);
-    }
-
-    if(__barcodeLastValue && inserted && __barcodeOnlyDigits(inserted)){
-      s.value = inserted;
-      currentPage = 1;
-      renderProducts();
-    }
-
     __barcodeLastValue = s.value || '';
   }, true);
 
