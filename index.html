@@ -110,6 +110,11 @@
               <button type="button" class="danger" onclick="clearDropboxToken()">Scollega</button>
               <div id="dropboxAccountStatus" class="oauth-status">Non collegato</div>
             </div>
+            <div class="oauth-help">
+              <span>URI Dropbox da registrare</span>
+              <code id="dropboxRedirectUriText">Apri l'app dal sito</code>
+              <button type="button" onclick="copyDropboxRedirectUri()">Copia URI</button>
+            </div>
           </div>
           <div class="settings-row">
             <label for="dropboxRefreshToken">Refresh Token</label>

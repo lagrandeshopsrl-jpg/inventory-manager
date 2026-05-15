@@ -64,6 +64,28 @@ function getOAuthRedirectUri(){
   return window.location.href.split('#')[0].split('?')[0];
 }
 
+function updateDropboxRedirectHint(){
+  const el = document.getElementById('dropboxRedirectUriText');
+  if(!el) return;
+  el.innerText = location.protocol === 'file:'
+    ? 'Apri l\'app dal sito o da localhost'
+    : getOAuthRedirectUri();
+}
+
+async function copyDropboxRedirectUri(){
+  if(location.protocol === 'file:'){
+    alert('Apri l\'app dal sito pubblicato o da localhost, poi copia l\'URI da questa riga.');
+    return;
+  }
+  const uri = getOAuthRedirectUri();
+  try{
+    await navigator.clipboard.writeText(uri);
+    setCloudStatus('☁ URI Dropbox copiato', 'ok');
+  }catch(error){
+    prompt('Copia questo URI nella console Dropbox:', uri);
+  }
+}
+
 function valueOf(p, keys){
   for(const k of keys){
     if(p && p[k] !== undefined && p[k] !== null && p[k] !== '') return p[k];
@@ -777,6 +799,7 @@ function showSettings(){
     accountStatus.innerText = connected ? 'Collegato' : 'Non collegato';
     accountStatus.classList.toggle('ok', connected);
   }
+  updateDropboxRedirectHint();
   setFolderPickerCurrent(getDropboxBackupFolder());
   setFolderPickerStatus(
     hasDropboxCredentials()
