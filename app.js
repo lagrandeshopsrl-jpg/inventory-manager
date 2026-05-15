@@ -95,12 +95,12 @@ function valueOf(p, keys){
   return '';
 }
 
-function getBarcode(p){ return textValue(valueOf(p, ['barcode','Barcode','codice','Codice','EAN','条码','b'])); }
-function getName(p){ return textValue(valueOf(p, ['name','prodotto','Prodotto','Nome','Product','商品','n'])); }
-function getSupplier(p){ return textValue(valueOf(p, ['supplier','fornitore','Fornitore','Supplier','Nome Fornitore','供应商','s'])); }
-function getCategory(p){ return textValue(valueOf(p, ['category','categoria','Categoria','Category','类别','c'])); }
-function getBuy(p){ return textValue(valueOf(p, ['buyPrice','buy_price','acquisto','Acquisto','Prezzo Acquisto','BuyPrice','进价','a'])); }
-function getSell(p){ return textValue(valueOf(p, ['sellPrice','sell_price','vendita','Vendita','Prezzo Vendita','SellPrice','售价','v'])); }
+function getBarcode(p){ return Array.isArray(p) ? textValue(p[0]) : textValue(valueOf(p, ['barcode','Barcode','codice','Codice','EAN','条码','b'])); }
+function getName(p){ return Array.isArray(p) ? textValue(p[1]) : textValue(valueOf(p, ['name','prodotto','Prodotto','Nome','Product','商品','n'])); }
+function getSupplier(p){ return Array.isArray(p) ? textValue(p[2]) : textValue(valueOf(p, ['supplier','fornitore','Fornitore','Supplier','Nome Fornitore','供应商','s'])); }
+function getCategory(p){ return Array.isArray(p) ? textValue(p[3]) : textValue(valueOf(p, ['category','categoria','Categoria','Category','类别','c'])); }
+function getBuy(p){ return Array.isArray(p) ? textValue(p[4]) : textValue(valueOf(p, ['buyPrice','buy_price','acquisto','Acquisto','Prezzo Acquisto','BuyPrice','进价','a'])); }
+function getSell(p){ return Array.isArray(p) ? textValue(p[5]) : textValue(valueOf(p, ['sellPrice','sell_price','vendita','Vendita','Prezzo Vendita','SellPrice','售价','v'])); }
 
 function canonicalProduct(p){
   const barcode = getBarcode(p);
@@ -130,14 +130,14 @@ function normalizeProductList(list){
 
 function compactProduct(p){
   const product = canonicalProduct(p);
-  return {
-    b: product.barcode,
-    n: product.name,
-    s: product.supplier,
-    c: product.category,
-    a: product.buyPrice,
-    v: product.sellPrice
-  };
+  return [
+    product.barcode,
+    product.name,
+    product.supplier,
+    product.category,
+    product.buyPrice,
+    product.sellPrice
+  ];
 }
 
 function compactProductList(list){
@@ -157,7 +157,7 @@ function importSessionProduct(p){
 }
 
 function sessionBarcodes(session){
-  const fromBarcodes = Array.isArray(session?.barcodes) ? session.barcodes : [];
+  const fromBarcodes = Array.isArray(session?.barcodes) ? session.barcodes : (Array.isArray(session?.b) ? session.b : []);
   const fromProducts = Array.isArray(session?.products) ? session.products.map(p => p?.barcode || getBarcode(p)) : [];
   return Array.from(new Set([...fromBarcodes, ...fromProducts].map(textValue).filter(Boolean)));
 }
@@ -180,10 +180,10 @@ function normalizeImportSessions(list){
     const sessionProducts = Array.isArray(session?.products) ? session.products.map(importSessionProduct) : [];
     const barcodes = sessionBarcodes({ ...session, products: sessionProducts });
     return {
-      id: textValue(session?.id || session?.session_id || `imp_${Date.now()}_${index}`),
-      fileName: textValue(session?.fileName || session?.file_name || 'Importazione'),
-      time: textValue(session?.time || session?.created_at || new Date().toISOString()),
-      count: Number(session?.count || session?.total || barcodes.length || sessionProducts.length) || 0,
+      id: textValue(session?.id || session?.i || session?.session_id || `imp_${Date.now()}_${index}`),
+      fileName: textValue(session?.fileName || session?.f || session?.file_name || 'Importazione'),
+      time: textValue(session?.time || session?.t || session?.created_at || new Date().toISOString()),
+      count: Number(session?.count || session?.c || session?.total || barcodes.length || sessionProducts.length) || 0,
       barcodes,
       products: sessionProducts.length <= importSessionPageSize ? sessionProducts : []
     };
@@ -192,11 +192,11 @@ function normalizeImportSessions(list){
 
 function compactImportSessions(list){
   return normalizeImportSessions(list).map(session => ({
-    id: session.id,
-    fileName: session.fileName,
-    time: session.time,
-    count: session.count || sessionBarcodes(session).length,
-    barcodes: sessionBarcodes(session)
+    i: session.id,
+    f: session.fileName,
+    t: session.time,
+    c: session.count || sessionBarcodes(session).length,
+    b: sessionBarcodes(session)
   }));
 }
 
