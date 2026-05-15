@@ -1,8 +1,0 @@
-FIX DEFINITIVO DROPBOX
-
-Problema risolto:
-- su nuovi dispositivi non cancella più tutti i prodotti
-- se Dropbox contiene dati, vengono scaricati automaticamente
-- protezione anti upload database vuoto
-
-Carica tutti i file nella root del repository GitHub.
