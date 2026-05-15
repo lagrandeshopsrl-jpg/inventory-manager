@@ -340,3 +340,27 @@ function installClearSearchOnClick(){
 
 setInterval(installClearSearchOnClick, 500);
 document.addEventListener('DOMContentLoaded', installClearSearchOnClick);
+
+function installClearSearchOnScan(){
+  const s=document.getElementById('search');
+  if(!s||s.dataset.clearScan==='1')return;
+  s.dataset.clearScan='1';
+  let lastKey=0;
+  const onKeydown=function(e){
+    const now=Date.now();
+    const isChar=e&&typeof e.key==='string'&&e.key.length===1;
+    if(!isChar){
+      lastKey=now;
+      return;
+    }
+    if(s.value && now-lastKey>1200){
+      s.value='';
+      currentPage=1;
+      renderProducts();
+    }
+    lastKey=now;
+  };
+  s.addEventListener('keydown',onKeydown,true);
+}
+setInterval(installClearSearchOnScan,500);
+document.addEventListener('DOMContentLoaded',installClearSearchOnScan);
