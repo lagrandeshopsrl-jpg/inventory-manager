@@ -448,7 +448,9 @@ function displayDropboxFolderPath(path){
 function setFolderPickerCurrent(path){
   dropboxFolderPickerPath = normalizeDropboxFolderPath(path);
   const current = document.getElementById('dropboxFolderCurrent');
-  if(current) current.innerText = displayDropboxFolderPath(dropboxFolderPickerPath);
+  if(current) current.innerText = 'Cartella aperta: ' + displayDropboxFolderPath(dropboxFolderPickerPath);
+  const backButton = document.getElementById('dropboxFolderBackButton');
+  if(backButton) backButton.classList.toggle('hidden', !dropboxFolderPickerPath);
 }
 
 function setFolderPickerOptions(folders, placeholder){
@@ -460,6 +462,7 @@ function setFolderPickerOptions(folders, placeholder){
     options.push(`<option value="${escapeAttr(path)}">${escapeHTML(folder.name)} - ${escapeHTML(path || '/')}</option>`);
   });
   select.innerHTML = options.join('');
+  select.disabled = folders.length === 0;
 }
 
 function setFolderPickerStatus(text, type = ''){
@@ -796,15 +799,15 @@ function showSettings(){
   if(backupFolderInput) backupFolderInput.value = getDropboxBackupFolder();
   if(accountStatus){
     const connected = hasDropboxCredentials();
-    accountStatus.innerText = connected ? 'Collegato' : 'Non collegato';
+    accountStatus.innerText = connected ? 'Dropbox collegato' : 'Dropbox non collegato';
     accountStatus.classList.toggle('ok', connected);
   }
   updateDropboxRedirectHint();
   setFolderPickerCurrent(getDropboxBackupFolder());
   setFolderPickerStatus(
     hasDropboxCredentials()
-      ? 'Premi Carica per vedere le cartelle Dropbox.'
-      : 'Collega Dropbox oppure inserisci un token, poi premi Carica.'
+      ? 'Mostra le cartelle, entra in quella che vuoi usare, poi premi Salva questa cartella.'
+      : 'Collega account Dropbox, poi mostra le cartelle.'
   );
 }
 
@@ -1359,15 +1362,15 @@ function saveDropboxSettings(options = {}){
     setCloudStatus(hasDropboxCredentials() ? '☁ Dropbox salvato' : '☁ Token Dropbox rimosso', hasDropboxCredentials() ? 'ok' : 'err');
     setFolderPickerStatus(
       hasDropboxCredentials()
-        ? 'Impostazioni salvate. Premi Carica per vedere le cartelle.'
-        : 'Dropbox non collegato: collega l\'account oppure inserisci un token.',
+        ? 'Impostazioni salvate. Ora puoi mostrare le cartelle.'
+        : 'Dropbox non collegato: collega account Dropbox.',
       hasDropboxCredentials() ? 'ok' : 'err'
     );
   }
   const accountStatus = document.getElementById('dropboxAccountStatus');
   if(accountStatus){
     const connected = hasDropboxCredentials();
-    accountStatus.innerText = connected ? 'Collegato' : 'Non collegato';
+    accountStatus.innerText = connected ? 'Dropbox collegato' : 'Dropbox non collegato';
     accountStatus.classList.toggle('ok', connected);
   }
 }
@@ -1375,25 +1378,25 @@ function saveDropboxSettings(options = {}){
 async function loadDropboxFolderPicker(path = dropboxFolderPickerPath){
   saveDropboxSettings({ silent: true });
   if(!hasDropboxCredentials()){
-    setFolderPickerStatus('Prima collega Dropbox oppure inserisci Access Token o App Key + Refresh Token.', 'err');
+    setFolderPickerStatus('Dropbox non collegato: collega account Dropbox prima di scegliere la cartella.', 'err');
     setCloudStatus('☁ Token Dropbox mancante', 'err');
     return;
   }
 
   try{
-    setFolderPickerStatus('Carico cartelle Dropbox...');
-    setCloudStatus('☁ Carico cartelle Dropbox...', '');
+    setFolderPickerStatus('Cerco le cartelle Dropbox...');
+    setCloudStatus('☁ Cerco cartelle Dropbox...', '');
     const cleanPath = normalizeDropboxFolderPath(path);
     const folders = await dropboxListFolders(cleanPath);
     setFolderPickerCurrent(cleanPath);
-    setFolderPickerOptions(folders, folders.length ? 'Seleziona cartella' : 'Nessuna sottocartella');
+    setFolderPickerOptions(folders, folders.length ? 'Scegli una cartella' : 'Nessuna cartella dentro');
     setFolderPickerStatus(
       folders.length
-        ? `Cartelle caricate: ${folders.length}. Seleziona una cartella e premi Apri oppure Usa cartella.`
-        : 'Cartella aperta. Non ci sono sottocartelle, puoi usare questa cartella.',
+        ? `Ho trovato ${folders.length} cartelle. Scegline una e premi Entra, oppure salva la cartella aperta.`
+        : 'Questa cartella non contiene altre cartelle. Puoi premere Salva questa cartella.',
       'ok'
     );
-    setCloudStatus('☁ Cartelle caricate', 'ok');
+    setCloudStatus('☁ Cartelle trovate', 'ok');
   }catch(error){
     const message = dropboxErrorMessage(error);
     const fileHint = location.protocol === 'file:' ? ' Se stai usando il collegamento diretto Dropbox, apri l\'app da localhost o da un sito http/https.' : '';
@@ -1405,7 +1408,7 @@ async function loadDropboxFolderPicker(path = dropboxFolderPickerPath){
 async function openSelectedDropboxFolder(){
   const selected = textValue(document.getElementById('dropboxFolderSelect')?.value);
   if(!selected){
-    setFolderPickerStatus('Seleziona prima una cartella dalla lista. Se la lista è vuota premi Carica.', 'err');
+    setFolderPickerStatus('Scegli una cartella dalla lista, poi premi Entra.', 'err');
     return;
   }
   await loadDropboxFolderPicker(selected);
@@ -1418,7 +1421,7 @@ function useSelectedDropboxFolder(){
   if(input) input.value = folder;
   setDropboxBackupFolder(folder);
   setFolderPickerCurrent(folder);
-  setFolderPickerStatus('Cartella backup selezionata: ' + folder, 'ok');
+  setFolderPickerStatus('Cartella backup salvata: ' + folder, 'ok');
   setCloudStatus('☁ Cartella backup selezionata', 'ok');
 }
 
@@ -1446,10 +1449,10 @@ function clearDropboxToken(){
   if(refreshInput) refreshInput.value = '';
   if(tokenInput) tokenInput.value = '';
   if(accountStatus){
-    accountStatus.innerText = 'Non collegato';
+    accountStatus.innerText = 'Dropbox non collegato';
     accountStatus.classList.remove('ok');
   }
-  setFolderPickerStatus('Dropbox scollegato. Collega di nuovo l\'account per caricare le cartelle.', 'err');
+  setFolderPickerStatus('Dropbox scollegato. Collega account Dropbox per scegliere le cartelle.', 'err');
   setCloudStatus('☁ Token Dropbox rimosso', 'err');
 }
 

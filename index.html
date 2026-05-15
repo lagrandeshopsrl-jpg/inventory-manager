@@ -40,7 +40,7 @@
         </div>
         <div class="top-actions">
           <span id="cloudStatus" class="cloud-status">☁ Locale</span>
-          <button tabindex="-1" class="blue-btn" onclick="syncNow()">Sincronizza</button>
+          <button tabindex="-1" class="blue-btn" onclick="syncNow()">Sincronizza dati</button>
           <button tabindex="-1" class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button>
         </div>
       </div>
@@ -100,57 +100,60 @@
       <section id="settingsPage" class="hidden">
         <div class="settings-panel">
           <div class="settings-row">
-            <label for="dropboxAppKey">App Key Dropbox</label>
-            <input id="dropboxAppKey" type="password" autocomplete="off" placeholder="App key per collegare Dropbox" />
+            <label for="dropboxAppKey">Codice app Dropbox</label>
+            <input id="dropboxAppKey" type="password" autocomplete="off" placeholder="Codice app Dropbox" />
           </div>
           <div class="settings-row">
             <label>Account Dropbox</label>
             <div class="oauth-box">
-              <button type="button" onclick="startDropboxOAuth()">Collega Dropbox</button>
+              <button type="button" onclick="startDropboxOAuth()">Collega account</button>
               <button type="button" class="danger" onclick="clearDropboxToken()">Scollega</button>
               <div id="dropboxAccountStatus" class="oauth-status">Non collegato</div>
             </div>
+          </div>
+          <details class="advanced-settings">
+            <summary>Impostazioni avanzate Dropbox</summary>
             <div class="oauth-help">
               <span>URI Dropbox da registrare</span>
               <code id="dropboxRedirectUriText">Apri l'app dal sito</code>
               <button type="button" onclick="copyDropboxRedirectUri()">Copia URI</button>
             </div>
-          </div>
-          <div class="settings-row">
-            <label for="dropboxRefreshToken">Refresh Token</label>
-            <input id="dropboxRefreshToken" type="password" autocomplete="off" placeholder="Token lungo per rinnovo automatico" />
-          </div>
-          <div class="settings-row">
-            <label for="dropboxToken">Access Token</label>
-            <input id="dropboxToken" type="password" autocomplete="off" placeholder="Token temporaneo opzionale" />
-          </div>
-          <div class="settings-row">
-            <label for="dropboxPath">File Dropbox</label>
-            <input id="dropboxPath" type="text" autocomplete="off" />
-          </div>
+            <div class="settings-row">
+              <label for="dropboxRefreshToken">Refresh Token</label>
+              <input id="dropboxRefreshToken" type="password" autocomplete="off" placeholder="Token lungo per rinnovo automatico" />
+            </div>
+            <div class="settings-row">
+              <label for="dropboxToken">Access Token</label>
+              <input id="dropboxToken" type="password" autocomplete="off" placeholder="Token temporaneo opzionale" />
+            </div>
+            <div class="settings-row">
+              <label for="dropboxPath">File Dropbox</label>
+              <input id="dropboxPath" type="text" autocomplete="off" />
+            </div>
+          </details>
           <div class="settings-row">
             <label for="dropboxBackupFolder">Cartella backup</label>
             <input id="dropboxBackupFolder" type="text" autocomplete="off" />
           </div>
           <div class="settings-row">
-            <label for="dropboxFolderSelect">Seleziona cartella</label>
+            <label for="dropboxFolderSelect">Cartelle Dropbox</label>
             <div class="folder-picker">
               <select id="dropboxFolderSelect">
-                <option value="">Carica cartelle Dropbox</option>
+                <option value="">Mostra cartelle Dropbox</option>
               </select>
               <div id="dropboxFolderCurrent" class="folder-current">/</div>
               <div class="folder-picker-actions">
-                <button type="button" onclick="loadDropboxFolderPicker()">Carica</button>
-                <button type="button" onclick="openSelectedDropboxFolder()">Apri</button>
-                <button type="button" onclick="goUpDropboxFolder()">Su</button>
-                <button type="button" onclick="useSelectedDropboxFolder()">Usa cartella</button>
+                <button type="button" onclick="loadDropboxFolderPicker()">Mostra cartelle</button>
+                <button type="button" onclick="openSelectedDropboxFolder()">Entra</button>
+                <button id="dropboxFolderBackButton" type="button" onclick="goUpDropboxFolder()">Torna indietro</button>
+                <button type="button" onclick="useSelectedDropboxFolder()">Salva questa cartella</button>
               </div>
-              <div id="dropboxFolderPickerStatus" class="folder-picker-status">Collega Dropbox e poi carica le cartelle.</div>
+              <div id="dropboxFolderPickerStatus" class="folder-picker-status">Collega Dropbox e mostra le cartelle.</div>
             </div>
           </div>
           <div class="settings-actions">
             <button type="button" onclick="saveDropboxSettings()">Salva</button>
-            <button type="button" onclick="syncNow()">Sincronizza</button>
+            <button type="button" onclick="syncNow()">Sincronizza dati</button>
             <button type="button" class="danger" onclick="clearDropboxToken()">Rimuovi token</button>
           </div>
         </div>
