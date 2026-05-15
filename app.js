@@ -14,6 +14,7 @@ const DROPBOX_OAUTH_REDIRECT_KEY = 'inventory_dropbox_oauth_redirect';
 const DEFAULT_DROPBOX_PATH = '/inventory_manager_snapshot.json';
 const DEFAULT_DROPBOX_BACKUP_FOLDER = '/inventory_manager_backups';
 const itemsPerPage = 100;
+const importSessionPageSize = 200;
 
 let products = normalizeProductList(readJson(STORAGE_PRODUCTS_KEY, []));
 let importSessions = normalizeImportSessions(readJson(STORAGE_IMPORTS_KEY, []));
@@ -24,6 +25,7 @@ let currentView = 'products';
 let cloudLoading = false;
 let __barcodeLastValue = '';
 let dropboxFolderPickerPath = '';
+let importSessionPages = {};
 
 function readJson(key, fallback){
   try{
@@ -183,7 +185,7 @@ function normalizeImportSessions(list){
       time: textValue(session?.time || session?.created_at || new Date().toISOString()),
       count: Number(session?.count || session?.total || barcodes.length || sessionProducts.length) || 0,
       barcodes,
-      products: sessionProducts
+      products: sessionProducts.length <= importSessionPageSize ? sessionProducts : []
     };
   }).filter(session => session.id);
 }
@@ -1124,13 +1126,42 @@ function renderImportSessions(){
       </div>
     </div>
     <div class="import-session-body" data-session-id="${escapeAttr(session.id)}">
+      <div class="import-session-page-info">Apri questa importazione per vedere i prodotti a pagine.</div>
+    </div>
+  </div>`;
+  }).join('');
+}
+
+function importSessionPageFor(id){
+  return Math.max(1, Number(importSessionPages[id] || 1) || 1);
+}
+
+function renderImportSessionBody(id){
+  const session = importSessions.find(s => s.id === String(id));
+  const body = importBodyFor(id);
+  if(!session || !body) return;
+
+  const barcodes = sessionBarcodes(session);
+  const total = barcodes.length;
+  const totalPages = Math.max(1, Math.ceil(total / importSessionPageSize));
+  const page = Math.min(importSessionPageFor(id), totalPages);
+  importSessionPages[id] = page;
+  const start = (page - 1) * importSessionPageSize;
+  const visibleBarcodes = barcodes.slice(start, start + importSessionPageSize);
+  const from = total ? start + 1 : 0;
+  const to = start + visibleBarcodes.length;
+
+  body.innerHTML = `
       <div class="import-selected-actions">
-        <button data-history-action="select-all" data-session-id="${escapeAttr(session.id)}">Seleziona tutti</button>
-        <button data-history-action="deselect-all" data-session-id="${escapeAttr(session.id)}">Deseleziona</button>
+        <button data-history-action="select-all" data-session-id="${escapeAttr(session.id)}">Seleziona pagina</button>
+        <button data-history-action="deselect-all" data-session-id="${escapeAttr(session.id)}">Deseleziona pagina</button>
         <button class="danger" data-history-action="delete-selected" data-session-id="${escapeAttr(session.id)}">Elimina selezionati</button>
+        <button data-history-action="prev-page" data-session-id="${escapeAttr(session.id)}" ${page <= 1 ? 'disabled' : ''}>Precedenti</button>
+        <button data-history-action="next-page" data-session-id="${escapeAttr(session.id)}" ${page >= totalPages ? 'disabled' : ''}>Successivi</button>
       </div>
+      <div class="import-session-page-info">Prodotti ${from}-${to} di ${total} · Pagina ${page} di ${totalPages}</div>
       <table class="import-products-table"><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th>Vendita</th></tr></thead><tbody>
-        ${barcodes.map(barcode => {
+        ${visibleBarcodes.map(barcode => {
           const p = displayProductForSession(session, barcode);
           return `<tr>
           <td><input type="checkbox" class="import-product-checkbox" data-session-id="${escapeAttr(session.id)}" data-barcode="${escapeAttr(p.barcode)}"></td>
@@ -1142,10 +1173,8 @@ function renderImportSessions(){
           <td>${escapeHTML(p.sellPrice || '')}</td>
         </tr>`;
         }).join('')}
-      </tbody></table>
-    </div>
-  </div>`;
-  }).join('');
+      </tbody></table>`;
+  body.dataset.loaded = '1';
 }
 
 function formatDate(value){
@@ -1164,7 +1193,18 @@ function importCheckboxesFor(id){
 
 function toggleImportSession(id){
   const body = importBodyFor(id);
-  if(body) body.style.display = body.style.display === 'block' ? 'none' : 'block';
+  if(!body) return;
+  const opening = body.style.display !== 'block';
+  body.style.display = opening ? 'block' : 'none';
+  if(opening && body.dataset.loaded !== '1') renderImportSessionBody(id);
+}
+
+function changeImportSessionPage(id, direction){
+  const session = importSessions.find(s => s.id === String(id));
+  if(!session) return;
+  const totalPages = Math.max(1, Math.ceil(sessionBarcodes(session).length / importSessionPageSize));
+  importSessionPages[id] = Math.min(totalPages, Math.max(1, importSessionPageFor(id) + direction));
+  renderImportSessionBody(id);
 }
 
 function selectImportProducts(id){
@@ -1696,6 +1736,8 @@ document.addEventListener('click', function(event){
     else if(action === 'select-all') selectImportProducts(id);
     else if(action === 'deselect-all') deselectImportProducts(id);
     else if(action === 'delete-selected') deleteSelectedImportProducts(id);
+    else if(action === 'prev-page') changeImportSessionPage(id, -1);
+    else if(action === 'next-page') changeImportSessionPage(id, 1);
   }
 });
 
