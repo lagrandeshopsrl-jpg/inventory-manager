@@ -3,6 +3,7 @@ const STORAGE_IMPORTS_KEY = 'importSessions';
 const LAST_MODIFIED_KEY = 'inventory_lastModified';
 const DROPBOX_TOKEN_KEY = 'inventory_dropbox_token';
 const DROPBOX_PATH_KEY = 'inventory_dropbox_path';
+const SYNC_FIX_VERSION_KEY = 'inventory_sync_fix_version';
 const DEFAULT_DROPBOX_PATH = '/inventory_manager_snapshot.json';
 const itemsPerPage = 100;
 
@@ -115,6 +116,11 @@ function getLocalModified(){
   return Number(localStorage.getItem(LAST_MODIFIED_KEY) || '0') || 0;
 }
 
+function parseDropboxTime(value){
+  const parsed = Date.parse(value || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function persistProducts(touch = true){
   products = normalizeProductList(products);
   localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(products));
@@ -134,7 +140,15 @@ function persistAll(touch = true){
 }
 
 function ensureLocalModified(){
-  if(!getLocalModified() && (products.length || importSessions.length)) setLocalModified();
+  if(!localStorage.getItem(LAST_MODIFIED_KEY)) {
+    localStorage.setItem(LAST_MODIFIED_KEY, '0');
+  }
+}
+
+function applySyncTimestampMigration(){
+  if(localStorage.getItem(SYNC_FIX_VERSION_KEY) === 'remote_time_v2') return;
+  localStorage.setItem(LAST_MODIFIED_KEY, '0');
+  localStorage.setItem(SYNC_FIX_VERSION_KEY, 'remote_time_v2');
 }
 
 function setCloudStatus(text, type = ''){
@@ -200,8 +214,11 @@ async function dropboxDownloadSnapshot(){
     meta = {};
   }
 
-  const serverModified = Date.parse(meta.server_modified || '');
-  data.lastModified = Number(data.lastModified || 0) || serverModified || 0;
+  const snapshotModified = Number(data.lastModified || 0) || 0;
+  const serverModified = parseDropboxTime(meta.server_modified);
+  data.lastModified = Math.max(snapshotModified, serverModified);
+  data.dropboxServerModified = serverModified;
+  data.snapshotModified = snapshotModified;
   data.products = normalizeProductList(data.products);
   data.importSessions = normalizeImportSessions(data.importSessions);
   return data;
@@ -232,10 +249,19 @@ async function dropboxUploadSnapshot(){
   if(response.status === 401) throw new Error('DROPBOX_AUTH');
   if(!response.ok) throw new Error('DROPBOX_UPLOAD_' + response.status);
 
+  let meta = {};
+  try{
+    meta = await response.json();
+  }catch(e){
+    meta = {};
+  }
+  const serverModified = parseDropboxTime(meta.server_modified);
+  const savedTime = Math.max(timestamp, serverModified);
+
   products = snapshot.products;
   importSessions = snapshot.importSessions;
   persistAll(false);
-  setLocalModified(timestamp);
+  setLocalModified(savedTime);
   return snapshot;
 }
 
@@ -303,6 +329,15 @@ async function syncNow(options = {}){
       persistAll(false);
       setLocalModified(remoteTime || Date.now());
       setCloudStatus('☁ Database scaricato da Dropbox', 'ok');
+    }else if(localTime === 0 && remoteProducts > 0){
+      products = remote.products;
+      importSessions = remote.importSessions;
+      persistAll(false);
+      setLocalModified(remoteTime || Date.now());
+      setCloudStatus('☁ Ultimo file Dropbox scaricato: ' + products.length + ' prodotti', 'ok');
+    }else if(localTime === 0 && localProducts > 0 && remoteProducts === 0){
+      await dropboxUploadSnapshot();
+      setCloudStatus('☁ Locale caricato su Dropbox: ' + products.length + ' prodotti', 'ok');
     }else if(remoteTime > localTime){
       products = remote.products;
       importSessions = remote.importSessions;
@@ -1100,6 +1135,7 @@ document.addEventListener('click', function(event){
 
 window.onload = function(){
   ensureLocalModified();
+  applySyncTimestampMigration();
   persistAll(false);
   if(!localStorage.getItem(DROPBOX_PATH_KEY)) setDropboxPath(DEFAULT_DROPBOX_PATH);
   showProducts();
