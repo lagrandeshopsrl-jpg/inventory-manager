@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260516-prezzo-vendita-evidente" />
+  <link rel="stylesheet" href="style.css?v=20260516-totale-vendita-destra" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -102,12 +102,12 @@
               <div id="saleCartBox"></div>
             </div>
             <div class="sale-bottom-actions">
+              <button type="button" class="confirm-sale large-sale-action" onclick="confirmSaleCart()">Conferma vendita</button>
+              <button type="button" class="clear-sale large-sale-action" onclick="clearSaleCart()">Svuota carrello</button>
               <div id="saleBottomTotal" class="sale-bottom-total">
                 <span>Totale vendita</span>
                 <strong id="saleBottomTotalAmount">€ 0,00</strong>
               </div>
-              <button type="button" class="confirm-sale large-sale-action" onclick="confirmSaleCart()">Conferma vendita</button>
-              <button type="button" class="clear-sale large-sale-action" onclick="clearSaleCart()">Svuota carrello</button>
             </div>
           </div>
         </div>
@@ -258,6 +258,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20260516-prezzo-vendita-evidente"></script>
+  <script src="app.js?v=20260516-totale-vendita-destra"></script>
 </body>
 </html>
