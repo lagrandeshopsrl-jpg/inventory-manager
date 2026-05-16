@@ -14,6 +14,7 @@
       <button tabindex="-1" class="menu active" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
       <button tabindex="-1" class="menu" id="menuSuppliers" onclick="showSuppliers()">📁 Fornitori</button>
       <button tabindex="-1" class="menu" id="menuSales" onclick="showSales()">€ Vendite</button>
+      <button tabindex="-1" class="menu" id="menuTopSales" onclick="showTopSales()">★ Più venduti</button>
       <button tabindex="-1" class="menu" id="menuHistory" onclick="showHistory()">🕘 Cronologia</button>
       <button tabindex="-1" class="menu" id="menuCategories" onclick="showCategories()">▤ Categorie</button>
       <button tabindex="-1" class="menu" id="menuSettings" onclick="showSettings()">⚙ Impostazioni</button>
@@ -82,7 +83,7 @@
       </section>
 
       <section id="salesPage" class="hidden">
-        <div class="sales-layout">
+        <div class="sales-layout sales-layout-single">
           <div class="sales-panel">
             <div class="sales-panel-header">
               <h2>Carrello vendita</h2>
@@ -98,7 +99,11 @@
             <div id="saleSearchResults" class="sales-results"></div>
             <div id="saleCartBox"></div>
           </div>
+        </div>
+      </section>
 
+      <section id="topSalesPage" class="hidden">
+        <div class="sales-layout sales-layout-single">
           <div class="sales-panel">
             <div class="sales-panel-header">
               <h2>Più venduti</h2>

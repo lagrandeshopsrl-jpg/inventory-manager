@@ -65,6 +65,9 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   gap:16px;
   align-items:start;
 }
+.sales-layout-single{
+  grid-template-columns:1fr;
+}
 .sales-panel{
   background:white;
   border:1px solid #e5eaf3;

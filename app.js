@@ -901,6 +901,7 @@ function setActive(view){
   document.getElementById('menuProducts')?.classList.toggle('active', view === 'products');
   document.getElementById('menuSuppliers')?.classList.toggle('active', view === 'suppliers');
   document.getElementById('menuSales')?.classList.toggle('active', view === 'sales');
+  document.getElementById('menuTopSales')?.classList.toggle('active', view === 'topSales');
   document.getElementById('menuHistory')?.classList.toggle('active', view === 'history');
   document.getElementById('menuCategories')?.classList.toggle('active', view === 'categories');
   document.getElementById('menuSettings')?.classList.toggle('active', view === 'settings');
@@ -911,6 +912,7 @@ function setPageVisibility(view){
     products: 'productsPage',
     suppliers: 'suppliersPage',
     sales: 'salesPage',
+    topSales: 'topSalesPage',
     history: 'historyPage',
     categories: 'categoriesPage',
     settings: 'settingsPage'
@@ -947,12 +949,21 @@ function showSales(){
   currentView = 'sales';
   setActive('sales');
   setPageVisibility('sales');
-  setTitle('Vendite', 'Carrello vendita e prodotti più venduti');
+  setTitle('Vendite', 'Scansiona prodotti e conferma la vendita');
   const search = document.getElementById('search');
   if(search) search.placeholder = 'SCANSIONA BARCODE PER VENDITA';
-  setupSalesDefaultDates();
   renderSaleCart();
   renderSaleSearchResults();
+}
+
+function showTopSales(){
+  currentView = 'topSales';
+  setActive('topSales');
+  setPageVisibility('topSales');
+  setTitle('Più venduti', 'Classifica prodotti e fornitori venduti');
+  const search = document.getElementById('search');
+  if(search) search.placeholder = 'SCANSIONA / CERCA BARCODE QUI';
+  setupSalesDefaultDates();
   renderSalesStats();
 }
 
@@ -1005,6 +1016,7 @@ function showSettings(){
 function renderCurrentView(){
   if(currentView === 'suppliers') renderSupplierFolders();
   else if(currentView === 'sales') showSales();
+  else if(currentView === 'topSales') showTopSales();
   else if(currentView === 'history') renderImportSessions();
   else if(currentView === 'categories') renderCategoryFolders();
   else if(currentView === 'settings') showSettings();
@@ -1173,17 +1185,23 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
-    ${items.map(item => `<tr>
-      <td>${escapeHTML(item.barcode)}</td>
-      <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
-      <td>${item.qty}</td>
-      <td><div class="action-buttons">
-        <button class="edit-btn" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
-        <button class="edit-btn" data-sale-cart-action="plus" data-barcode="${escapeAttr(item.barcode)}">+</button>
-        <button class="delete-btn" data-sale-cart-action="remove" data-barcode="${escapeAttr(item.barcode)}">Rimuovi</button>
-      </div></td>
-    </tr>`).join('')}
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+    ${items.map(item => {
+      const buyPrice = item.product ? (getBuy(item.product) || '-') : '-';
+      const sellPrice = item.product ? (getSell(item.product) || '-') : '-';
+      return `<tr>
+        <td>${escapeHTML(item.barcode)}</td>
+        <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
+        <td>${escapeHTML(buyPrice)}</td>
+        <td>${escapeHTML(sellPrice)}</td>
+        <td>${item.qty}</td>
+        <td><div class="action-buttons">
+          <button class="edit-btn" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
+          <button class="edit-btn" data-sale-cart-action="plus" data-barcode="${escapeAttr(item.barcode)}">+</button>
+          <button class="delete-btn" data-sale-cart-action="remove" data-barcode="${escapeAttr(item.barcode)}">Rimuovi</button>
+        </div></td>
+      </tr>`;
+    }).join('')}
   </tbody></table></div>`;
 }
 
@@ -1359,8 +1377,10 @@ function handleScannerInput(){
     renderSaleSearchResults(value);
     return;
   }
-  currentPage = 1;
-  renderProducts();
+  if(currentView === 'products'){
+    currentPage = 1;
+    renderProducts();
+  }
 }
 
 function renderProducts(){
