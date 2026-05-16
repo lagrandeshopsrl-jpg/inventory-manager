@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260516-scanner-barcode-icon" />
+  <link rel="stylesheet" href="style.css?v=20260517-prodotti-scan-stabile" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -32,9 +32,8 @@
             autocapitalize="off" spellcheck="false"
             tabindex="1" inputmode="numeric"
             oninput="handleScannerInput()"
-            onfocus="clearSearchField()"
-            onclick="clearSearchField()"
-            onmousedown="clearSearchField()">
+            onclick="clearSearchField(event)"
+            onmousedown="clearSearchField(event)">
           <button type="button" class="scanner-camera-btn" onclick="startBarcodeCameraScanner()" aria-label="Scansiona barcode con fotocamera">
             <span class="scanner-barcode-icon" aria-hidden="true"><span></span></span>
             <span class="camera-label">Scanner</span>
@@ -283,6 +282,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20260516-scanner-barcode-icon"></script>
+  <script src="app.js?v=20260517-prodotti-scan-stabile"></script>
 </body>
 </html>

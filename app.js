@@ -2458,9 +2458,12 @@ function logoutUser(){
   showSettings();
 }
 
-function clearSearchField(){
+function clearSearchField(event){
   const s = document.getElementById('search');
   if(!s) return;
+  const eventType = event && event.type ? event.type : '';
+  if(eventType === 'focus') return;
+  if(!eventType && document.activeElement === s) return;
   if(s.value){
     s.value = '';
     currentPage = 1;
