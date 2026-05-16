@@ -1116,6 +1116,11 @@ function saleMoney(value){
   });
 }
 
+function updateSaleBottomTotal(total = 0){
+  const amount = document.getElementById('saleBottomTotalAmount');
+  if(amount) amount.innerText = saleMoney(total);
+}
+
 function saleCartSellTotal(items){
   return items.reduce((sum, item) => {
     const sellPrice = item.product ? salePriceNumber(getSell(item.product)) : 0;
@@ -1315,13 +1320,14 @@ function renderSaleCart(){
   const items = Object.entries(saleCart)
     .filter(([, qty]) => Number(qty) > 0)
     .map(([barcode, qty]) => ({ barcode, qty: Number(qty), product: productForBarcode(barcode) }));
+  const totalSell = saleCartSellTotal(items);
+  updateSaleBottomTotal(totalSell);
   if(!items.length){
     saleCartAllSelected = false;
     if(selectBtn) selectBtn.innerText = 'Seleziona carrello';
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  const totalSell = saleCartSellTotal(items);
   box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
       const buyPrice = item.product ? (getBuy(item.product) || '-') : '-';
@@ -1341,11 +1347,7 @@ function renderSaleCart(){
         </div></td>
       </tr>`;
     }).join('')}
-  </tbody></table></div>
-  <div class="sale-total-box">
-    <span>Totale vendita</span>
-    <strong>${saleMoney(totalSell)}</strong>
-  </div>`;
+  </tbody></table></div>`;
 }
 
 function dateInputValue(date){
@@ -1479,6 +1481,81 @@ async function deleteSelectedSalesStats(){
   await saveCloudAfterChange('Classifica aggiornata', { silentDropboxError: true });
 }
 
+function salesStatsTargetQuantity(target, range){
+  return salesRecords.reduce((sum, record) => {
+    if(!saleRecordInRange(record, range)) return sum;
+    return sum + record.items.reduce((itemSum, item) => {
+      return itemSum + (saleItemMatchesStatsTarget(item, target) ? (Number(item.qty) || 0) : 0);
+    }, 0);
+  }, 0);
+}
+
+function salesAdjustmentTime(range){
+  const now = new Date();
+  if(range.from && now < range.from) return range.from.toISOString();
+  if(range.to && now > range.to) return range.to.toISOString();
+  return now.toISOString();
+}
+
+function reduceSalesStatsQuantity(target, range, amount){
+  let remaining = amount;
+  salesRecords = salesRecords.map(record => {
+    if(!saleRecordInRange(record, range) || remaining <= 0) return record;
+    const items = [];
+    record.items.forEach(item => {
+      if(remaining > 0 && saleItemMatchesStatsTarget(item, target)){
+        const qty = Number(item.qty) || 0;
+        const removeQty = Math.min(qty, remaining);
+        remaining -= removeQty;
+        const keptQty = qty - removeQty;
+        if(keptQty > 0) items.push({ ...item, qty: keptQty });
+      }else{
+        items.push(item);
+      }
+    });
+    return { ...record, items };
+  }).filter(record => record.items.length);
+}
+
+async function editSalesStatsQuantity(type, key, addBarcode = ''){
+  const target = { type: textValue(type), key: textValue(key) };
+  if(!target.type || !target.key) return;
+  const range = salesDateRange();
+  const currentQty = salesStatsTargetQuantity(target, range);
+  const answer = prompt('Nuova quantità venduta:', String(currentQty));
+  if(answer === null) return;
+  const newQty = Math.round(Number(String(answer).replace(',', '.')));
+  if(!Number.isFinite(newQty) || newQty < 0){
+    setSalesStatsStatus('Quantità non valida.', 'err');
+    return;
+  }
+  if(newQty === currentQty){
+    setSalesStatsStatus('Quantità già uguale: ' + currentQty + '.', 'ok');
+    return;
+  }
+
+  if(newQty < currentQty){
+    reduceSalesStatsQuantity(target, range, currentQty - newQty);
+  }else{
+    const barcode = target.type === 'product' ? target.key : textValue(addBarcode);
+    if(!barcode){
+      setSalesStatsStatus('Non trovo un prodotto su cui aggiungere quantità.', 'err');
+      return;
+    }
+    salesRecords.unshift({
+      id: 'sale_adjust_' + Date.now(),
+      time: salesAdjustmentTime(range),
+      items: [{ barcode, qty: newQty - currentQty }]
+    });
+  }
+
+  salesStatsAllSelected = false;
+  persistSalesRecords(true);
+  renderSalesStats();
+  setSalesStatsStatus('Quantità aggiornata da ' + currentQty + ' a ' + newQty + '.', 'ok');
+  await saveCloudAfterChange('Quantità venduta aggiornata', { silentDropboxError: true });
+}
+
 function salesDateRange(){
   const fromValue = document.getElementById('salesDateFrom')?.value || '';
   const toValue = document.getElementById('salesDateTo')?.value || '';
@@ -1542,7 +1619,7 @@ function renderProductSalesStats(box, records){
         <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td><strong>${data.qty}</strong></td>
         <td>${escapeHTML(formatDate(data.last))}</td>
-        <td>${p ? `<button class="edit-btn" data-sale-edit-barcode="${escapeAttr(barcode)}">Modifica</button>` : '-'}</td>
+        <td><button class="edit-btn" data-sales-qty-type="product" data-sales-qty-key="${escapeAttr(barcode)}" data-sales-qty-add-barcode="${escapeAttr(barcode)}">Modifica</button></td>
       </tr>`;
     }).join('')}
   </tbody></table></div>`;
@@ -1576,7 +1653,7 @@ function renderSupplierSalesStats(box, records){
         <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
-        <td>${top ? `<button class="edit-btn" data-sale-edit-barcode="${escapeAttr(top[0])}">Modifica</button>` : '-'}</td>
+        <td>${top ? `<button class="edit-btn" data-sales-qty-type="supplier" data-sales-qty-key="${escapeAttr(supplier)}" data-sales-qty-add-barcode="${escapeAttr(top[0])}">Modifica</button>` : '-'}</td>
       </tr>`;
     }).join('')}
   </tbody></table></div>`;
@@ -2426,6 +2503,16 @@ document.addEventListener('keydown', function(e){
 }, true);
 
 document.addEventListener('click', function(event){
+  const salesQtyEdit = event.target.closest('[data-sales-qty-type]');
+  if(salesQtyEdit){
+    editSalesStatsQuantity(
+      salesQtyEdit.dataset.salesQtyType,
+      salesQtyEdit.dataset.salesQtyKey,
+      salesQtyEdit.dataset.salesQtyAddBarcode
+    );
+    return;
+  }
+
   const saleEdit = event.target.closest('[data-sale-edit-barcode]');
   if(saleEdit){
     editSaleProductByBarcode(saleEdit.dataset.saleEditBarcode);
