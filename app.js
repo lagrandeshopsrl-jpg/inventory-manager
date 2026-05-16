@@ -1053,6 +1053,15 @@ function setSaleStatus(text, type = ''){
   el.innerText = text;
 }
 
+function clearSaleAddedStatusIfCartEmpty(){
+  const el = document.getElementById('saleStatus');
+  if(!el || saleCartTotal()) return;
+  const currentText = textValue(el.innerText);
+  if(currentText.startsWith('Aggiunto al carrello:')){
+    setSaleStatus('Carrello vendita vuoto.');
+  }
+}
+
 function clearSaleCurrentProduct(){
   const box = document.getElementById('saleCurrentProduct');
   currentSaleBarcode = '';
@@ -1325,6 +1334,8 @@ function renderSaleCart(){
   if(!items.length){
     saleCartAllSelected = false;
     if(selectBtn) selectBtn.innerText = 'Seleziona carrello';
+    clearSaleCurrentProduct();
+    clearSaleAddedStatusIfCartEmpty();
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
