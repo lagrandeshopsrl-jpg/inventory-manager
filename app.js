@@ -33,6 +33,7 @@ let importSessionPages = {};
 let currentSaleBarcode = '';
 let saleCartAllSelected = false;
 let salesStatsAllSelected = false;
+let openSalesSupplierKey = '';
 
 function readJson(key, fallback){
   try{
@@ -1441,6 +1442,13 @@ function updateSalesStatsSelectButton(){
   if(btn) btn.innerText = salesStatsAllSelected ? 'Deseleziona lista' : 'Seleziona lista';
 }
 
+function toggleSalesSupplierProducts(supplier){
+  const key = textValue(supplier);
+  if(!key) return;
+  openSalesSupplierKey = openSalesSupplierKey === key ? '' : key;
+  renderSalesStats();
+}
+
 function toggleSalesStatsSelection(){
   salesStatsAllSelected = !salesStatsAllSelected;
   salesStatsCheckboxes().forEach(cb => cb.checked = salesStatsAllSelected);
@@ -1589,6 +1597,7 @@ function renderSalesStats(){
   if(!box) return;
   updateSalesStatsSelectButton();
   const view = document.getElementById('salesStatsView')?.value || 'products';
+  if(view !== 'suppliers') openSalesSupplierKey = '';
   const range = salesDateRange();
   const filtered = salesRecords.filter(record => saleRecordInRange(record, range));
   const totalPieces = filtered.reduce((sum, record) => sum + record.items.reduce((itemSum, item) => itemSum + item.qty, 0), 0);
@@ -1642,9 +1651,12 @@ function renderSupplierSalesStats(box, records){
     record.items.forEach(item => {
       const p = productForBarcode(item.barcode);
       const supplier = p ? supplierNameOf(p) : 'Senza fornitore';
-      if(!totals[supplier]) totals[supplier] = { qty: 0, products: {}, last: '' };
+      if(!totals[supplier]) totals[supplier] = { qty: 0, products: {}, productLast: {}, last: '' };
       totals[supplier].qty += item.qty;
       totals[supplier].products[item.barcode] = (totals[supplier].products[item.barcode] || 0) + item.qty;
+      if(!totals[supplier].productLast[item.barcode] || record.time > totals[supplier].productLast[item.barcode]){
+        totals[supplier].productLast[item.barcode] = record.time;
+      }
       if(!totals[supplier].last || record.time > totals[supplier].last) totals[supplier].last = record.time;
     });
   });
@@ -1654,6 +1666,7 @@ function renderSupplierSalesStats(box, records){
       const top = Object.entries(data.products).sort((a, b) => b[1] - a[1])[0];
       const p = top ? productForBarcode(top[0]) : null;
       const topName = top ? `${p ? getName(p) : top[0]} (${top[1]})` : '-';
+      const isOpen = openSalesSupplierKey === supplier;
       return `<tr>
         <td><input type="checkbox" class="sales-stat-checkbox" data-stat-type="supplier" data-stat-key="${escapeAttr(supplier)}" ${salesStatsAllSelected ? 'checked' : ''}></td>
         <td>${index + 1}</td>
@@ -1664,10 +1677,44 @@ function renderSupplierSalesStats(box, records){
         <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
-        <td>${top ? `<button class="edit-btn" data-sales-qty-type="supplier" data-sales-qty-key="${escapeAttr(supplier)}" data-sales-qty-add-barcode="${escapeAttr(top[0])}">Modifica</button>` : '-'}</td>
-      </tr>`;
+        <td><div class="action-buttons">
+          <button class="edit-btn" data-sales-supplier-details="${escapeAttr(supplier)}">${isOpen ? 'Nascondi prodotti' : 'Vedi prodotti'}</button>
+          ${top ? `<button class="edit-btn" data-sales-qty-type="supplier" data-sales-qty-key="${escapeAttr(supplier)}" data-sales-qty-add-barcode="${escapeAttr(top[0])}">Modifica</button>` : ''}
+        </div></td>
+      </tr>${isOpen ? renderSupplierSalesProductDetail(supplier, data) : ''}`;
     }).join('')}
   </tbody></table></div>`;
+}
+
+function renderSupplierSalesProductDetail(supplier, data){
+  const productsRows = Object.entries(data.products).sort((a, b) => b[1] - a[1]);
+  if(!productsRows.length) return '';
+  return `<tr class="supplier-sales-detail-row">
+    <td colspan="10">
+      <div class="supplier-sales-detail">
+        <div class="supplier-sales-detail-title">Prodotti venduti di ${escapeHTML(supplier)}: ${productsRows.length}</div>
+        <div class="table-card supplier-sales-products">
+          <table>
+            <thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Acquisto</th><th>Vendita</th><th>Qta venduta</th><th>Ultima vendita</th></tr></thead>
+            <tbody>
+              ${productsRows.map(([barcode, qty], index) => {
+                const p = productForBarcode(barcode);
+                return `<tr>
+                  <td>${index + 1}</td>
+                  <td>${escapeHTML(p ? getName(p) : 'Prodotto non trovato')}</td>
+                  <td>${escapeHTML(barcode)}</td>
+                  <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
+                  <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
+                  <td><strong>${qty}</strong></td>
+                  <td>${escapeHTML(formatDate(data.productLast[barcode] || data.last))}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </td>
+  </tr>`;
 }
 
 function handleScannerInput(){
@@ -2514,6 +2561,12 @@ document.addEventListener('keydown', function(e){
 }, true);
 
 document.addEventListener('click', function(event){
+  const supplierDetails = event.target.closest('[data-sales-supplier-details]');
+  if(supplierDetails){
+    toggleSalesSupplierProducts(supplierDetails.dataset.salesSupplierDetails);
+    return;
+  }
+
   const salesQtyEdit = event.target.closest('[data-sales-qty-type]');
   if(salesQtyEdit){
     editSalesStatsQuantity(

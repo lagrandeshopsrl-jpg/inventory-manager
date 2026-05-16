@@ -297,6 +297,27 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .sales-panel .action-buttons button{
   min-width:38px;
 }
+.supplier-sales-detail-row td{
+  background:#f8fafc;
+  padding:16px;
+}
+.supplier-sales-detail{
+  text-align:left;
+}
+.supplier-sales-detail-title{
+  color:#0f172a;
+  font-weight:900;
+  margin:0 0 10px;
+}
+.supplier-sales-products{
+  max-height:min(44vh,430px);
+  overflow:auto;
+}
+.supplier-sales-products th{
+  position:sticky;
+  top:0;
+  z-index:1;
+}
 .sale-total-box{
   display:flex;
   justify-content:space-between;
