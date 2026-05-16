@@ -115,6 +115,7 @@ function getSupplier(p){ return Array.isArray(p) ? textValue(p[2]) : textValue(v
 function getCategory(p){ return Array.isArray(p) ? textValue(p[3]) : textValue(valueOf(p, ['category','categoria','Categoria','Category','类别','c'])); }
 function getBuy(p){ return Array.isArray(p) ? textValue(p[4]) : textValue(valueOf(p, ['buyPrice','buy_price','acquisto','Acquisto','Prezzo Acquisto','BuyPrice','进价','a'])); }
 function getSell(p){ return Array.isArray(p) ? textValue(p[5]) : textValue(valueOf(p, ['sellPrice','sell_price','vendita','Vendita','Prezzo Vendita','SellPrice','售价','v'])); }
+function getQuantity(p){ return Array.isArray(p) ? textValue(p[6]) : textValue(valueOf(p, ['quantity','quantita','quantità','Quantita','Quantità','qta','Qta','qty','Qty','stock','Stock','Giacenza','giacenza','数量','库存','q'])); }
 
 function canonicalProduct(p){
   const barcode = getBarcode(p);
@@ -123,6 +124,7 @@ function canonicalProduct(p){
   const category = getCategory(p);
   const buyPrice = getBuy(p);
   const sellPrice = getSell(p);
+  const quantity = getQuantity(p);
   return {
     barcode,
     name,
@@ -130,11 +132,14 @@ function canonicalProduct(p){
     category,
     buyPrice,
     sellPrice,
+    quantity,
     prodotto: name,
     fornitore: supplier,
     categoria: category,
     acquisto: buyPrice,
-    vendita: sellPrice
+    vendita: sellPrice,
+    quantita: quantity,
+    quantità: quantity
   };
 }
 
@@ -150,7 +155,8 @@ function compactProduct(p){
     product.supplier,
     product.category,
     product.buyPrice,
-    product.sellPrice
+    product.sellPrice,
+    product.quantity
   ];
 }
 
@@ -166,7 +172,8 @@ function importSessionProduct(p){
     supplier: product.supplier,
     category: product.category,
     buyPrice: product.buyPrice,
-    sellPrice: product.sellPrice
+    sellPrice: product.sellPrice,
+    quantity: product.quantity
   };
 }
 
@@ -1039,7 +1046,7 @@ function renderCurrentView(){
 }
 
 function productMatchesSearch(p, search){
-  return [getBarcode(p), getName(p), getSupplier(p), getCategory(p)]
+  return [getBarcode(p), getName(p), getSupplier(p), getCategory(p), getQuantity(p)]
     .some(value => String(value).toLowerCase().includes(search));
 }
 
@@ -1761,7 +1768,7 @@ function renderProducts(){
 
   const visibleIndexes = matches.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   if(!visibleIndexes.length){
-    table.innerHTML = '<tr><td colspan="8" class="empty-row">Nessun prodotto trovato</td></tr>';
+    table.innerHTML = '<tr><td colspan="9" class="empty-row">Nessun prodotto trovato</td></tr>';
   }else{
     table.innerHTML = visibleIndexes.map(realIndex => {
       const p = products[realIndex];
@@ -1770,9 +1777,10 @@ function renderProducts(){
         <td>${escapeHTML(getBarcode(p))}</td>
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
-        <td>${escapeHTML(getCategory(p) || '-')}</td>
         <td>${escapeHTML(getBuy(p))}</td>
         <td>${escapeHTML(getSell(p))}</td>
+        <td>${escapeHTML(getCategory(p) || '-')}</td>
+        <td>${escapeHTML(getQuantity(p) || '-')}</td>
         <td><div class="action-buttons"><button class="edit-btn" onclick="openEditModal(${realIndex})">✎</button><button class="delete-btn" onclick="deleteProduct(${realIndex})">🗑</button></div></td>
       </tr>`;
     }).join('');
@@ -1844,9 +1852,10 @@ function productRowsForDetail(items, mode){
       <td>${escapeHTML(getBarcode(p))}</td>
       <td>${escapeHTML(getName(p))}</td>
       <td>${escapeHTML(getSupplier(p) || '-')}</td>
-      <td>${escapeHTML(getCategory(p) || '-')}</td>
       <td>${escapeHTML(getBuy(p))}</td>
       <td>${escapeHTML(getSell(p))}</td>
+      <td>${escapeHTML(getCategory(p) || '-')}</td>
+      <td>${escapeHTML(getQuantity(p) || '-')}</td>
       <td><button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button><button class="delete-btn" onclick="deleteProduct(${item.index})">Elimina</button></td>
     </tr>`;
   }).join('');
@@ -1866,7 +1875,7 @@ function renderDetail(name, items, options){
         <button class="back-folder" onclick="${options.backFn}()">Torna alle cartelle</button>
       </div>
     </div>
-    <div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th>Vendita</th><th>Azioni</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Categoria</th><th>Quantità</th><th>Azioni</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function openSupplierFolder(name){
@@ -1988,7 +1997,7 @@ function renderImportSessionBody(id){
         <button data-history-action="next-page" data-session-id="${escapeAttr(session.id)}" ${page >= totalPages ? 'disabled' : ''}>Successivi</button>
       </div>
       <div class="import-session-page-info">Prodotti ${from}-${to} di ${total} · Pagina ${page} di ${totalPages}</div>
-      <table class="import-products-table"><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th>Vendita</th></tr></thead><tbody>
+      <table class="import-products-table"><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Categoria</th><th>Quantità</th></tr></thead><tbody>
         ${visibleBarcodes.map(barcode => {
           const p = displayProductForSession(session, barcode);
           return `<tr>
@@ -1996,9 +2005,10 @@ function renderImportSessionBody(id){
           <td>${escapeHTML(p.barcode || '')}</td>
           <td>${escapeHTML(p.name || '')}</td>
           <td>${escapeHTML(p.supplier || '')}</td>
-          <td>${escapeHTML(p.category || '')}</td>
           <td>${escapeHTML(p.buyPrice || '')}</td>
           <td>${escapeHTML(p.sellPrice || '')}</td>
+          <td>${escapeHTML(p.category || '')}</td>
+          <td>${escapeHTML(p.quantity || '')}</td>
         </tr>`;
         }).join('')}
       </tbody></table>`;
@@ -2110,6 +2120,7 @@ function openEditModal(index){
   document.getElementById('editName').value = getName(p);
   document.getElementById('editSupplier').value = getSupplier(p);
   document.getElementById('editCategory').value = getCategory(p);
+  document.getElementById('editQuantity').value = getQuantity(p);
   document.getElementById('editBuy').value = getBuy(p);
   document.getElementById('editSell').value = getSell(p);
   document.getElementById('editModal').style.display = 'flex';
@@ -2126,6 +2137,7 @@ function productFromForm(prefix){
     name: document.getElementById(prefix + 'Name').value,
     supplier: document.getElementById(prefix + 'Supplier').value,
     category: document.getElementById(prefix + 'Category').value,
+    quantity: document.getElementById(prefix + 'Quantity')?.value || '',
     buyPrice: document.getElementById(prefix + 'Buy').value,
     sellPrice: document.getElementById(prefix + 'Sell').value
   });
@@ -2165,7 +2177,7 @@ async function saveEditProduct(){
 }
 
 function openNewProductModal(){
-  ['newBarcode','newName','newSupplier','newCategory','newBuy','newSell'].forEach(id => document.getElementById(id).value = '');
+  ['newBarcode','newName','newSupplier','newCategory','newQuantity','newBuy','newSell'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('newProductModal').style.display = 'flex';
   setTimeout(() => document.getElementById('newBarcode').focus(), 100);
 }
@@ -2232,9 +2244,10 @@ function exportExcel(){
     Barcode: getBarcode(p),
     Prodotto: getName(p),
     Fornitore: getSupplier(p),
-    Categoria: getCategory(p),
     Acquisto: getBuy(p),
-    Vendita: getSell(p)
+    Vendita: getSell(p),
+    Categoria: getCategory(p),
+    Quantità: getQuantity(p)
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -2285,6 +2298,7 @@ async function importExcel(event){
           name: getValue(row, ['Prodotto','Nome','Product','商品']),
           supplier: getValue(row, ['Fornitore','Supplier','Nome Fornitore','供应商']),
           category: getValue(row, ['Categoria','Category','类别']),
+          quantity: getValue(row, ['Quantità','Quantita','Qta','Qty','Quantity','Giacenza','Stock','数量','库存']),
           buyPrice: getValue(row, ['Acquisto','Prezzo Acquisto','BuyPrice','进价']),
           sellPrice: getValue(row, ['Vendita','Prezzo Vendita','SellPrice','售价'])
         });
