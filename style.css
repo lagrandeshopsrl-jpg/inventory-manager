@@ -126,11 +126,27 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   cursor:pointer;
   font-weight:900;
 }
-.sales-controls button:nth-of-type(2){
-  background:#64748b;
+.sales-controls button:nth-of-type(2){background:#64748b}
+.confirm-sale{background:#16a34a;color:white}
+.sale-bottom-actions{
+  display:grid;
+  grid-template-columns:minmax(240px,1.35fr) minmax(190px,.85fr);
+  gap:12px;
+  margin-top:14px;
 }
-.sales-controls .confirm-sale{
-  background:#16a34a;
+.large-sale-action{
+  border:none;
+  border-radius:16px;
+  padding:19px 22px;
+  min-height:62px;
+  font-size:21px;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:0 8px 22px rgba(15,23,42,.12);
+}
+.clear-sale{
+  background:#ef4444;
+  color:white;
 }
 .sale-status{
   background:#f8fafc;
@@ -161,6 +177,25 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .sales-panel .action-buttons button{
   min-width:38px;
 }
+.sale-total-box{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:14px;
+  margin-top:12px;
+  padding:16px 18px;
+  border-radius:16px;
+  background:#ecfdf5;
+  border:1px solid #bbf7d0;
+  color:#14532d;
+  font-weight:900;
+}
+.sale-total-box span{
+  font-size:18px;
+}
+.sale-total-box strong{
+  font-size:28px;
+}
 
 @media(max-width:1000px){
   .sales-layout{grid-template-columns:1fr}
@@ -170,6 +205,9 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   .sales-panel{padding:12px;border-radius:14px}
   .sales-panel-header{align-items:flex-start;flex-direction:column}
   .sales-controls button,.sales-controls input,.sales-filters input,.sales-filters select{width:100%;min-width:0}
+  .sale-bottom-actions{grid-template-columns:1fr}
+  .sale-total-box{align-items:flex-start;flex-direction:column}
+  .sale-total-box strong{font-size:24px}
 }
 
 

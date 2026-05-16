@@ -1049,6 +1049,37 @@ function saleCartTotal(){
   return Object.values(saleCart).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
 }
 
+function salePriceNumber(value){
+  const raw = textValue(value).replace(/[^\d,.-]/g, '');
+  if(!raw) return 0;
+  let normalized = raw;
+  const commaIndex = raw.lastIndexOf(',');
+  const dotIndex = raw.lastIndexOf('.');
+  if(commaIndex >= 0 && dotIndex >= 0){
+    normalized = commaIndex > dotIndex
+      ? raw.replace(/\./g, '').replace(',', '.')
+      : raw.replace(/,/g, '');
+  }else if(commaIndex >= 0){
+    normalized = raw.replace(',', '.');
+  }
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function saleMoney(value){
+  return '€ ' + Number(value || 0).toLocaleString('it-IT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function saleCartSellTotal(items){
+  return items.reduce((sum, item) => {
+    const sellPrice = item.product ? salePriceNumber(getSell(item.product)) : 0;
+    return sum + (sellPrice * item.qty);
+  }, 0);
+}
+
 function addProductIndexToSaleCart(index, qty = 1){
   if(index < 0 || index >= products.length) return false;
   return addBarcodeToSaleCart(getBarcode(products[index]), qty);
@@ -1092,7 +1123,6 @@ function clearSaleCart(){
     setSaleStatus('Carrello gia vuoto.');
     return;
   }
-  if(!confirm('Svuotare il carrello vendita?')) return;
   saleCart = {};
   persistSaleCart();
   renderSaleCart();
@@ -1109,7 +1139,6 @@ async function confirmSaleCart(){
   }
 
   const total = items.reduce((sum, item) => sum + item.qty, 0);
-  if(!confirm('Confermare vendita di ' + total + ' pezzi?')) return;
 
   salesRecords.unshift({
     id: 'sale_' + Date.now(),
@@ -1185,6 +1214,7 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
+  const totalSell = saleCartSellTotal(items);
   box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
       const buyPrice = item.product ? (getBuy(item.product) || '-') : '-';
@@ -1202,7 +1232,11 @@ function renderSaleCart(){
         </div></td>
       </tr>`;
     }).join('')}
-  </tbody></table></div>`;
+  </tbody></table></div>
+  <div class="sale-total-box">
+    <span>Totale vendita</span>
+    <strong>${saleMoney(totalSell)}</strong>
+  </div>`;
 }
 
 function dateInputValue(date){
@@ -2252,7 +2286,7 @@ window.onload = async function(){
     }
   }
   if(!localStorage.getItem(DROPBOX_PATH_KEY)) setDropboxPath(DEFAULT_DROPBOX_PATH);
-  showProducts();
+  showSales();
   __installBarcodeInputLogic();
   installClearSearchOnScan();
   setInterval(__focusBarcodeIfAllowed, 1200);

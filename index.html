@@ -11,9 +11,9 @@
   <div id="appRoot" class="app-root">
     <aside class="sidebar">
       <div class="logo">Inventory Manager</div>
-      <button tabindex="-1" class="menu active" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
+      <button tabindex="-1" class="menu active" id="menuSales" onclick="showSales()">€ Vendite</button>
+      <button tabindex="-1" class="menu" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
       <button tabindex="-1" class="menu" id="menuSuppliers" onclick="showSuppliers()">📁 Fornitori</button>
-      <button tabindex="-1" class="menu" id="menuSales" onclick="showSales()">€ Vendite</button>
       <button tabindex="-1" class="menu" id="menuTopSales" onclick="showTopSales()">★ Più venduti</button>
       <button tabindex="-1" class="menu" id="menuHistory" onclick="showHistory()">🕘 Cronologia</button>
       <button tabindex="-1" class="menu" id="menuCategories" onclick="showCategories()">▤ Categorie</button>
@@ -92,12 +92,14 @@
             <div class="sales-controls">
               <input id="saleProductSearch" placeholder="Cerca prodotto o barcode..." oninput="renderSaleSearchResults()" />
               <button type="button" onclick="addFirstSaleSearchResult()">Aggiungi primo risultato</button>
-              <button type="button" onclick="clearSaleCart()">Svuota carrello</button>
-              <button type="button" class="confirm-sale" onclick="confirmSaleCart()">Conferma vendita</button>
             </div>
             <div id="saleStatus" class="sale-status">Scansiona o cerca un prodotto, poi conferma la vendita.</div>
             <div id="saleSearchResults" class="sales-results"></div>
             <div id="saleCartBox"></div>
+            <div class="sale-bottom-actions">
+              <button type="button" class="confirm-sale large-sale-action" onclick="confirmSaleCart()">Conferma vendita</button>
+              <button type="button" class="clear-sale large-sale-action" onclick="clearSaleCart()">Svuota carrello</button>
+            </div>
           </div>
         </div>
       </section>
