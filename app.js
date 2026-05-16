@@ -34,6 +34,12 @@ let currentSaleBarcode = '';
 let saleCartAllSelected = false;
 let salesStatsAllSelected = false;
 let openSalesSupplierKey = '';
+let barcodeCameraControls = null;
+let barcodeCameraStream = null;
+let barcodeCameraAnimation = 0;
+let barcodeCameraDetector = null;
+let barcodeCameraFound = false;
+let barcodeCameraReader = null;
 
 function readJson(key, fallback){
   try{
@@ -2463,11 +2469,149 @@ function clearSearchField(){
   __barcodeLastValue = '';
 }
 
+function setBarcodeCameraStatus(text, type = ''){
+  const el = document.getElementById('barcodeCameraStatus');
+  if(!el) return;
+  el.className = 'barcode-camera-status' + (type ? ' ' + type : '');
+  el.innerText = text;
+}
+
+async function barcodeDetectorFormats(){
+  const preferred = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'itf', 'qr_code'];
+  if(window.BarcodeDetector && typeof BarcodeDetector.getSupportedFormats === 'function'){
+    try{
+      const supported = await BarcodeDetector.getSupportedFormats();
+      const selected = preferred.filter(format => supported.includes(format));
+      return selected.length ? selected : supported;
+    }catch(error){
+      return preferred;
+    }
+  }
+  return preferred;
+}
+
+function applyBarcodeFromCamera(code){
+  const value = textValue(code).replace(/\s/g, '');
+  if(!value){
+    setBarcodeCameraStatus('Barcode non leggibile. Riprova.', 'err');
+    return;
+  }
+  const search = document.getElementById('search');
+  if(search){
+    search.value = value;
+    __barcodeLastValue = value;
+    currentPage = 1;
+    handleScannerInput();
+  }
+  setBarcodeCameraStatus('Barcode letto: ' + value, 'ok');
+  setTimeout(() => stopBarcodeCameraScanner(), 450);
+}
+
+function scanBarcodeCameraFrame(){
+  const video = document.getElementById('barcodeCameraVideo');
+  if(barcodeCameraFound || !barcodeCameraDetector || !video) return;
+  if(video.readyState < 2){
+    barcodeCameraAnimation = requestAnimationFrame(scanBarcodeCameraFrame);
+    return;
+  }
+  barcodeCameraDetector.detect(video).then(codes => {
+    if(codes && codes.length && !barcodeCameraFound){
+      barcodeCameraFound = true;
+      applyBarcodeFromCamera(codes[0].rawValue || '');
+      return;
+    }
+    barcodeCameraAnimation = requestAnimationFrame(scanBarcodeCameraFrame);
+  }).catch(() => {
+    barcodeCameraAnimation = requestAnimationFrame(scanBarcodeCameraFrame);
+  });
+}
+
+async function startBarcodeCameraScanner(){
+  const modal = document.getElementById('barcodeCameraModal');
+  const video = document.getElementById('barcodeCameraVideo');
+  if(!modal || !video) return;
+  barcodeCameraFound = false;
+  modal.style.display = 'flex';
+  setBarcodeCameraStatus('Apro fotocamera...');
+
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    setBarcodeCameraStatus('Fotocamera non disponibile. Apri l’app da Safari/Chrome aggiornato e da sito HTTPS.', 'err');
+    return;
+  }
+
+  const constraints = {
+    video: {
+      facingMode: { ideal: 'environment' },
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    },
+    audio: false
+  };
+
+  try{
+    if(window.ZXingBrowser && ZXingBrowser.BrowserMultiFormatReader){
+      barcodeCameraReader = new ZXingBrowser.BrowserMultiFormatReader();
+      barcodeCameraControls = await barcodeCameraReader.decodeFromConstraints(constraints, video, result => {
+        if(result && !barcodeCameraFound){
+          barcodeCameraFound = true;
+          const code = typeof result.getText === 'function' ? result.getText() : String(result.text || result);
+          applyBarcodeFromCamera(code);
+        }
+      });
+      setBarcodeCameraStatus('Inquadra il barcode dentro il riquadro verde.');
+      return;
+    }
+
+    if(!window.BarcodeDetector){
+      setBarcodeCameraStatus('Lettore barcode non caricato. Controlla connessione internet e ricarica la pagina.', 'err');
+      return;
+    }
+
+    barcodeCameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = barcodeCameraStream;
+    await video.play();
+    barcodeCameraDetector = new BarcodeDetector({ formats: await barcodeDetectorFormats() });
+    setBarcodeCameraStatus('Inquadra il barcode dentro il riquadro verde.');
+    scanBarcodeCameraFrame();
+  }catch(error){
+    console.error('Errore fotocamera barcode:', error);
+    setBarcodeCameraStatus('Non riesco ad aprire la fotocamera. Controlla il permesso fotocamera del browser.', 'err');
+  }
+}
+
+function stopBarcodeCameraScanner(){
+  barcodeCameraFound = true;
+  if(barcodeCameraAnimation){
+    cancelAnimationFrame(barcodeCameraAnimation);
+    barcodeCameraAnimation = 0;
+  }
+  if(barcodeCameraControls && typeof barcodeCameraControls.stop === 'function'){
+    barcodeCameraControls.stop();
+  }
+  barcodeCameraControls = null;
+  barcodeCameraReader = null;
+  const video = document.getElementById('barcodeCameraVideo');
+  const stream = barcodeCameraStream || (video && video.srcObject);
+  if(stream && typeof stream.getTracks === 'function'){
+    stream.getTracks().forEach(track => track.stop());
+  }
+  barcodeCameraStream = null;
+  barcodeCameraDetector = null;
+  if(video){
+    video.pause();
+    video.srcObject = null;
+  }
+  const modal = document.getElementById('barcodeCameraModal');
+  if(modal) modal.style.display = 'none';
+}
+
 function __modalOpen(){
   const editModal = document.getElementById('editModal');
   const newModal = document.getElementById('newProductModal');
+  const cameraModal = document.getElementById('barcodeCameraModal');
   return (editModal && editModal.style.display === 'flex') ||
-         (newModal && newModal.style.display === 'flex');
+         (newModal && newModal.style.display === 'flex') ||
+         (cameraModal && cameraModal.style.display === 'flex');
 }
 
 function __hasSelection(){
