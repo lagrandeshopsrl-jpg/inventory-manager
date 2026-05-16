@@ -2185,8 +2185,21 @@ function freeBrowserMemory(){
   alert('Memoria liberata. I prodotti sono rimasti salvati; la cronologia importazioni è stata svuotata.');
 }
 
+function supplierOptions(){
+  return Array.from(new Set(products.map(p => getSupplier(p)).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function updateSupplierOptions(){
+  const list = document.getElementById('supplierOptions');
+  if(!list) return;
+  const options = supplierOptions().map(name => `<option value="${escapeAttr(name)}"></option>`);
+  list.innerHTML = options.join('');
+}
+
 function openEditModal(index){
   if(index < 0 || index >= products.length) return;
+  updateSupplierOptions();
   editingIndex = index;
   const p = products[index];
   document.getElementById('editBarcode').value = getBarcode(p);
@@ -2250,6 +2263,7 @@ async function saveEditProduct(){
 }
 
 function openNewProductModal(){
+  updateSupplierOptions();
   ['newBarcode','newName','newSupplier','newCategory','newQuantity','newBuy','newSell'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('newProductModal').style.display = 'flex';
   setTimeout(() => document.getElementById('newBarcode').focus(), 100);
