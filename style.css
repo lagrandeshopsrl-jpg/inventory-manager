@@ -127,6 +127,7 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   font-weight:900;
 }
 .sales-controls button:nth-of-type(2){background:#64748b}
+.sales-controls .sale-delete-selected{background:#ef4444}
 .confirm-sale{background:#16a34a;color:white}
 .sale-bottom-actions{
   display:grid;
@@ -197,6 +198,9 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   margin-top:5px;
   color:#475569;
   font-weight:800;
+}
+.sale-current-actions{
+  margin-top:10px;
 }
 .sale-current-prices{
   display:grid;
