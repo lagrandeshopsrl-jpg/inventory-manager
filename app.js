@@ -1088,8 +1088,8 @@ function renderSaleCurrentProduct(product, barcode){
   const box = document.getElementById('saleCurrentProduct');
   if(!box || !product) return;
   const code = textValue(barcode || getBarcode(product));
-  const buyPrice = getBuy(product) || '-';
-  const sellPrice = getSell(product) || '-';
+  const buyPrice = formatPriceDisplay(getBuy(product));
+  const sellPrice = formatPriceDisplay(getSell(product));
   const cartQty = Number(saleCart[code] || 0);
   currentSaleBarcode = code;
   box.classList.remove('hidden');
@@ -1132,11 +1132,68 @@ function salePriceNumber(value){
   return Number.isFinite(number) ? number : 0;
 }
 
+function formatPriceDisplay(value, fallback = '-'){
+  const raw = textValue(value);
+  if(!raw) return fallback;
+  const numericPart = raw.replace(/[^\d,.-]/g, '');
+  if(!numericPart || numericPart === '-' || numericPart === ',' || numericPart === '.') return raw;
+  const number = salePriceNumber(raw);
+  if(!Number.isFinite(number)) return raw;
+  return number.toFixed(2);
+}
+
 function saleMoney(value){
   return '€ ' + Number(value || 0).toLocaleString('it-IT', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+}
+
+function stockQuantityNumber(value){
+  const raw = textValue(value).replace(/[^\d,.-]/g, '');
+  if(!raw) return 0;
+  let normalized = raw;
+  const commaIndex = raw.lastIndexOf(',');
+  const dotIndex = raw.lastIndexOf('.');
+  if(commaIndex >= 0 && dotIndex >= 0){
+    normalized = commaIndex > dotIndex
+      ? raw.replace(/\./g, '').replace(',', '.')
+      : raw.replace(/,/g, '');
+  }else if(commaIndex >= 0){
+    normalized = raw.replace(',', '.');
+  }
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatStockQuantity(value){
+  const number = Number(value || 0);
+  if(!Number.isFinite(number)) return '0';
+  return Number.isInteger(number)
+    ? String(number)
+    : String(Number(number.toFixed(3))).replace('.', ',');
+}
+
+function adjustProductQuantitiesForSaleItems(items, direction){
+  let changed = 0;
+  (items || []).forEach(item => {
+    const barcode = textValue(item.barcode);
+    const qty = Number(item.qty) || 0;
+    if(!barcode || qty <= 0) return;
+    const index = productIndexByBarcode(barcode);
+    if(index < 0) return;
+    const current = stockQuantityNumber(getQuantity(products[index]));
+    const next = current + (Number(direction) * qty);
+    const quantity = formatStockQuantity(next);
+    products[index] = canonicalProduct({
+      ...products[index],
+      quantity,
+      quantita: quantity,
+      'quantità': quantity
+    });
+    changed += qty;
+  });
+  return changed;
 }
 
 function updateSaleBottomTotal(total = 0){
@@ -1261,8 +1318,10 @@ async function confirmSaleCart(){
     time: new Date().toISOString(),
     items
   });
+  adjustProductQuantitiesForSaleItems(items, -1);
   saleCartAllSelected = false;
   saleCart = {};
+  persistProducts(false);
   persistSalesRecords(true);
   persistSaleCart();
   renderSaleCart();
@@ -1296,7 +1355,7 @@ function renderSaleSearchResults(query = null){
     box.innerHTML = '<div class="sale-status err">Nessun prodotto trovato.</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Vendita</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th class="sell-price-header">Vendita</th><th>Azioni</th></tr></thead><tbody>
     ${matches.map(item => {
       const p = item.product;
       const barcode = getBarcode(p);
@@ -1304,7 +1363,7 @@ function renderSaleSearchResults(query = null){
         <td>${escapeHTML(barcode)}</td>
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
-        <td>${escapeHTML(getSell(p) || '-')}</td>
+        <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
         <td><div class="action-buttons">
           <button class="edit-btn" data-sale-add-index="${item.index}">Aggiungi</button>
           <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(barcode)}">Modifica</button>
@@ -1353,16 +1412,16 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
-      const buyPrice = item.product ? (getBuy(item.product) || '-') : '-';
-      const sellPrice = item.product ? (getSell(item.product) || '-') : '-';
+      const buyPrice = item.product ? formatPriceDisplay(getBuy(item.product)) : '-';
+      const sellPrice = item.product ? formatPriceDisplay(getSell(item.product)) : '-';
       return `<tr>
         <td><input type="checkbox" class="sale-cart-checkbox" data-barcode="${escapeAttr(item.barcode)}" ${saleCartAllSelected ? 'checked' : ''}></td>
         <td>${escapeHTML(item.barcode)}</td>
         <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
         <td>${escapeHTML(buyPrice)}</td>
-        <td>${escapeHTML(sellPrice)}</td>
+        <td class="sell-price-cell">${escapeHTML(sellPrice)}</td>
         <td>${item.qty}</td>
         <td><div class="action-buttons">
           <button class="edit-btn" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
@@ -1491,22 +1550,29 @@ async function deleteSelectedSalesStats(){
     setSalesStatsStatus('Seleziona almeno una riga da eliminare.', 'err');
     return;
   }
-  if(!confirm('Eliminare le righe selezionate dalla classifica nel periodo scelto? I prodotti restano nel magazzino.')) return;
+  if(!confirm('Eliminare le righe selezionate dalla classifica nel periodo scelto? Le quantità dei prodotti verranno rimesse indietro.')) return;
 
   const range = salesDateRange();
   const targets = new Set(selected.map(item => item.type + '::' + item.key));
   let removedPieces = 0;
+  const removedItems = [];
   salesRecords = salesRecords.map(record => {
     if(!saleRecordInRange(record, range)) return record;
     const keptItems = record.items.filter(item => {
       const shouldRemove = selected.some(target => saleItemMatchesStatsTarget(item, target));
-      if(shouldRemove) removedPieces += Number(item.qty) || 0;
+      if(shouldRemove){
+        const qty = Number(item.qty) || 0;
+        removedPieces += qty;
+        removedItems.push({ barcode: item.barcode, qty });
+      }
       return !shouldRemove;
     });
     return { ...record, items: keptItems };
   }).filter(record => record.items.length);
 
   salesStatsAllSelected = false;
+  adjustProductQuantitiesForSaleItems(removedItems, 1);
+  persistProducts(false);
   persistSalesRecords(true);
   renderSalesStats();
   setSalesStatsStatus('Eliminate ' + targets.size + ' righe dalla classifica (' + removedPieces + ' pezzi).', 'ok');
@@ -1531,6 +1597,7 @@ function salesAdjustmentTime(range){
 
 function reduceSalesStatsQuantity(target, range, amount){
   let remaining = amount;
+  const removedItems = [];
   salesRecords = salesRecords.map(record => {
     if(!saleRecordInRange(record, range) || remaining <= 0) return record;
     const items = [];
@@ -1539,6 +1606,7 @@ function reduceSalesStatsQuantity(target, range, amount){
         const qty = Number(item.qty) || 0;
         const removeQty = Math.min(qty, remaining);
         remaining -= removeQty;
+        if(removeQty > 0) removedItems.push({ barcode: item.barcode, qty: removeQty });
         const keptQty = qty - removeQty;
         if(keptQty > 0) items.push({ ...item, qty: keptQty });
       }else{
@@ -1547,6 +1615,7 @@ function reduceSalesStatsQuantity(target, range, amount){
     });
     return { ...record, items };
   }).filter(record => record.items.length);
+  return removedItems;
 }
 
 async function editSalesStatsQuantity(type, key, addBarcode = ''){
@@ -1567,21 +1636,25 @@ async function editSalesStatsQuantity(type, key, addBarcode = ''){
   }
 
   if(newQty < currentQty){
-    reduceSalesStatsQuantity(target, range, currentQty - newQty);
+    const restoredItems = reduceSalesStatsQuantity(target, range, currentQty - newQty);
+    adjustProductQuantitiesForSaleItems(restoredItems, 1);
   }else{
     const barcode = target.type === 'product' ? target.key : textValue(addBarcode);
     if(!barcode){
       setSalesStatsStatus('Non trovo un prodotto su cui aggiungere quantità.', 'err');
       return;
     }
+    const addedItems = [{ barcode, qty: newQty - currentQty }];
     salesRecords.unshift({
       id: 'sale_adjust_' + Date.now(),
       time: salesAdjustmentTime(range),
-      items: [{ barcode, qty: newQty - currentQty }]
+      items: addedItems
     });
+    adjustProductQuantitiesForSaleItems(addedItems, -1);
   }
 
   salesStatsAllSelected = false;
+  persistProducts(false);
   persistSalesRecords(true);
   renderSalesStats();
   setSalesStatsStatus('Quantità aggiornata da ' + currentQty + ' a ' + newQty + '.', 'ok');
@@ -1638,7 +1711,7 @@ function renderProductSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Qta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
     ${rows.map(([barcode, data], index) => {
       const p = productForBarcode(barcode);
       return `<tr>
@@ -1648,8 +1721,8 @@ function renderProductSalesStats(box, records){
         <td>${escapeHTML(barcode)}</td>
         <td>${escapeHTML(p ? (getSupplier(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? (getCategory(p) || '-') : '-')}</td>
-        <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
-        <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
+        <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
+        <td class="sell-price-cell">${escapeHTML(p ? formatPriceDisplay(getSell(p)) : '-')}</td>
         <td><strong>${data.qty}</strong></td>
         <td>${escapeHTML(formatDate(data.last))}</td>
         <td><button class="edit-btn" data-sales-qty-type="product" data-sales-qty-key="${escapeAttr(barcode)}" data-sales-qty-add-barcode="${escapeAttr(barcode)}">Modifica</button></td>
@@ -1674,7 +1747,7 @@ function renderSupplierSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th>Vendita</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
     ${rows.map(([supplier, data], index) => {
       const top = Object.entries(data.products).sort((a, b) => b[1] - a[1])[0];
       const p = top ? productForBarcode(top[0]) : null;
@@ -1687,8 +1760,8 @@ function renderSupplierSalesStats(box, records){
         <td><strong>${data.qty}</strong></td>
         <td>${Object.keys(data.products).length}</td>
         <td>${escapeHTML(topName)}</td>
-        <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
-        <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
+        <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
+        <td class="sell-price-cell">${escapeHTML(p ? formatPriceDisplay(getSell(p)) : '-')}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
         <td><span class="supplier-sales-open-note">Apri fornitore</span></td>
       </tr>${isOpen ? renderSupplierSalesProductDetail(supplier, data) : ''}`;
@@ -1705,7 +1778,7 @@ function renderSupplierSalesProductDetail(supplier, data){
         <div class="supplier-sales-detail-title">Prodotti venduti di ${escapeHTML(supplier)}: ${productsRows.length}</div>
         <div class="table-card supplier-sales-products">
           <table>
-            <thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Acquisto</th><th>Vendita</th><th>Qta venduta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead>
+            <thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Qta venduta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead>
             <tbody>
               ${productsRows.map(([barcode, qty], index) => {
                 const p = productForBarcode(barcode);
@@ -1713,8 +1786,8 @@ function renderSupplierSalesProductDetail(supplier, data){
                   <td>${index + 1}</td>
                   <td>${escapeHTML(p ? getName(p) : 'Prodotto non trovato')}</td>
                   <td>${escapeHTML(barcode)}</td>
-                  <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
-                  <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
+                  <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
+                  <td class="sell-price-cell">${escapeHTML(p ? formatPriceDisplay(getSell(p)) : '-')}</td>
                   <td><strong>${qty}</strong></td>
                   <td>${escapeHTML(formatDate(data.productLast[barcode] || data.last))}</td>
                   <td><button class="edit-btn" data-sales-qty-type="product" data-sales-qty-key="${escapeAttr(barcode)}" data-sales-qty-add-barcode="${escapeAttr(barcode)}">Modifica</button></td>
@@ -1777,8 +1850,8 @@ function renderProducts(){
         <td>${escapeHTML(getBarcode(p))}</td>
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
-        <td>${escapeHTML(getBuy(p))}</td>
-        <td>${escapeHTML(getSell(p))}</td>
+        <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
+        <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
         <td>${escapeHTML(getCategory(p) || '-')}</td>
         <td>${escapeHTML(getQuantity(p) || '-')}</td>
         <td><div class="action-buttons"><button class="edit-btn" onclick="openEditModal(${realIndex})">✎</button><button class="delete-btn" onclick="deleteProduct(${realIndex})">🗑</button></div></td>
@@ -1852,8 +1925,8 @@ function productRowsForDetail(items, mode){
       <td>${escapeHTML(getBarcode(p))}</td>
       <td>${escapeHTML(getName(p))}</td>
       <td>${escapeHTML(getSupplier(p) || '-')}</td>
-      <td>${escapeHTML(getBuy(p))}</td>
-      <td>${escapeHTML(getSell(p))}</td>
+      <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
+      <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
       <td>${escapeHTML(getCategory(p) || '-')}</td>
       <td>${escapeHTML(getQuantity(p) || '-')}</td>
       <td><button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button><button class="delete-btn" onclick="deleteProduct(${item.index})">Elimina</button></td>
@@ -1875,7 +1948,7 @@ function renderDetail(name, items, options){
         <button class="back-folder" onclick="${options.backFn}()">Torna alle cartelle</button>
       </div>
     </div>
-    <div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Categoria</th><th>Quantità</th><th>Azioni</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Categoria</th><th>Quantità</th><th>Azioni</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function openSupplierFolder(name){
@@ -1997,7 +2070,7 @@ function renderImportSessionBody(id){
         <button data-history-action="next-page" data-session-id="${escapeAttr(session.id)}" ${page >= totalPages ? 'disabled' : ''}>Successivi</button>
       </div>
       <div class="import-session-page-info">Prodotti ${from}-${to} di ${total} · Pagina ${page} di ${totalPages}</div>
-      <table class="import-products-table"><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Categoria</th><th>Quantità</th></tr></thead><tbody>
+      <table class="import-products-table"><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Categoria</th><th>Quantità</th></tr></thead><tbody>
         ${visibleBarcodes.map(barcode => {
           const p = displayProductForSession(session, barcode);
           return `<tr>
@@ -2005,8 +2078,8 @@ function renderImportSessionBody(id){
           <td>${escapeHTML(p.barcode || '')}</td>
           <td>${escapeHTML(p.name || '')}</td>
           <td>${escapeHTML(p.supplier || '')}</td>
-          <td>${escapeHTML(p.buyPrice || '')}</td>
-          <td>${escapeHTML(p.sellPrice || '')}</td>
+          <td>${escapeHTML(formatPriceDisplay(p.buyPrice, ''))}</td>
+          <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(p.sellPrice, ''))}</td>
           <td>${escapeHTML(p.category || '')}</td>
           <td>${escapeHTML(p.quantity || '')}</td>
         </tr>`;
@@ -2244,8 +2317,8 @@ function exportExcel(){
     Barcode: getBarcode(p),
     Prodotto: getName(p),
     Fornitore: getSupplier(p),
-    Acquisto: getBuy(p),
-    Vendita: getSell(p),
+    Acquisto: formatPriceDisplay(getBuy(p), ''),
+    Vendita: formatPriceDisplay(getSell(p), ''),
     Categoria: getCategory(p),
     Quantità: getQuantity(p)
   }));
