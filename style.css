@@ -274,6 +274,21 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   font-weight:900;
   word-break:break-word;
 }
+.sale-current-prices .sale-current-sell-price{
+  background:#dcfce7;
+  border:3px solid #16a34a;
+  box-shadow:0 10px 24px rgba(22,163,74,.22);
+  transform:scale(1.04);
+}
+.sale-current-prices .sale-current-sell-price span{
+  color:#166534;
+  font-size:15px;
+}
+.sale-current-prices .sale-current-sell-price strong{
+  color:#14532d;
+  font-size:32px;
+  line-height:1;
+}
 .sales-results{
   margin-bottom:12px;
 }

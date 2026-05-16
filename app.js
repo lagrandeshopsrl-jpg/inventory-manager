@@ -1092,7 +1092,7 @@ function renderSaleCurrentProduct(product, barcode){
       </div>
       <div class="sale-current-prices">
         <div><span>Acquisto</span><strong>${escapeHTML(buyPrice)}</strong></div>
-        <div><span>Vendita</span><strong>${escapeHTML(sellPrice)}</strong></div>
+        <div class="sale-current-sell-price"><span>Vendita</span><strong>${escapeHTML(sellPrice)}</strong></div>
         <div><span>Nel carrello</span><strong>${cartQty}</strong></div>
       </div>
     </div>`;
