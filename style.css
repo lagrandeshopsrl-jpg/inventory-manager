@@ -297,6 +297,23 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .sales-panel .action-buttons button{
   min-width:38px;
 }
+.supplier-sales-name{
+  border:none;
+  background:#e8f1ff;
+  color:#0b63e5;
+  border-radius:12px;
+  padding:9px 12px;
+  cursor:pointer;
+  font:inherit;
+  font-weight:900;
+  max-width:100%;
+  word-break:break-word;
+}
+.supplier-sales-name span{
+  color:#1d4ed8;
+  font-size:13px;
+  margin-left:4px;
+}
 .supplier-sales-detail-row td{
   background:#f8fafc;
   padding:16px;

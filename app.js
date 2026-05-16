@@ -1670,7 +1670,7 @@ function renderSupplierSalesStats(box, records){
       return `<tr>
         <td><input type="checkbox" class="sales-stat-checkbox" data-stat-type="supplier" data-stat-key="${escapeAttr(supplier)}" ${salesStatsAllSelected ? 'checked' : ''}></td>
         <td>${index + 1}</td>
-        <td>${escapeHTML(supplier)}</td>
+        <td><button class="supplier-sales-name" data-sales-supplier-details="${escapeAttr(supplier)}">${escapeHTML(supplier)} <span>${isOpen ? '▲' : '▼'}</span></button></td>
         <td><strong>${data.qty}</strong></td>
         <td>${Object.keys(data.products).length}</td>
         <td>${escapeHTML(topName)}</td>
@@ -1678,7 +1678,6 @@ function renderSupplierSalesStats(box, records){
         <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
         <td><div class="action-buttons">
-          <button class="edit-btn" data-sales-supplier-details="${escapeAttr(supplier)}">${isOpen ? 'Nascondi prodotti' : 'Vedi prodotti'}</button>
           ${top ? `<button class="edit-btn" data-sales-qty-type="supplier" data-sales-qty-key="${escapeAttr(supplier)}" data-sales-qty-add-barcode="${escapeAttr(top[0])}">Modifica</button>` : ''}
         </div></td>
       </tr>${isOpen ? renderSupplierSalesProductDetail(supplier, data) : ''}`;
