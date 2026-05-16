@@ -32,6 +32,7 @@ let dropboxFolderPickerPath = '';
 let importSessionPages = {};
 let currentSaleBarcode = '';
 let saleCartAllSelected = false;
+let salesStatsAllSelected = false;
 
 function readJson(key, fallback){
   try{
@@ -1401,6 +1402,74 @@ function setSalesCustomRange(){
   renderSalesStats();
 }
 
+function setSalesStatsStatus(text, type = ''){
+  const el = document.getElementById('salesStatsActionStatus');
+  if(!el) return;
+  el.className = 'sale-status' + (type ? ' ' + type : '');
+  el.classList.toggle('hidden', !text);
+  el.innerText = text || '';
+}
+
+function salesStatsCheckboxes(){
+  return Array.from(document.querySelectorAll('.sales-stat-checkbox'));
+}
+
+function updateSalesStatsSelectButton(){
+  const btn = document.getElementById('toggleSalesStatsSelectBtn');
+  if(btn) btn.innerText = salesStatsAllSelected ? 'Deseleziona lista' : 'Seleziona lista';
+}
+
+function toggleSalesStatsSelection(){
+  salesStatsAllSelected = !salesStatsAllSelected;
+  salesStatsCheckboxes().forEach(cb => cb.checked = salesStatsAllSelected);
+  updateSalesStatsSelectButton();
+}
+
+function selectedSalesStatsTargets(){
+  return salesStatsCheckboxes()
+    .filter(cb => cb.checked)
+    .map(cb => ({ type: cb.dataset.statType, key: cb.dataset.statKey }))
+    .filter(item => item.type && item.key);
+}
+
+function saleItemMatchesStatsTarget(item, target){
+  if(target.type === 'product') return String(item.barcode) === String(target.key);
+  if(target.type === 'supplier'){
+    const p = productForBarcode(item.barcode);
+    const supplier = p ? supplierNameOf(p) : 'Senza fornitore';
+    return String(supplier) === String(target.key);
+  }
+  return false;
+}
+
+async function deleteSelectedSalesStats(){
+  const selected = selectedSalesStatsTargets();
+  if(!selected.length){
+    setSalesStatsStatus('Seleziona almeno una riga da eliminare.', 'err');
+    return;
+  }
+  if(!confirm('Eliminare le righe selezionate dalla classifica nel periodo scelto? I prodotti restano nel magazzino.')) return;
+
+  const range = salesDateRange();
+  const targets = new Set(selected.map(item => item.type + '::' + item.key));
+  let removedPieces = 0;
+  salesRecords = salesRecords.map(record => {
+    if(!saleRecordInRange(record, range)) return record;
+    const keptItems = record.items.filter(item => {
+      const shouldRemove = selected.some(target => saleItemMatchesStatsTarget(item, target));
+      if(shouldRemove) removedPieces += Number(item.qty) || 0;
+      return !shouldRemove;
+    });
+    return { ...record, items: keptItems };
+  }).filter(record => record.items.length);
+
+  salesStatsAllSelected = false;
+  persistSalesRecords(true);
+  renderSalesStats();
+  setSalesStatsStatus('Eliminate ' + targets.size + ' righe dalla classifica (' + removedPieces + ' pezzi).', 'ok');
+  await saveCloudAfterChange('Classifica aggiornata', { silentDropboxError: true });
+}
+
 function salesDateRange(){
   const fromValue = document.getElementById('salesDateFrom')?.value || '';
   const toValue = document.getElementById('salesDateTo')?.value || '';
@@ -1421,6 +1490,7 @@ function saleRecordInRange(record, range){
 function renderSalesStats(){
   const box = document.getElementById('salesStatsBox');
   if(!box) return;
+  updateSalesStatsSelectButton();
   const view = document.getElementById('salesStatsView')?.value || 'products';
   const range = salesDateRange();
   const filtered = salesRecords.filter(record => saleRecordInRange(record, range));
@@ -1429,6 +1499,8 @@ function renderSalesStats(){
   if(count) count.innerText = totalPieces + ' pezzi';
 
   if(!filtered.length){
+    salesStatsAllSelected = false;
+    updateSalesStatsSelectButton();
     box.innerHTML = '<div class="empty-row">Nessuna vendita nel periodo selezionato</div>';
     return;
   }
@@ -1447,10 +1519,11 @@ function renderProductSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Ultima vendita</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
     ${rows.map(([barcode, data], index) => {
       const p = productForBarcode(barcode);
       return `<tr>
+        <td><input type="checkbox" class="sales-stat-checkbox" data-stat-type="product" data-stat-key="${escapeAttr(barcode)}" ${salesStatsAllSelected ? 'checked' : ''}></td>
         <td>${index + 1}</td>
         <td>${escapeHTML(p ? getName(p) : 'Prodotto non trovato')}</td>
         <td>${escapeHTML(barcode)}</td>
@@ -1460,6 +1533,7 @@ function renderProductSalesStats(box, records){
         <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td><strong>${data.qty}</strong></td>
         <td>${escapeHTML(formatDate(data.last))}</td>
+        <td>${p ? `<button class="edit-btn" data-sale-edit-barcode="${escapeAttr(barcode)}">Modifica</button>` : '-'}</td>
       </tr>`;
     }).join('')}
   </tbody></table></div>`;
@@ -1478,12 +1552,13 @@ function renderSupplierSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th>Vendita</th><th>Ultima vendita</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th>Vendita</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
     ${rows.map(([supplier, data], index) => {
       const top = Object.entries(data.products).sort((a, b) => b[1] - a[1])[0];
       const p = top ? productForBarcode(top[0]) : null;
       const topName = top ? `${p ? getName(p) : top[0]} (${top[1]})` : '-';
       return `<tr>
+        <td><input type="checkbox" class="sales-stat-checkbox" data-stat-type="supplier" data-stat-key="${escapeAttr(supplier)}" ${salesStatsAllSelected ? 'checked' : ''}></td>
         <td>${index + 1}</td>
         <td>${escapeHTML(supplier)}</td>
         <td><strong>${data.qty}</strong></td>
@@ -1492,6 +1567,7 @@ function renderSupplierSalesStats(box, records){
         <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
+        <td>${top ? `<button class="edit-btn" data-sale-edit-barcode="${escapeAttr(top[0])}">Modifica</button>` : '-'}</td>
       </tr>`;
     }).join('')}
   </tbody></table></div>`;

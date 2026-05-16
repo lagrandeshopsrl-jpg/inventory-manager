@@ -132,6 +132,11 @@
                 <option value="suppliers">Fornitori più venduti</option>
               </select>
             </div>
+            <div class="sales-stat-actions">
+              <button type="button" id="toggleSalesStatsSelectBtn" onclick="toggleSalesStatsSelection()">Seleziona lista</button>
+              <button type="button" class="sale-delete-selected" onclick="deleteSelectedSalesStats()">Elimina selezionati</button>
+            </div>
+            <div id="salesStatsActionStatus" class="sale-status hidden"></div>
             <div id="salesStatsBox"></div>
           </div>
         </div>
