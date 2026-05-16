@@ -1286,6 +1286,15 @@ function renderSaleSearchResults(query = null){
   </tbody></table></div>`;
 }
 
+function clearSaleSearchResults(clearInput = false){
+  const box = document.getElementById('saleSearchResults');
+  if(box) box.innerHTML = '';
+  if(clearInput){
+    const input = document.getElementById('saleProductSearch');
+    if(input) input.value = '';
+  }
+}
+
 function addFirstSaleSearchResult(){
   const query = document.getElementById('saleProductSearch')?.value || '';
   const first = saleSearchMatches(query)[0];
@@ -1584,6 +1593,7 @@ function handleScannerInput(){
     const exactIndex = productIndexByBarcode(value);
     if(exactIndex >= 0){
       addProductIndexToSaleCart(exactIndex);
+      clearSaleSearchResults(true);
       if(search) search.value = '';
       return;
     }
