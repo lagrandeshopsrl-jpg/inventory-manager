@@ -1045,6 +1045,36 @@ function setSaleStatus(text, type = ''){
   el.innerText = text;
 }
 
+function clearSaleCurrentProduct(){
+  const box = document.getElementById('saleCurrentProduct');
+  if(!box) return;
+  box.innerHTML = '';
+  box.classList.add('hidden');
+}
+
+function renderSaleCurrentProduct(product, barcode){
+  const box = document.getElementById('saleCurrentProduct');
+  if(!box || !product) return;
+  const code = textValue(barcode || getBarcode(product));
+  const buyPrice = getBuy(product) || '-';
+  const sellPrice = getSell(product) || '-';
+  const cartQty = Number(saleCart[code] || 0);
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <div class="sale-current-label">Ultimo prodotto scansionato</div>
+    <div class="sale-current-main">
+      <div>
+        <div class="sale-current-name">${escapeHTML(getName(product) || 'Prodotto senza nome')}</div>
+        <div class="sale-current-barcode">${escapeHTML(code)}</div>
+      </div>
+      <div class="sale-current-prices">
+        <div><span>Acquisto</span><strong>${escapeHTML(buyPrice)}</strong></div>
+        <div><span>Vendita</span><strong>${escapeHTML(sellPrice)}</strong></div>
+        <div><span>Nel carrello</span><strong>${cartQty}</strong></div>
+      </div>
+    </div>`;
+}
+
 function saleCartTotal(){
   return Object.values(saleCart).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
 }
@@ -1091,12 +1121,14 @@ function addBarcodeToSaleCart(barcode, qty = 1){
   const product = productForBarcode(code);
   if(!product){
     setSaleStatus('Prodotto non trovato: ' + code, 'err');
+    clearSaleCurrentProduct();
     return false;
   }
   saleCart[code] = Math.max(0, Number(saleCart[code] || 0) + Number(qty || 1));
   persistSaleCart();
   renderSaleCart();
   renderSalesStats();
+  renderSaleCurrentProduct(product, code);
   setSaleStatus('Aggiunto al carrello: ' + (getName(product) || code), 'ok');
   return true;
 }
@@ -1108,6 +1140,9 @@ function changeSaleCartQty(barcode, delta){
   if(saleCart[code] <= 0) delete saleCart[code];
   persistSaleCart();
   renderSaleCart();
+  const product = productForBarcode(code);
+  if(product && saleCart[code]) renderSaleCurrentProduct(product, code);
+  else clearSaleCurrentProduct();
 }
 
 function removeSaleCartItem(barcode){
@@ -1116,6 +1151,7 @@ function removeSaleCartItem(barcode){
   delete saleCart[code];
   persistSaleCart();
   renderSaleCart();
+  clearSaleCurrentProduct();
 }
 
 function clearSaleCart(){
@@ -1126,6 +1162,7 @@ function clearSaleCart(){
   saleCart = {};
   persistSaleCart();
   renderSaleCart();
+  clearSaleCurrentProduct();
   setSaleStatus('Carrello svuotato.', 'ok');
 }
 
@@ -1149,6 +1186,7 @@ async function confirmSaleCart(){
   persistSalesRecords(true);
   persistSaleCart();
   renderSaleCart();
+  clearSaleCurrentProduct();
   renderSalesStats();
   const cloudResult = await saveCloudAfterChange('Vendita salvata', { silentDropboxError: true });
   setSaleStatus(cloudResult.synced ? 'Vendita confermata e sincronizzata.' : 'Vendita confermata sul dispositivo.', cloudResult.synced ? 'ok' : '');
@@ -1348,7 +1386,7 @@ function renderProductSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Qta</th><th>Ultima vendita</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Ultima vendita</th></tr></thead><tbody>
     ${rows.map(([barcode, data], index) => {
       const p = productForBarcode(barcode);
       return `<tr>
@@ -1357,6 +1395,8 @@ function renderProductSalesStats(box, records){
         <td>${escapeHTML(barcode)}</td>
         <td>${escapeHTML(p ? (getSupplier(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? (getCategory(p) || '-') : '-')}</td>
+        <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
+        <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td><strong>${data.qty}</strong></td>
         <td>${escapeHTML(formatDate(data.last))}</td>
       </tr>`;
@@ -1377,7 +1417,7 @@ function renderSupplierSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Ultima vendita</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th>Vendita</th><th>Ultima vendita</th></tr></thead><tbody>
     ${rows.map(([supplier, data], index) => {
       const top = Object.entries(data.products).sort((a, b) => b[1] - a[1])[0];
       const p = top ? productForBarcode(top[0]) : null;
@@ -1388,6 +1428,8 @@ function renderSupplierSalesStats(box, records){
         <td><strong>${data.qty}</strong></td>
         <td>${Object.keys(data.products).length}</td>
         <td>${escapeHTML(topName)}</td>
+        <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
+        <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
       </tr>`;
     }).join('')}

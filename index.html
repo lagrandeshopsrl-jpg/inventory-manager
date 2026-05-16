@@ -94,8 +94,11 @@
               <button type="button" onclick="addFirstSaleSearchResult()">Aggiungi primo risultato</button>
             </div>
             <div id="saleStatus" class="sale-status">Scansiona o cerca un prodotto, poi conferma la vendita.</div>
+            <div id="saleCurrentProduct" class="sale-current-product hidden"></div>
             <div id="saleSearchResults" class="sales-results"></div>
-            <div id="saleCartBox"></div>
+            <div class="sale-cart-section">
+              <div id="saleCartBox"></div>
+            </div>
             <div class="sale-bottom-actions">
               <button type="button" class="confirm-sale large-sale-action" onclick="confirmSaleCart()">Conferma vendita</button>
               <button type="button" class="clear-sale large-sale-action" onclick="clearSaleCart()">Svuota carrello</button>

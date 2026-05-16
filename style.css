@@ -167,8 +167,70 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   border-color:#fecaca;
   color:#991b1b;
 }
+.sale-current-product{
+  margin:14px 0 22px;
+  padding:16px;
+  border-radius:18px;
+  border:2px solid #bfdbfe;
+  background:#eff6ff;
+  color:#0f172a;
+}
+.sale-current-label{
+  color:#1d4ed8;
+  font-size:14px;
+  font-weight:900;
+  margin-bottom:8px;
+  text-transform:uppercase;
+}
+.sale-current-main{
+  display:grid;
+  grid-template-columns:minmax(220px,1fr) auto;
+  gap:16px;
+  align-items:center;
+}
+.sale-current-name{
+  font-size:24px;
+  font-weight:900;
+  word-break:break-word;
+}
+.sale-current-barcode{
+  margin-top:5px;
+  color:#475569;
+  font-weight:800;
+}
+.sale-current-prices{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(105px,1fr));
+  gap:10px;
+}
+.sale-current-prices div{
+  background:white;
+  border:1px solid #dbeafe;
+  border-radius:14px;
+  padding:10px 12px;
+  min-width:0;
+}
+.sale-current-prices span{
+  display:block;
+  color:#64748b;
+  font-size:13px;
+  font-weight:900;
+  margin-bottom:4px;
+}
+.sale-current-prices strong{
+  display:block;
+  color:#0f172a;
+  font-size:20px;
+  font-weight:900;
+  word-break:break-word;
+}
 .sales-results{
   margin-bottom:12px;
+}
+.sale-cart-section{
+  margin-top:24px;
+  padding-top:18px;
+  border-top:2px solid #e5eaf3;
 }
 .sales-panel .table-card{
   box-shadow:none;
@@ -205,6 +267,8 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   .sales-panel{padding:12px;border-radius:14px}
   .sales-panel-header{align-items:flex-start;flex-direction:column}
   .sales-controls button,.sales-controls input,.sales-filters input,.sales-filters select{width:100%;min-width:0}
+  .sale-current-main{grid-template-columns:1fr}
+  .sale-current-prices{grid-template-columns:1fr}
   .sale-bottom-actions{grid-template-columns:1fr}
   .sale-total-box{align-items:flex-start;flex-direction:column}
   .sale-total-box strong{font-size:24px}
