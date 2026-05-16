@@ -13,6 +13,7 @@
       <div class="logo">Inventory Manager</div>
       <button tabindex="-1" class="menu active" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
       <button tabindex="-1" class="menu" id="menuSuppliers" onclick="showSuppliers()">📁 Fornitori</button>
+      <button tabindex="-1" class="menu" id="menuSales" onclick="showSales()">€ Vendite</button>
       <button tabindex="-1" class="menu" id="menuHistory" onclick="showHistory()">🕘 Cronologia</button>
       <button tabindex="-1" class="menu" id="menuCategories" onclick="showCategories()">▤ Categorie</button>
       <button tabindex="-1" class="menu" id="menuSettings" onclick="showSettings()">⚙ Impostazioni</button>
@@ -27,7 +28,7 @@
           autofocus autocomplete="off" autocorrect="off"
           autocapitalize="off" spellcheck="false"
           tabindex="1" inputmode="numeric"
-          oninput="currentPage=1; renderProducts();"
+          oninput="handleScannerInput()"
           onfocus="clearSearchField()"
           onclick="clearSearchField()"
           onmousedown="clearSearchField()">
@@ -78,6 +79,50 @@
         <div id="supplierStats" class="supplier-stats"></div>
         <div id="supplierFolders" class="supplier-folders"></div>
         <div id="supplierDetail" class="supplier-detail hidden"></div>
+      </section>
+
+      <section id="salesPage" class="hidden">
+        <div class="sales-layout">
+          <div class="sales-panel">
+            <div class="sales-panel-header">
+              <h2>Carrello vendita</h2>
+              <span id="saleCartCount" class="sales-badge">0 pezzi</span>
+            </div>
+            <div class="sales-controls">
+              <input id="saleProductSearch" placeholder="Cerca prodotto o barcode..." oninput="renderSaleSearchResults()" />
+              <button type="button" onclick="addFirstSaleSearchResult()">Aggiungi primo risultato</button>
+              <button type="button" onclick="clearSaleCart()">Svuota carrello</button>
+              <button type="button" class="confirm-sale" onclick="confirmSaleCart()">Conferma vendita</button>
+            </div>
+            <div id="saleStatus" class="sale-status">Scansiona o cerca un prodotto, poi conferma la vendita.</div>
+            <div id="saleSearchResults" class="sales-results"></div>
+            <div id="saleCartBox"></div>
+          </div>
+
+          <div class="sales-panel">
+            <div class="sales-panel-header">
+              <h2>Più venduti</h2>
+              <span id="salesStatsCount" class="sales-badge">0 vendite</span>
+            </div>
+            <div class="sales-filters">
+              <select id="salesQuickRange" onchange="applySalesQuickRange()">
+                <option value="today">Oggi</option>
+                <option value="week">Settimana</option>
+                <option value="month">Mese</option>
+                <option value="year">Anno</option>
+                <option value="all">Tutto</option>
+                <option value="custom">Da data a data</option>
+              </select>
+              <input id="salesDateFrom" type="date" onchange="setSalesCustomRange()" />
+              <input id="salesDateTo" type="date" onchange="setSalesCustomRange()" />
+              <select id="salesStatsView" onchange="renderSalesStats()">
+                <option value="products">Prodotti più venduti</option>
+                <option value="suppliers">Fornitori più venduti</option>
+              </select>
+            </div>
+            <div id="salesStatsBox"></div>
+          </div>
+        </div>
       </section>
 
       <section id="historyPage" class="hidden">

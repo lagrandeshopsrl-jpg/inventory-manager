@@ -1,5 +1,7 @@
 const STORAGE_PRODUCTS_KEY = 'products';
 const STORAGE_IMPORTS_KEY = 'importSessions';
+const STORAGE_SALES_KEY = 'salesRecords';
+const STORAGE_SALE_CART_KEY = 'saleCart';
 const LAST_MODIFIED_KEY = 'inventory_lastModified';
 const DROPBOX_TOKEN_KEY = 'inventory_dropbox_token';
 const DROPBOX_TOKEN_EXPIRES_KEY = 'inventory_dropbox_token_expires_at';
@@ -18,6 +20,8 @@ const importSessionPageSize = 200;
 
 let products = normalizeProductList(readJson(STORAGE_PRODUCTS_KEY, []));
 let importSessions = normalizeImportSessions(readJson(STORAGE_IMPORTS_KEY, []));
+let salesRecords = normalizeSalesRecords(readJson(STORAGE_SALES_KEY, []));
+let saleCart = normalizeSaleCart(readJson(STORAGE_SALE_CART_KEY, {}));
 let currentPage = 1;
 let allSelected = false;
 let editingIndex = null;
@@ -200,6 +204,55 @@ function compactImportSessions(list){
   }));
 }
 
+function normalizeSaleItems(items){
+  if(!Array.isArray(items)) return [];
+  const totals = {};
+  items.forEach(item => {
+    const barcode = Array.isArray(item) ? textValue(item[0]) : textValue(item?.barcode || item?.b);
+    const qty = Math.max(0, Number(Array.isArray(item) ? item[1] : (item?.qty || item?.q || 0)) || 0);
+    if(barcode && qty > 0) totals[barcode] = (totals[barcode] || 0) + qty;
+  });
+  return Object.entries(totals).map(([barcode, qty]) => ({ barcode, qty }));
+}
+
+function normalizeSalesRecords(list){
+  if(!Array.isArray(list)) return [];
+  return list.map((record, index) => {
+    const items = normalizeSaleItems(record?.items || record?.m || []);
+    return {
+      id: textValue(record?.id || record?.i || `sale_${Date.now()}_${index}`),
+      time: textValue(record?.time || record?.t || new Date().toISOString()),
+      items
+    };
+  }).filter(record => record.id && record.items.length);
+}
+
+function compactSalesRecords(list){
+  return normalizeSalesRecords(list).map(record => ({
+    i: record.id,
+    t: record.time,
+    m: record.items.map(item => [item.barcode, item.qty])
+  }));
+}
+
+function normalizeSaleCart(cart){
+  const totals = {};
+  if(Array.isArray(cart)){
+    normalizeSaleItems(cart).forEach(item => totals[item.barcode] = item.qty);
+  }else if(cart && typeof cart === 'object'){
+    Object.entries(cart).forEach(([barcode, qty]) => {
+      const cleanBarcode = textValue(barcode);
+      const cleanQty = Math.max(0, Number(qty) || 0);
+      if(cleanBarcode && cleanQty > 0) totals[cleanBarcode] = cleanQty;
+    });
+  }
+  return totals;
+}
+
+function compactSaleCart(cart){
+  return normalizeSaleCart(cart);
+}
+
 function escapeHTML(value){
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;',
@@ -271,9 +324,20 @@ function persistImportSessions(touch = true){
   if(touch) setLocalModified();
 }
 
+function persistSalesRecords(touch = true){
+  salesRecords = normalizeSalesRecords(salesRecords);
+  safeSetStorage(STORAGE_SALES_KEY, JSON.stringify(compactSalesRecords(salesRecords)));
+  if(touch) setLocalModified();
+}
+
+function persistSaleCart(){
+  safeSetStorage(STORAGE_SALE_CART_KEY, JSON.stringify(compactSaleCart(saleCart)));
+}
+
 function persistAll(touch = true){
   persistProducts(false);
   persistImportSessions(false);
+  persistSalesRecords(false);
   if(touch) setLocalModified();
 }
 
@@ -580,7 +644,8 @@ function buildSnapshot(timestamp = Date.now(), meta = {}){
     backupLabel: meta.backupLabel || '',
     backupPath: meta.backupPath || '',
     products: compactProductList(products),
-    importSessions: compactImportSessions(importSessions)
+    importSessions: compactImportSessions(importSessions),
+    salesRecords: compactSalesRecords(salesRecords)
   };
 }
 
@@ -620,6 +685,7 @@ async function dropboxDownloadSnapshot(){
   data.snapshotModified = snapshotModified;
   data.products = normalizeProductList(data.products);
   data.importSessions = normalizeImportSessions(data.importSessions);
+  data.salesRecords = normalizeSalesRecords(data.salesRecords);
   return data;
 }
 
@@ -702,6 +768,7 @@ async function dropboxUploadSnapshot(){
   const savedTime = Math.max(timestamp, serverModified);
   products = snapshot.products;
   importSessions = snapshot.importSessions;
+  salesRecords = snapshot.salesRecords;
   persistAll(false);
   setLocalModified(savedTime);
   return snapshot;
@@ -796,12 +863,14 @@ async function syncNow(options = {}){
     }else if(localProducts === 0 && remoteProducts > 0){
       products = remote.products;
       importSessions = remote.importSessions;
+      salesRecords = remote.salesRecords || [];
       persistAll(false);
       setLocalModified(remoteTime || Date.now());
       setCloudStatus('☁ Database scaricato da Dropbox', 'ok');
     }else if(localTime === 0 && remoteProducts > 0){
       products = remote.products;
       importSessions = remote.importSessions;
+      salesRecords = remote.salesRecords || [];
       persistAll(false);
       setLocalModified(remoteTime || Date.now());
       setCloudStatus('☁ Ultimo file Dropbox scaricato: ' + products.length + ' prodotti', 'ok');
@@ -811,6 +880,7 @@ async function syncNow(options = {}){
     }else if(remoteTime > localTime){
       products = remote.products;
       importSessions = remote.importSessions;
+      salesRecords = remote.salesRecords || [];
       persistAll(false);
       setLocalModified(remoteTime);
       setCloudStatus('☁ Scaricato da Dropbox: ' + products.length + ' prodotti', 'ok');
@@ -830,6 +900,7 @@ async function syncNow(options = {}){
 function setActive(view){
   document.getElementById('menuProducts')?.classList.toggle('active', view === 'products');
   document.getElementById('menuSuppliers')?.classList.toggle('active', view === 'suppliers');
+  document.getElementById('menuSales')?.classList.toggle('active', view === 'sales');
   document.getElementById('menuHistory')?.classList.toggle('active', view === 'history');
   document.getElementById('menuCategories')?.classList.toggle('active', view === 'categories');
   document.getElementById('menuSettings')?.classList.toggle('active', view === 'settings');
@@ -839,6 +910,7 @@ function setPageVisibility(view){
   const pages = {
     products: 'productsPage',
     suppliers: 'suppliersPage',
+    sales: 'salesPage',
     history: 'historyPage',
     categories: 'categoriesPage',
     settings: 'settingsPage'
@@ -858,6 +930,8 @@ function showProducts(){
   setActive('products');
   setPageVisibility('products');
   setTitle('Gestione Prodotti', 'Gestionale Magazzino / 库存管理');
+  const search = document.getElementById('search');
+  if(search) search.placeholder = 'SCANSIONA / CERCA BARCODE QUI';
   renderProducts();
 }
 
@@ -867,6 +941,19 @@ function showSuppliers(){
   setPageVisibility('suppliers');
   setTitle('Fornitori', 'Cartelle fornitori / 供应商文件夹');
   renderSupplierFolders();
+}
+
+function showSales(){
+  currentView = 'sales';
+  setActive('sales');
+  setPageVisibility('sales');
+  setTitle('Vendite', 'Carrello vendita e prodotti più venduti');
+  const search = document.getElementById('search');
+  if(search) search.placeholder = 'SCANSIONA BARCODE PER VENDITA';
+  setupSalesDefaultDates();
+  renderSaleCart();
+  renderSaleSearchResults();
+  renderSalesStats();
 }
 
 function showHistory(){
@@ -917,6 +1004,7 @@ function showSettings(){
 
 function renderCurrentView(){
   if(currentView === 'suppliers') renderSupplierFolders();
+  else if(currentView === 'sales') showSales();
   else if(currentView === 'history') renderImportSessions();
   else if(currentView === 'categories') renderCategoryFolders();
   else if(currentView === 'settings') showSettings();
@@ -926,6 +1014,353 @@ function renderCurrentView(){
 function productMatchesSearch(p, search){
   return [getBarcode(p), getName(p), getSupplier(p), getCategory(p)]
     .some(value => String(value).toLowerCase().includes(search));
+}
+
+function productIndexByBarcode(barcode){
+  const code = String(barcode || '');
+  return products.findIndex(p => String(getBarcode(p)) === code);
+}
+
+function productForBarcode(barcode){
+  const index = productIndexByBarcode(barcode);
+  return index >= 0 ? products[index] : null;
+}
+
+function setSaleStatus(text, type = ''){
+  const el = document.getElementById('saleStatus');
+  if(!el) return;
+  el.className = 'sale-status' + (type ? ' ' + type : '');
+  el.innerText = text;
+}
+
+function saleCartTotal(){
+  return Object.values(saleCart).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
+}
+
+function addProductIndexToSaleCart(index, qty = 1){
+  if(index < 0 || index >= products.length) return false;
+  return addBarcodeToSaleCart(getBarcode(products[index]), qty);
+}
+
+function addBarcodeToSaleCart(barcode, qty = 1){
+  const code = textValue(barcode);
+  if(!code) return false;
+  const product = productForBarcode(code);
+  if(!product){
+    setSaleStatus('Prodotto non trovato: ' + code, 'err');
+    return false;
+  }
+  saleCart[code] = Math.max(0, Number(saleCart[code] || 0) + Number(qty || 1));
+  persistSaleCart();
+  renderSaleCart();
+  renderSalesStats();
+  setSaleStatus('Aggiunto al carrello: ' + (getName(product) || code), 'ok');
+  return true;
+}
+
+function changeSaleCartQty(barcode, delta){
+  const code = textValue(barcode);
+  if(!code || !saleCart[code]) return;
+  saleCart[code] = Math.max(0, Number(saleCart[code] || 0) + delta);
+  if(saleCart[code] <= 0) delete saleCart[code];
+  persistSaleCart();
+  renderSaleCart();
+}
+
+function removeSaleCartItem(barcode){
+  const code = textValue(barcode);
+  if(!code) return;
+  delete saleCart[code];
+  persistSaleCart();
+  renderSaleCart();
+}
+
+function clearSaleCart(){
+  if(!saleCartTotal()){
+    setSaleStatus('Carrello gia vuoto.');
+    return;
+  }
+  if(!confirm('Svuotare il carrello vendita?')) return;
+  saleCart = {};
+  persistSaleCart();
+  renderSaleCart();
+  setSaleStatus('Carrello svuotato.', 'ok');
+}
+
+async function confirmSaleCart(){
+  const items = Object.entries(saleCart)
+    .map(([barcode, qty]) => ({ barcode, qty: Number(qty) || 0 }))
+    .filter(item => item.barcode && item.qty > 0);
+  if(!items.length){
+    setSaleStatus('Aggiungi almeno un prodotto prima di confermare.', 'err');
+    return;
+  }
+
+  const total = items.reduce((sum, item) => sum + item.qty, 0);
+  if(!confirm('Confermare vendita di ' + total + ' pezzi?')) return;
+
+  salesRecords.unshift({
+    id: 'sale_' + Date.now(),
+    time: new Date().toISOString(),
+    items
+  });
+  saleCart = {};
+  persistSalesRecords(true);
+  persistSaleCart();
+  renderSaleCart();
+  renderSalesStats();
+  const cloudResult = await saveCloudAfterChange('Vendita salvata', { silentDropboxError: true });
+  setSaleStatus(cloudResult.synced ? 'Vendita confermata e sincronizzata.' : 'Vendita confermata sul dispositivo.', cloudResult.synced ? 'ok' : '');
+}
+
+function saleSearchMatches(query){
+  const search = String(query || '').toLowerCase();
+  if(!search) return [];
+  const matches = [];
+  products.forEach((product, index) => {
+    if(productMatchesSearch(product, search)) matches.push({ product, index });
+  });
+  return matches.slice(0, 25);
+}
+
+function renderSaleSearchResults(query = null){
+  const box = document.getElementById('saleSearchResults');
+  if(!box) return;
+  const inputValue = document.getElementById('saleProductSearch')?.value || '';
+  const search = query === null ? inputValue : query;
+  const matches = saleSearchMatches(search);
+  if(!String(search || '').trim()){
+    box.innerHTML = '';
+    return;
+  }
+  if(!matches.length){
+    box.innerHTML = '<div class="sale-status err">Nessun prodotto trovato.</div>';
+    return;
+  }
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Vendita</th><th></th></tr></thead><tbody>
+    ${matches.map(item => {
+      const p = item.product;
+      return `<tr>
+        <td>${escapeHTML(getBarcode(p))}</td>
+        <td>${escapeHTML(getName(p))}</td>
+        <td>${escapeHTML(getSupplier(p) || '-')}</td>
+        <td>${escapeHTML(getSell(p) || '-')}</td>
+        <td><button class="edit-btn" data-sale-add-index="${item.index}">Aggiungi</button></td>
+      </tr>`;
+    }).join('')}
+  </tbody></table></div>`;
+}
+
+function addFirstSaleSearchResult(){
+  const query = document.getElementById('saleProductSearch')?.value || '';
+  const first = saleSearchMatches(query)[0];
+  if(!first){
+    setSaleStatus('Cerca un prodotto prima di aggiungere.', 'err');
+    return;
+  }
+  addProductIndexToSaleCart(first.index);
+}
+
+function renderSaleCart(){
+  const count = document.getElementById('saleCartCount');
+  if(count) count.innerText = saleCartTotal() + ' pezzi';
+  const box = document.getElementById('saleCartBox');
+  if(!box) return;
+  const items = Object.entries(saleCart)
+    .filter(([, qty]) => Number(qty) > 0)
+    .map(([barcode, qty]) => ({ barcode, qty: Number(qty), product: productForBarcode(barcode) }));
+  if(!items.length){
+    box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
+    return;
+  }
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+    ${items.map(item => `<tr>
+      <td>${escapeHTML(item.barcode)}</td>
+      <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
+      <td>${item.qty}</td>
+      <td><div class="action-buttons">
+        <button class="edit-btn" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
+        <button class="edit-btn" data-sale-cart-action="plus" data-barcode="${escapeAttr(item.barcode)}">+</button>
+        <button class="delete-btn" data-sale-cart-action="remove" data-barcode="${escapeAttr(item.barcode)}">Rimuovi</button>
+      </div></td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+function dateInputValue(date){
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function startOfDay(date){
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function endOfDay(date){
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function setupSalesDefaultDates(){
+  const from = document.getElementById('salesDateFrom');
+  const to = document.getElementById('salesDateTo');
+  const quick = document.getElementById('salesQuickRange');
+  if(from && to && quick && !from.value && !to.value){
+    quick.value = 'today';
+    applySalesQuickRange(false);
+  }
+}
+
+function applySalesQuickRange(render = true){
+  const quick = document.getElementById('salesQuickRange');
+  const from = document.getElementById('salesDateFrom');
+  const to = document.getElementById('salesDateTo');
+  if(!quick || !from || !to) return;
+  const now = new Date();
+  let start = null;
+  let end = now;
+  if(quick.value === 'today'){
+    start = startOfDay(now);
+  }else if(quick.value === 'week'){
+    start = startOfDay(new Date(now));
+    const mondayOffset = (start.getDay() + 6) % 7;
+    start.setDate(start.getDate() - mondayOffset);
+  }else if(quick.value === 'month'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+  }else if(quick.value === 'year'){
+    start = new Date(now.getFullYear(), 0, 1);
+  }else if(quick.value === 'all'){
+    from.value = '';
+    to.value = '';
+    if(render) renderSalesStats();
+    return;
+  }else{
+    if(render) renderSalesStats();
+    return;
+  }
+  from.value = dateInputValue(start);
+  to.value = dateInputValue(end);
+  if(render) renderSalesStats();
+}
+
+function setSalesCustomRange(){
+  const quick = document.getElementById('salesQuickRange');
+  if(quick) quick.value = 'custom';
+  renderSalesStats();
+}
+
+function salesDateRange(){
+  const fromValue = document.getElementById('salesDateFrom')?.value || '';
+  const toValue = document.getElementById('salesDateTo')?.value || '';
+  return {
+    from: fromValue ? startOfDay(new Date(fromValue + 'T00:00:00')) : null,
+    to: toValue ? endOfDay(new Date(toValue + 'T00:00:00')) : null
+  };
+}
+
+function saleRecordInRange(record, range){
+  const time = new Date(record.time);
+  if(Number.isNaN(time.getTime())) return false;
+  if(range.from && time < range.from) return false;
+  if(range.to && time > range.to) return false;
+  return true;
+}
+
+function renderSalesStats(){
+  const box = document.getElementById('salesStatsBox');
+  if(!box) return;
+  const view = document.getElementById('salesStatsView')?.value || 'products';
+  const range = salesDateRange();
+  const filtered = salesRecords.filter(record => saleRecordInRange(record, range));
+  const totalPieces = filtered.reduce((sum, record) => sum + record.items.reduce((itemSum, item) => itemSum + item.qty, 0), 0);
+  const count = document.getElementById('salesStatsCount');
+  if(count) count.innerText = totalPieces + ' pezzi';
+
+  if(!filtered.length){
+    box.innerHTML = '<div class="empty-row">Nessuna vendita nel periodo selezionato</div>';
+    return;
+  }
+
+  if(view === 'suppliers') renderSupplierSalesStats(box, filtered);
+  else renderProductSalesStats(box, filtered);
+}
+
+function renderProductSalesStats(box, records){
+  const totals = {};
+  records.forEach(record => {
+    record.items.forEach(item => {
+      if(!totals[item.barcode]) totals[item.barcode] = { qty: 0, last: '' };
+      totals[item.barcode].qty += item.qty;
+      if(!totals[item.barcode].last || record.time > totals[item.barcode].last) totals[item.barcode].last = record.time;
+    });
+  });
+  const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Qta</th><th>Ultima vendita</th></tr></thead><tbody>
+    ${rows.map(([barcode, data], index) => {
+      const p = productForBarcode(barcode);
+      return `<tr>
+        <td>${index + 1}</td>
+        <td>${escapeHTML(p ? getName(p) : 'Prodotto non trovato')}</td>
+        <td>${escapeHTML(barcode)}</td>
+        <td>${escapeHTML(p ? (getSupplier(p) || '-') : '-')}</td>
+        <td>${escapeHTML(p ? (getCategory(p) || '-') : '-')}</td>
+        <td><strong>${data.qty}</strong></td>
+        <td>${escapeHTML(formatDate(data.last))}</td>
+      </tr>`;
+    }).join('')}
+  </tbody></table></div>`;
+}
+
+function renderSupplierSalesStats(box, records){
+  const totals = {};
+  records.forEach(record => {
+    record.items.forEach(item => {
+      const p = productForBarcode(item.barcode);
+      const supplier = p ? supplierNameOf(p) : 'Senza fornitore';
+      if(!totals[supplier]) totals[supplier] = { qty: 0, products: {}, last: '' };
+      totals[supplier].qty += item.qty;
+      totals[supplier].products[item.barcode] = (totals[supplier].products[item.barcode] || 0) + item.qty;
+      if(!totals[supplier].last || record.time > totals[supplier].last) totals[supplier].last = record.time;
+    });
+  });
+  const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Ultima vendita</th></tr></thead><tbody>
+    ${rows.map(([supplier, data], index) => {
+      const top = Object.entries(data.products).sort((a, b) => b[1] - a[1])[0];
+      const p = top ? productForBarcode(top[0]) : null;
+      const topName = top ? `${p ? getName(p) : top[0]} (${top[1]})` : '-';
+      return `<tr>
+        <td>${index + 1}</td>
+        <td>${escapeHTML(supplier)}</td>
+        <td><strong>${data.qty}</strong></td>
+        <td>${Object.keys(data.products).length}</td>
+        <td>${escapeHTML(topName)}</td>
+        <td>${escapeHTML(formatDate(data.last))}</td>
+      </tr>`;
+    }).join('')}
+  </tbody></table></div>`;
+}
+
+function handleScannerInput(){
+  const search = document.getElementById('search');
+  if(currentView === 'sales'){
+    const value = textValue(search?.value);
+    if(!value){
+      renderSaleSearchResults();
+      return;
+    }
+    const exactIndex = productIndexByBarcode(value);
+    if(exactIndex >= 0){
+      addProductIndexToSaleCart(exactIndex);
+      if(search) search.value = '';
+      return;
+    }
+    renderSaleSearchResults(value);
+    return;
+  }
+  currentPage = 1;
+  renderProducts();
 }
 
 function renderProducts(){
@@ -1638,7 +2073,7 @@ function clearSearchField(){
   if(s.value){
     s.value = '';
     currentPage = 1;
-    renderProducts();
+    handleScannerInput();
   }
   __barcodeLastValue = '';
 }
@@ -1664,8 +2099,10 @@ function __barcodeOnlyDigits(str){
 
 function __focusBarcodeIfAllowed(){
   const s = document.getElementById('search');
-  const productsPage = document.getElementById('productsPage');
-  if(!s || !productsPage || currentView !== 'products' || productsPage.classList.contains('hidden') || __modalOpen() || __hasSelection()) return;
+  const activePage = currentView === 'sales'
+    ? document.getElementById('salesPage')
+    : document.getElementById('productsPage');
+  if(!s || !activePage || !['products', 'sales'].includes(currentView) || activePage.classList.contains('hidden') || __modalOpen() || __hasSelection()) return;
 
   const ae = document.activeElement;
   const userTypingElsewhere =
@@ -1709,7 +2146,7 @@ function installClearSearchOnScan(){
     if(s.value && now - lastKey > 1200){
       s.value = '';
       currentPage = 1;
-      renderProducts();
+      handleScannerInput();
     }
     lastKey = now;
   }, true);
@@ -1724,19 +2161,35 @@ document.addEventListener('keydown', function(e){
   if(inOtherInput) return;
 
   if(e.key && e.key.length === 1 && __barcodeOnlyDigits(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey){
-    if(document.activeElement !== s && currentView === 'products'){
+    if(document.activeElement !== s && ['products', 'sales'].includes(currentView)){
       e.preventDefault();
       s.value = '';
       s.focus({ preventScroll: true });
       s.value = e.key;
       __barcodeLastValue = s.value;
       currentPage = 1;
-      renderProducts();
+      handleScannerInput();
     }
   }
 }, true);
 
 document.addEventListener('click', function(event){
+  const saleAdd = event.target.closest('[data-sale-add-index]');
+  if(saleAdd){
+    addProductIndexToSaleCart(Number(saleAdd.dataset.saleAddIndex));
+    return;
+  }
+
+  const saleAction = event.target.closest('[data-sale-cart-action]');
+  if(saleAction){
+    const barcode = saleAction.dataset.barcode;
+    const action = saleAction.dataset.saleCartAction;
+    if(action === 'plus') changeSaleCartQty(barcode, 1);
+    else if(action === 'minus') changeSaleCartQty(barcode, -1);
+    else if(action === 'remove') removeSaleCartItem(barcode);
+    return;
+  }
+
   const supplierFolder = event.target.closest('[data-supplier-folder]');
   if(supplierFolder){
     openSupplierFolder(supplierFolder.dataset.supplierFolder);
