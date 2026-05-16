@@ -314,6 +314,11 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   font-size:13px;
   margin-left:4px;
 }
+.supplier-sales-open-note{
+  color:#64748b;
+  font-size:13px;
+  font-weight:900;
+}
 .supplier-sales-detail-row td{
   background:#f8fafc;
   padding:16px;

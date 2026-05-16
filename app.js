@@ -1677,9 +1677,7 @@ function renderSupplierSalesStats(box, records){
         <td>${escapeHTML(p ? (getBuy(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
-        <td><div class="action-buttons">
-          ${top ? `<button class="edit-btn" data-sales-qty-type="supplier" data-sales-qty-key="${escapeAttr(supplier)}" data-sales-qty-add-barcode="${escapeAttr(top[0])}">Modifica</button>` : ''}
-        </div></td>
+        <td><span class="supplier-sales-open-note">Apri fornitore</span></td>
       </tr>${isOpen ? renderSupplierSalesProductDetail(supplier, data) : ''}`;
     }).join('')}
   </tbody></table></div>`;
@@ -1694,7 +1692,7 @@ function renderSupplierSalesProductDetail(supplier, data){
         <div class="supplier-sales-detail-title">Prodotti venduti di ${escapeHTML(supplier)}: ${productsRows.length}</div>
         <div class="table-card supplier-sales-products">
           <table>
-            <thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Acquisto</th><th>Vendita</th><th>Qta venduta</th><th>Ultima vendita</th></tr></thead>
+            <thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Acquisto</th><th>Vendita</th><th>Qta venduta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead>
             <tbody>
               ${productsRows.map(([barcode, qty], index) => {
                 const p = productForBarcode(barcode);
@@ -1706,6 +1704,7 @@ function renderSupplierSalesProductDetail(supplier, data){
                   <td>${escapeHTML(p ? (getSell(p) || '-') : '-')}</td>
                   <td><strong>${qty}</strong></td>
                   <td>${escapeHTML(formatDate(data.productLast[barcode] || data.last))}</td>
+                  <td><button class="edit-btn" data-sales-qty-type="product" data-sales-qty-key="${escapeAttr(barcode)}" data-sales-qty-add-barcode="${escapeAttr(barcode)}">Modifica</button></td>
                 </tr>`;
               }).join('')}
             </tbody>
