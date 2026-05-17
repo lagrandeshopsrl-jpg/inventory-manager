@@ -1412,7 +1412,7 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
       const buyPrice = item.product ? formatPriceDisplay(getBuy(item.product)) : '-';
       const sellPrice = item.product ? formatPriceDisplay(getSell(item.product)) : '-';
@@ -1421,7 +1421,7 @@ function renderSaleCart(){
         <td>${escapeHTML(item.barcode)}</td>
         <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
         <td>${escapeHTML(buyPrice)}</td>
-        <td class="sell-price-cell">${escapeHTML(sellPrice)}</td>
+        <td>${escapeHTML(sellPrice)}</td>
         <td>${item.qty}</td>
         <td><div class="action-buttons">
           <button class="edit-btn" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
