@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260517-import-avviso-fornitori" />
+  <link rel="stylesheet" href="style.css?v=20260517-lucchetto-prezzi" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -59,6 +59,7 @@
           <button tabindex="-1" onclick="toggleSelectProducts()" id="toggleSelectBtn">Seleziona prodotti</button>
           <button tabindex="-1" onclick="deleteSelectedProducts()">Elimina selezionati</button>
           <button tabindex="-1" onclick="exportExcel()">Esporta Excel</button>
+          <button tabindex="-1" onclick="bulkUpdateAutoSellPrices()">Aggiorna prezzi vendita</button>
           <label class="file-label">Importa
             <input type="file" accept=".csv,.xls,.xlsx,.xlsm,.ods" onchange="importExcel(event)" />
           </label>
@@ -275,6 +276,7 @@
       <div class="edit-row"><div class="left-icon">Aa</div><div class="field"><label>Nome Prodotto / 产品名称</label><div class="modern-input"><input id="editName"><span>✓</span></div></div></div>
       <div class="edit-row"><div class="left-icon">◆</div><div class="field"><label>Prezzo Acquisto (€) / 进货价</label><div class="modern-input"><input id="editBuy" type="number" step="0.01" inputmode="decimal"></div></div></div>
       <div class="edit-row sell-price-edit-row"><div class="left-icon">€</div><div class="field"><label>Prezzo Vendita (€) / 售价</label><div class="modern-input"><input id="editSell" type="number" step="0.01" inputmode="decimal"></div></div></div>
+      <div class="edit-row price-lock-row"><div class="left-icon">🔒</div><div class="field"><label class="price-lock-control"><input id="editPriceLocked" type="checkbox"> Blocca prezzo vendita manuale</label></div></div>
       <div class="edit-row"><div class="left-icon">♟</div><div class="field"><label>Fornitore / 供应商</label><div class="modern-input"><input id="editSupplier" list="supplierOptions" placeholder="Scegli o scrivi fornitore"><span>⌄</span></div></div></div>
       <div class="edit-row"><div class="left-icon">#</div><div class="field"><label>Quantità / 数量</label><div class="modern-input"><input id="editQuantity" type="number" step="1" inputmode="numeric"></div></div></div>
       <div class="edit-row"><div class="left-icon">▤</div><div class="field"><label>Categoria / 类别</label><div class="modern-input"><input id="editCategory"><span>⌄</span></div></div></div>
@@ -291,6 +293,7 @@
       <div class="edit-row"><div class="left-icon">Aa</div><div class="field"><label>Nome Prodotto / 产品名称</label><div class="modern-input"><input id="newName"><span>✓</span></div></div></div>
       <div class="edit-row"><div class="left-icon">◆</div><div class="field"><label>Prezzo Acquisto (€) / 进货价</label><div class="modern-input"><input id="newBuy" type="number" step="0.01" inputmode="decimal"></div></div></div>
       <div class="edit-row sell-price-edit-row"><div class="left-icon">€</div><div class="field"><label>Prezzo Vendita (€) / 售价</label><div class="modern-input"><input id="newSell" type="number" step="0.01" inputmode="decimal"></div></div></div>
+      <div class="edit-row price-lock-row"><div class="left-icon">🔒</div><div class="field"><label class="price-lock-control"><input id="newPriceLocked" type="checkbox"> Blocca prezzo vendita manuale</label></div></div>
       <div class="edit-row"><div class="left-icon">♟</div><div class="field"><label>Fornitore / 供应商</label><div class="modern-input"><input id="newSupplier" list="supplierOptions" placeholder="Scegli o scrivi fornitore"><span>⌄</span></div></div></div>
       <div class="edit-row"><div class="left-icon">#</div><div class="field"><label>Quantità / 数量</label><div class="modern-input"><input id="newQuantity" type="number" step="1" inputmode="numeric"></div></div></div>
       <div class="edit-row"><div class="left-icon">▤</div><div class="field"><label>Categoria / 类别</label><div class="modern-input"><input id="newCategory"><span>⌄</span></div></div></div>
@@ -301,6 +304,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260517-import-avviso-fornitori"></script>
+  <script src="app.js?v=20260517-lucchetto-prezzi"></script>
 </body>
 </html>

@@ -549,6 +549,23 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .sale-current-supplier strong{
   color:#0f172a;
 }
+.price-lock-control{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:48px;
+  padding:12px 14px;
+  border:1px solid #d8e0ef;
+  border-radius:14px;
+  background:#f8fafc;
+  color:#0f172a;
+  font-weight:900;
+}
+.price-lock-control input{
+  width:18px;
+  height:18px;
+  accent-color:#0b63e5;
+}
 .sale-current-actions{
   margin-top:10px;
 }

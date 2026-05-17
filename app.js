@@ -120,6 +120,12 @@ function getCategory(p){ return Array.isArray(p) ? textValue(p[3]) : textValue(v
 function getBuy(p){ return Array.isArray(p) ? textValue(p[4]) : textValue(valueOf(p, ['buyPrice','buy_price','acquisto','Acquisto','Prezzo Acquisto','BuyPrice','进价','a'])); }
 function getSell(p){ return Array.isArray(p) ? textValue(p[5]) : textValue(valueOf(p, ['sellPrice','sell_price','vendita','Vendita','Prezzo Vendita','SellPrice','售价','v'])); }
 function getQuantity(p){ return Array.isArray(p) ? textValue(p[6]) : textValue(valueOf(p, ['quantity','quantita','quantità','Quantita','Quantità','qta','Qta','qty','Qty','stock','Stock','Giacenza','giacenza','数量','库存','q'])); }
+function boolValue(value){
+  if(value === true || value === 1) return true;
+  const text = textValue(value).toLowerCase();
+  return ['1','true','si','sì','yes','y','locked','bloccato','blocca'].includes(text);
+}
+function getPriceLocked(p){ return Array.isArray(p) ? boolValue(p[7]) : boolValue(valueOf(p, ['priceLocked','prezzoBloccato','Prezzo Bloccato','locked','Locked','lucchetto','Lucchetto'])); }
 
 function canonicalProduct(p){
   const barcode = getBarcode(p);
@@ -129,6 +135,7 @@ function canonicalProduct(p){
   const buyPrice = getBuy(p);
   const sellPrice = getSell(p);
   const quantity = getQuantity(p);
+  const priceLocked = getPriceLocked(p);
   return {
     barcode,
     name,
@@ -137,13 +144,15 @@ function canonicalProduct(p){
     buyPrice,
     sellPrice,
     quantity,
+    priceLocked,
     prodotto: name,
     fornitore: supplier,
     categoria: category,
     acquisto: buyPrice,
     vendita: sellPrice,
     quantita: quantity,
-    quantità: quantity
+    quantità: quantity,
+    prezzoBloccato: priceLocked
   };
 }
 
@@ -160,7 +169,8 @@ function compactProduct(p){
     product.category,
     product.buyPrice,
     product.sellPrice,
-    product.quantity
+    product.quantity,
+    product.priceLocked ? 1 : 0
   ];
 }
 
@@ -1189,6 +1199,61 @@ function salePriceNumber(value){
   }
   const number = Number(normalized);
   return Number.isFinite(number) ? number : 0;
+}
+
+function autoSellPriceNumberFromBuy(buyValue){
+  const buy = salePriceNumber(buyValue);
+  if(!Number.isFinite(buy) || buy <= 0) return '';
+  const rules = [
+    [0.40, 1.20],
+    [0.60, 1.50],
+    [0.70, 1.60],
+    [0.80, 1.80],
+    [1.20, 2.50],
+    [1.70, 3.50],
+    [2.20, 4.50],
+    [3.20, 6.80],
+    [3.50, 7.50],
+    [4.00, 8.50],
+    [4.50, 9.50]
+  ];
+  for(const [limit, sell] of rules){
+    if(buy <= limit) return sell;
+  }
+  return (buy * 2) + 1;
+}
+
+function autoSellPriceTextFromBuy(buyValue){
+  const price = autoSellPriceNumberFromBuy(buyValue);
+  if(price === '') return '';
+  const fixed = Number(price).toFixed(2);
+  return fixed.endsWith('.00') ? String(Math.round(Number(price))) : fixed;
+}
+
+function updateSellPriceFromBuy(prefix){
+  const buyInput = document.getElementById(prefix + 'Buy');
+  const sellInput = document.getElementById(prefix + 'Sell');
+  const lockInput = document.getElementById(prefix + 'PriceLocked');
+  if(!buyInput || !sellInput) return;
+  if(lockInput && lockInput.checked) return;
+  sellInput.value = autoSellPriceTextFromBuy(buyInput.value);
+}
+
+function installAutoSellPriceFromBuy(){
+  ['new', 'edit'].forEach(prefix => {
+    const buyInput = document.getElementById(prefix + 'Buy');
+    if(!buyInput || buyInput.dataset.autoSellPrice === '1') return;
+    buyInput.dataset.autoSellPrice = '1';
+    buyInput.addEventListener('input', () => updateSellPriceFromBuy(prefix));
+    const lockInput = document.getElementById(prefix + 'PriceLocked');
+    if(lockInput && lockInput.dataset.autoSellPrice === '1') return;
+    if(lockInput){
+      lockInput.dataset.autoSellPrice = '1';
+      lockInput.addEventListener('change', () => {
+        if(!lockInput.checked) updateSellPriceFromBuy(prefix);
+      });
+    }
+  });
 }
 
 function formatPriceDisplay(value, fallback = '-'){
@@ -2435,6 +2500,41 @@ function freeBrowserMemory(){
   alert('Memoria liberata. I prodotti sono rimasti salvati; la cronologia importazioni è stata svuotata.');
 }
 
+async function bulkUpdateAutoSellPrices(){
+  if(!confirm('Aggiornare il prezzo vendita di tutti i prodotti senza lucchetto? I prodotti con lucchetto non verranno modificati.')) return;
+  let updated = 0;
+  let locked = 0;
+  let skipped = 0;
+
+  products = products.map(product => {
+    const current = canonicalProduct(product);
+    if(getPriceLocked(current)){
+      locked++;
+      return current;
+    }
+    const nextSell = autoSellPriceTextFromBuy(getBuy(current));
+    if(!nextSell){
+      skipped++;
+      return current;
+    }
+    if(textValue(getSell(current)) === textValue(nextSell)){
+      return current;
+    }
+    updated++;
+    return canonicalProduct({
+      ...current,
+      sellPrice: nextSell,
+      vendita: nextSell
+    });
+  });
+
+  persistProducts(true);
+  renderCurrentView();
+  const cloudResult = await saveCloudAfterChange('Prezzi vendita aggiornati', { silentDropboxError: true });
+  const syncText = cloudResult.synced ? 'Dropbox aggiornato.' : 'Salvato sul dispositivo.';
+  alert(`Prezzi vendita aggiornati: ${updated}\nProtetti con lucchetto: ${locked}\nSenza prezzo acquisto valido: ${skipped}\n${syncText}`);
+}
+
 function supplierOptions(){
   return Array.from(new Set(products.map(p => getSupplier(p)).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b));
@@ -2459,6 +2559,8 @@ function openEditModal(index){
   document.getElementById('editQuantity').value = getQuantity(p);
   document.getElementById('editBuy').value = getBuy(p);
   document.getElementById('editSell').value = getSell(p);
+  const editLock = document.getElementById('editPriceLocked');
+  if(editLock) editLock.checked = getPriceLocked(p);
   document.getElementById('editModal').style.display = 'flex';
 }
 
@@ -2475,7 +2577,8 @@ function productFromForm(prefix){
     category: document.getElementById(prefix + 'Category').value,
     quantity: document.getElementById(prefix + 'Quantity')?.value || '',
     buyPrice: document.getElementById(prefix + 'Buy').value,
-    sellPrice: document.getElementById(prefix + 'Sell').value
+    sellPrice: document.getElementById(prefix + 'Sell').value,
+    priceLocked: Boolean(document.getElementById(prefix + 'PriceLocked')?.checked)
   });
 }
 
@@ -2518,6 +2621,8 @@ async function saveEditProduct(){
 function openNewProductModal(prefillBarcode = ''){
   updateSupplierOptions();
   ['newBarcode','newName','newSupplier','newCategory','newQuantity','newBuy','newSell'].forEach(id => document.getElementById(id).value = '');
+  const newLock = document.getElementById('newPriceLocked');
+  if(newLock) newLock.checked = false;
   const barcode = textValue(prefillBarcode);
   if(barcode) document.getElementById('newBarcode').value = barcode;
   document.getElementById('newProductModal').style.display = 'flex';
@@ -2594,7 +2699,8 @@ function exportExcel(){
     Acquisto: formatPriceDisplay(getBuy(p), ''),
     Vendita: formatPriceDisplay(getSell(p), ''),
     Categoria: getCategory(p),
-    Quantità: getQuantity(p)
+    Quantità: getQuantity(p),
+    'Prezzo Bloccato': getPriceLocked(p) ? 'SI' : ''
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -2619,11 +2725,7 @@ function getValue(row, keys){
 function importSellFromBuyIfMissing(buyValue, sellValue){
   const sellText = textValue(sellValue);
   if(sellText) return sellText;
-  const buyText = textValue(buyValue);
-  if(!buyText) return '';
-  const buyNumber = salePriceNumber(buyText);
-  if(!Number.isFinite(buyNumber) || buyNumber <= 0) return '';
-  return (buyNumber * 2).toFixed(2);
+  return autoSellPriceTextFromBuy(buyValue);
 }
 
 function confirmImportSuppliers(productsToImport){
@@ -2665,6 +2767,7 @@ async function importExcel(event){
       for(const row of rows){
         const importBuyPrice = getValue(row, ['Acquisto','Prezzo Acquisto','BuyPrice','进价']);
         const importSellPrice = getValue(row, ['Vendita','Prezzo Vendita','SellPrice','售价']);
+        const importPriceLocked = getValue(row, ['Prezzo Bloccato','Bloccato','Lock','Locked','Lucchetto']);
         const product = canonicalProduct({
           barcode: getValue(row, ['Barcode','Codice','EAN','条码']),
           name: getValue(row, ['Prodotto','Nome','Product','商品']),
@@ -2672,7 +2775,8 @@ async function importExcel(event){
           category: getValue(row, ['Categoria','Category','类别']),
           quantity: getValue(row, ['Quantità','Quantita','Qta','Qty','Quantity','Giacenza','Stock','数量','库存']),
           buyPrice: importBuyPrice,
-          sellPrice: importSellFromBuyIfMissing(importBuyPrice, importSellPrice)
+          sellPrice: importSellFromBuyIfMissing(importBuyPrice, importSellPrice),
+          priceLocked: boolValue(importPriceLocked)
         });
         if(!product.barcode) continue;
         importProducts.push(product);
@@ -2687,7 +2791,16 @@ async function importExcel(event){
       for(const product of importProducts){
         const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
         if(existing >= 0){
-          products[existing] = product;
+          const currentProduct = canonicalProduct(products[existing]);
+          products[existing] = getPriceLocked(currentProduct)
+            ? canonicalProduct({
+                ...product,
+                sellPrice: getSell(currentProduct),
+                vendita: getSell(currentProduct),
+                priceLocked: true,
+                prezzoBloccato: true
+              })
+            : product;
           updated++;
         }else{
           products.push(product);
@@ -3225,6 +3338,7 @@ window.onload = async function(){
   }
   if(!localStorage.getItem(DROPBOX_PATH_KEY)) setDropboxPath(DEFAULT_DROPBOX_PATH);
   showSales();
+  installAutoSellPriceFromBuy();
   __installBarcodeInputLogic();
   installClearSearchOnScan();
   setInterval(__focusBarcodeIfAllowed, 1200);
