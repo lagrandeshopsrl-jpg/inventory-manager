@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260517-totale-vendita-fornitore" />
+  <link rel="stylesheet" href="style.css?v=20260517-piu-venduti-aggiungi-vendita" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -146,6 +146,12 @@
                 <option value="suppliers">Fornitori più venduti</option>
               </select>
             </div>
+            <div class="sales-controls sales-manual-add">
+              <input id="salesManualProduct" list="salesManualProductOptions" placeholder="Cerca prodotto o barcode da aggiungere..." oninput="renderSalesManualOptions()" />
+              <input id="salesManualQty" class="sales-manual-qty" type="number" min="1" step="1" value="1" inputmode="numeric" />
+              <button type="button" onclick="addManualSalesStat()">+ Aggiungi vendita</button>
+            </div>
+            <datalist id="salesManualProductOptions"></datalist>
             <div class="sales-stat-actions">
               <button type="button" id="toggleSalesStatsSelectBtn" onclick="toggleSalesStatsSelection()">Seleziona lista</button>
               <button type="button" class="sale-delete-selected" onclick="deleteSelectedSalesStats()">Elimina selezionati</button>
@@ -290,6 +296,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260517-totale-vendita-fornitore"></script>
+  <script src="app.js?v=20260517-piu-venduti-aggiungi-vendita"></script>
 </body>
 </html>

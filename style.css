@@ -279,6 +279,18 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   gap:10px;
   margin-bottom:12px;
 }
+.sales-manual-add{
+  padding:12px;
+  border:1px solid #dbeafe;
+  border-radius:16px;
+  background:#f8fbff;
+}
+.sales-manual-add input:first-child{
+  flex:2 1 320px;
+}
+.sales-manual-qty{
+  max-width:150px;
+}
 .sales-stat-actions{
   display:flex;
   flex-wrap:wrap;

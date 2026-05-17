@@ -986,6 +986,7 @@ function showTopSales(){
   const search = document.getElementById('search');
   if(search) search.placeholder = 'SCANSIONA / CERCA BARCODE QUI';
   setupSalesDefaultDates();
+  renderSalesManualOptions();
   renderSalesStats();
 }
 
@@ -1508,6 +1509,67 @@ function setSalesStatsStatus(text, type = ''){
   el.className = 'sale-status' + (type ? ' ' + type : '');
   el.classList.toggle('hidden', !text);
   el.innerText = text || '';
+}
+
+function renderSalesManualOptions(){
+  const list = document.getElementById('salesManualProductOptions');
+  if(!list) return;
+  const query = textValue(document.getElementById('salesManualProduct')?.value);
+  if(!query){
+    list.innerHTML = '';
+    return;
+  }
+  list.innerHTML = saleSearchMatches(query).map(item => {
+    const product = item.product;
+    const barcode = getBarcode(product);
+    const name = getName(product) || 'Prodotto senza nome';
+    const supplier = getSupplier(product);
+    const label = name + (supplier ? ' - ' + supplier : '');
+    return `<option value="${escapeAttr(barcode)}" label="${escapeAttr(label)}"></option>`;
+  }).join('');
+}
+
+function selectedSalesManualProduct(){
+  const query = textValue(document.getElementById('salesManualProduct')?.value);
+  if(!query) return null;
+  const exactIndex = productIndexByBarcode(query);
+  if(exactIndex >= 0) return { product: products[exactIndex], index: exactIndex };
+  const first = saleSearchMatches(query)[0];
+  return first || null;
+}
+
+async function addManualSalesStat(){
+  const selected = selectedSalesManualProduct();
+  if(!selected){
+    setSalesStatsStatus('Cerca o seleziona un prodotto da aggiungere.', 'err');
+    return;
+  }
+  const qtyInput = document.getElementById('salesManualQty');
+  const qty = Math.round(Number(String(qtyInput?.value || '1').replace(',', '.')));
+  if(!Number.isFinite(qty) || qty <= 0){
+    setSalesStatsStatus('Quantità non valida.', 'err');
+    return;
+  }
+
+  const barcode = getBarcode(selected.product);
+  const item = { barcode, qty };
+  salesRecords.unshift({
+    id: 'sale_manual_' + Date.now(),
+    time: salesAdjustmentTime(salesDateRange()),
+    items: [item]
+  });
+  adjustProductQuantitiesForSaleItems([item], -1);
+  salesStatsAllSelected = false;
+  persistProducts(false);
+  persistSalesRecords(true);
+
+  const productInput = document.getElementById('salesManualProduct');
+  if(productInput) productInput.value = '';
+  if(qtyInput) qtyInput.value = '1';
+  renderSalesManualOptions();
+  renderSalesStats();
+  setSalesStatsStatus('Aggiunta vendita: ' + (getName(selected.product) || barcode) + ' x ' + qty + '.', 'ok');
+  await saveCloudAfterChange('Vendita aggiunta', { silentDropboxError: true });
 }
 
 function salesStatsCheckboxes(){
