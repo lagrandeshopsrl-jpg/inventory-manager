@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260518-filtro-lucchetto-selezionabile" />
+  <link rel="stylesheet" href="style.css?v=20260518-lucchetto-fornitori-destra" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -60,14 +60,14 @@
           <button tabindex="-1" onclick="deleteSelectedProducts()">Elimina selezionati</button>
           <button tabindex="-1" onclick="exportExcel()">Esporta Excel</button>
           <button tabindex="-1" onclick="bulkUpdateAutoSellPrices()">Aggiorna prezzi vendita</button>
-          <select id="productLockFilter" class="product-lock-filter" oninput="setProductLockFilter()" onchange="setProductLockFilter()">
+          <label class="file-label">Importa
+            <input type="file" accept=".csv,.xls,.xlsx,.xlsm,.ods" onchange="importExcel(event)" />
+          </label>
+          <select id="productLockFilter" class="product-lock-filter lock-filter-right" oninput="setProductLockFilter()" onchange="setProductLockFilter()">
             <option value="all">Tutti i prodotti</option>
             <option value="locked">Con lucchetto 🔒</option>
             <option value="unlocked">Senza lucchetto</option>
           </select>
-          <label class="file-label">Importa
-            <input type="file" accept=".csv,.xls,.xlsx,.xlsm,.ods" onchange="importExcel(event)" />
-          </label>
         </div>
         <div class="table-card">
           <table>
@@ -88,6 +88,11 @@
         <div class="supplier-top">
           <input id="supplierSearch" placeholder="Cerca fornitore..." oninput="renderSupplierFolders()" />
           <button tabindex="-1" onclick="showProducts()">Torna ai prodotti</button>
+          <select id="supplierLockFilter" class="supplier-lock-filter lock-filter-right" oninput="setSupplierLockFilter()" onchange="setSupplierLockFilter()">
+            <option value="all">Tutti i prodotti</option>
+            <option value="locked">Con lucchetto 🔒</option>
+            <option value="unlocked">Senza lucchetto</option>
+          </select>
         </div>
         <div id="supplierStats" class="supplier-stats"></div>
         <div id="supplierFolders" class="supplier-folders"></div>
@@ -309,6 +314,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260518-filtro-lucchetto-selezionabile"></script>
+  <script src="app.js?v=20260518-lucchetto-fornitori-destra"></script>
 </body>
 </html>

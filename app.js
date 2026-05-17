@@ -2176,6 +2176,10 @@ function getProductLockFilter(){
   return document.getElementById('productLockFilter')?.value || 'all';
 }
 
+function getSupplierLockFilter(){
+  return document.getElementById('supplierLockFilter')?.value || 'all';
+}
+
 function productMatchesLockFilter(product, filter){
   if(filter === 'locked') return getPriceLocked(product);
   if(filter === 'unlocked') return !getPriceLocked(product);
@@ -2185,6 +2189,14 @@ function productMatchesLockFilter(product, filter){
 function setProductLockFilter(){
   currentPage = 1;
   renderProducts();
+}
+
+function setSupplierLockFilter(){
+  if(openSupplierFolderName){
+    openSupplierFolder(openSupplierFolderName);
+    return;
+  }
+  renderSupplierFolders();
 }
 
 function renderProducts(){
@@ -2245,6 +2257,17 @@ function groupProductsBy(getGroupName){
   return groups;
 }
 
+function filteredGroupsByLock(groups, filter){
+  if(filter === 'all') return groups;
+  return Object.fromEntries(Object.entries(groups)
+    .map(([name, items]) => [name, items.filter(item => productMatchesLockFilter(item.product, filter))])
+    .filter(([, items]) => items.length));
+}
+
+function groupedProductCount(groups){
+  return Object.values(groups).reduce((sum, items) => sum + items.length, 0);
+}
+
 function renderFolderCards(containerId, groups, kind, emptyText){
   const container = document.getElementById(containerId);
   if(!container) return;
@@ -2265,8 +2288,8 @@ function renderFolderCards(containerId, groups, kind, emptyText){
 
 function renderSupplierFolders(){
   openSupplierFolderName = '';
-  const groups = groupProductsBy(supplierNameOf);
-  document.getElementById('supplierStats').innerHTML = `<div class="stat-box">Fornitori totali: ${Object.keys(groups).length}</div><div class="stat-box">Prodotti totali: ${products.length}</div>`;
+  const groups = filteredGroupsByLock(groupProductsBy(supplierNameOf), getSupplierLockFilter());
+  document.getElementById('supplierStats').innerHTML = `<div class="stat-box">Fornitori totali: ${Object.keys(groups).length}</div><div class="stat-box">Prodotti totali: ${groupedProductCount(groups)}</div>`;
   document.getElementById('supplierDetail').classList.add('hidden');
   document.getElementById('supplierFolders').classList.remove('hidden');
   renderFolderCards('supplierFolders', groups, 'supplier', 'Nessun fornitore trovato.');
@@ -2313,12 +2336,13 @@ function renderDetail(name, items, options){
         <button class="back-folder" onclick="${options.backFn}()">Torna alle cartelle</button>
       </div>
     </div>
-    <div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Categoria</th><th>Quantità</th><th>Azioni</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Categoria</th><th>Quantità</th><th>Azioni</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="empty-row">Nessun prodotto trovato</td></tr>'}</tbody></table></div>`;
 }
 
 function openSupplierFolder(name){
   openSupplierFolderName = String(name);
-  const items = groupProductsBy(supplierNameOf)[String(name)] || [];
+  const items = (groupProductsBy(supplierNameOf)[String(name)] || [])
+    .filter(item => productMatchesLockFilter(item.product, getSupplierLockFilter()));
   renderDetail(String(name), items, {
     mode: 'supplier',
     icon: '📁',
