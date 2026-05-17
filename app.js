@@ -187,7 +187,8 @@ function importSessionProduct(p){
     category: product.category,
     buyPrice: product.buyPrice,
     sellPrice: product.sellPrice,
-    quantity: product.quantity
+    quantity: product.quantity,
+    priceLocked: product.priceLocked
   };
 }
 
@@ -1157,7 +1158,6 @@ function renderSaleCurrentProduct(product, barcode){
   const code = textValue(barcode || getBarcode(product));
   const supplier = getSupplier(product) || '-';
   const buyPrice = formatPriceDisplay(getBuy(product));
-  const sellPrice = formatPriceDisplay(getSell(product));
   const cartQty = Number(saleCart[code] || 0);
   currentSaleBarcode = code;
   box.classList.remove('hidden');
@@ -1174,7 +1174,7 @@ function renderSaleCurrentProduct(product, barcode){
       </div>
       <div class="sale-current-prices">
         <div><span>Acquisto</span><strong>${escapeHTML(buyPrice)}</strong></div>
-        <div class="sale-current-sell-price"><span>Vendita</span><strong>${escapeHTML(sellPrice)}</strong></div>
+        <div class="sale-current-sell-price"><span>Vendita</span><strong>${sellPriceDisplayHTML(product)}</strong></div>
         <div><span>Nel carrello</span><strong>${cartQty}</strong></div>
       </div>
     </div>`;
@@ -1274,6 +1274,13 @@ function formatPriceDisplay(value, fallback = '-'){
   const number = salePriceNumber(raw);
   if(!Number.isFinite(number)) return raw;
   return number.toFixed(2);
+}
+
+function sellPriceDisplayHTML(product, fallback = '-'){
+  if(!product) return escapeHTML(fallback);
+  const price = formatPriceDisplay(getSell(product), fallback);
+  const lock = getPriceLocked(product) ? ' <span class="price-lock-icon" title="Prezzo vendita bloccato">🔒</span>' : '';
+  return `${escapeHTML(price)}${lock}`;
 }
 
 function saleMoney(value){
@@ -1538,7 +1545,7 @@ function renderSaleSearchResults(query = null){
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
         <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
-        <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
+        <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td><div class="action-buttons">
           <button class="edit-btn" data-sale-add-index="${item.index}">Aggiungi</button>
           <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(barcode)}">Modifica</button>
@@ -1589,7 +1596,6 @@ function renderSaleCart(){
   box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
       const buyPrice = item.product ? formatPriceDisplay(getBuy(item.product)) : '-';
-      const sellPrice = item.product ? formatPriceDisplay(getSell(item.product)) : '-';
       const supplier = item.product ? (getSupplier(item.product) || '-') : '-';
       return `<tr>
         <td><input type="checkbox" class="sale-cart-checkbox" data-barcode="${escapeAttr(item.barcode)}" ${saleCartAllSelected ? 'checked' : ''}></td>
@@ -1597,7 +1603,7 @@ function renderSaleCart(){
         <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
         <td>${escapeHTML(supplier)}</td>
         <td>${escapeHTML(buyPrice)}</td>
-        <td>${escapeHTML(sellPrice)}</td>
+        <td>${sellPriceDisplayHTML(item.product)}</td>
         <td>${item.qty}</td>
         <td><div class="action-buttons">
           <button class="edit-btn" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
@@ -1711,7 +1717,7 @@ function renderSalesManualOptions(){
     const barcode = getBarcode(product);
     const name = getName(product) || 'Prodotto senza nome';
     const supplier = getSupplier(product) || '-';
-    const sell = formatPriceDisplay(getSell(product));
+    const sell = sellPriceDisplayHTML(product);
     const selected = String(barcode) === String(query);
     return `<div class="sales-manual-result ${selected ? 'selected' : ''}">
       <button type="button" class="sales-manual-product-pick" data-sales-manual-pick="${escapeAttr(barcode)}">
@@ -1724,7 +1730,7 @@ function renderSalesManualOptions(){
         <button type="button" data-sales-manual-qty-action="plus" data-barcode="${escapeAttr(barcode)}">+</button>
       </div>
       <button type="button" class="sales-manual-row-add" data-sales-manual-add-barcode="${escapeAttr(barcode)}">Aggiungi</button>
-      <em>${escapeHTML(sell)}</em>
+      <em>${sell}</em>
     </div>`;
   }).join('');
   preview.classList.remove('hidden');
@@ -2024,7 +2030,7 @@ function renderProductSalesStats(box, records){
         <td>${escapeHTML(p ? (getSupplier(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? (getCategory(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
-        <td class="sell-price-cell">${escapeHTML(p ? formatPriceDisplay(getSell(p)) : '-')}</td>
+        <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td><strong>${data.qty}</strong></td>
         <td>${escapeHTML(formatDate(data.last))}</td>
         <td><button class="edit-btn" data-sales-qty-type="product" data-sales-qty-key="${escapeAttr(barcode)}" data-sales-qty-add-barcode="${escapeAttr(barcode)}">Modifica</button></td>
@@ -2065,7 +2071,7 @@ function renderSupplierSalesStats(box, records){
         <td>${Object.keys(data.products).length}</td>
         <td>${escapeHTML(topName)}</td>
         <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
-        <td class="sell-price-cell">${escapeHTML(p ? formatPriceDisplay(getSell(p)) : '-')}</td>
+        <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
         <td><span class="supplier-sales-open-note">Apri fornitore</span></td>
       </tr>${isOpen ? renderSupplierSalesProductDetail(supplier, data) : ''}`;
@@ -2091,7 +2097,7 @@ function renderSupplierSalesProductDetail(supplier, data){
                   <td>${escapeHTML(p ? getName(p) : 'Prodotto non trovato')}</td>
                   <td>${escapeHTML(barcode)}</td>
                   <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
-                  <td class="sell-price-cell">${escapeHTML(p ? formatPriceDisplay(getSell(p)) : '-')}</td>
+                  <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
                   <td><strong>${qty}</strong></td>
                   <td class="sales-total-cell">${escapeHTML(saleMoney(salesItemSellTotal(barcode, qty)))}</td>
                   <td>${escapeHTML(formatDate(data.productLast[barcode] || data.last))}</td>
@@ -2176,7 +2182,7 @@ function renderProducts(){
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
         <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
-        <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
+        <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td>${escapeHTML(getCategory(p) || '-')}</td>
         <td>${escapeHTML(formatStockQuantity(stockQuantityNumber(getQuantity(p))))}</td>
         <td><div class="action-buttons"><button class="edit-btn" onclick="openEditModal(${realIndex})">✎</button><button class="delete-btn" onclick="deleteProduct(${realIndex})">🗑</button></div></td>
@@ -2251,7 +2257,7 @@ function productRowsForDetail(items, mode){
       <td>${escapeHTML(getName(p))}</td>
       <td>${escapeHTML(getSupplier(p) || '-')}</td>
       <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
-      <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
+      <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
       <td>${escapeHTML(getCategory(p) || '-')}</td>
       <td>${escapeHTML(formatStockQuantity(stockQuantityNumber(getQuantity(p))))}</td>
       <td><button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button><button class="delete-btn" onclick="deleteProduct(${item.index})">Elimina</button></td>
@@ -2404,7 +2410,7 @@ function renderImportSessionBody(id){
           <td>${escapeHTML(p.name || '')}</td>
           <td>${escapeHTML(p.supplier || '')}</td>
           <td>${escapeHTML(formatPriceDisplay(p.buyPrice, ''))}</td>
-          <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(p.sellPrice, ''))}</td>
+          <td class="sell-price-cell">${sellPriceDisplayHTML(p, '')}</td>
           <td>${escapeHTML(p.category || '')}</td>
           <td>${escapeHTML(p.quantity || '')}</td>
         </tr>`;

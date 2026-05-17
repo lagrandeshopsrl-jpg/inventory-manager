@@ -566,6 +566,13 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   height:18px;
   accent-color:#0b63e5;
 }
+.price-lock-icon{
+  display:inline-block;
+  margin-left:5px;
+  color:#0f172a;
+  font-size:.9em;
+  vertical-align:baseline;
+}
 .sale-current-actions{
   margin-top:10px;
 }
