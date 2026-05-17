@@ -2616,6 +2616,16 @@ function getValue(row, keys){
   return '';
 }
 
+function importSellFromBuyIfMissing(buyValue, sellValue){
+  const sellText = textValue(sellValue);
+  if(sellText) return sellText;
+  const buyText = textValue(buyValue);
+  if(!buyText) return '';
+  const buyNumber = salePriceNumber(buyText);
+  if(!Number.isFinite(buyNumber) || buyNumber <= 0) return '';
+  return (buyNumber * 2).toFixed(2);
+}
+
 async function importExcel(event){
   const file = event.target.files[0];
   if(!file) return;
@@ -2640,14 +2650,16 @@ async function importExcel(event){
       let updated = 0;
 
       for(const row of rows){
+        const importBuyPrice = getValue(row, ['Acquisto','Prezzo Acquisto','BuyPrice','进价']);
+        const importSellPrice = getValue(row, ['Vendita','Prezzo Vendita','SellPrice','售价']);
         const product = canonicalProduct({
           barcode: getValue(row, ['Barcode','Codice','EAN','条码']),
           name: getValue(row, ['Prodotto','Nome','Product','商品']),
           supplier: getValue(row, ['Fornitore','Supplier','Nome Fornitore','供应商']),
           category: getValue(row, ['Categoria','Category','类别']),
           quantity: getValue(row, ['Quantità','Quantita','Qta','Qty','Quantity','Giacenza','Stock','数量','库存']),
-          buyPrice: getValue(row, ['Acquisto','Prezzo Acquisto','BuyPrice','进价']),
-          sellPrice: getValue(row, ['Vendita','Prezzo Vendita','SellPrice','售价'])
+          buyPrice: importBuyPrice,
+          sellPrice: importSellFromBuyIfMissing(importBuyPrice, importSellPrice)
         });
         if(!product.barcode) continue;
         const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
