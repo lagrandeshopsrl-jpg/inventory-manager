@@ -2,6 +2,7 @@ const STORAGE_PRODUCTS_KEY = 'products';
 const STORAGE_IMPORTS_KEY = 'importSessions';
 const STORAGE_SALES_KEY = 'salesRecords';
 const STORAGE_SALE_CART_KEY = 'saleCart';
+const STORAGE_SALE_CART_ORDER_KEY = 'saleCartOrder';
 const LAST_MODIFIED_KEY = 'inventory_lastModified';
 const DROPBOX_TOKEN_KEY = 'inventory_dropbox_token';
 const DROPBOX_TOKEN_EXPIRES_KEY = 'inventory_dropbox_token_expires_at';
@@ -22,6 +23,7 @@ let products = normalizeProductList(readJson(STORAGE_PRODUCTS_KEY, []));
 let importSessions = normalizeImportSessions(readJson(STORAGE_IMPORTS_KEY, []));
 let salesRecords = normalizeSalesRecords(readJson(STORAGE_SALES_KEY, []));
 let saleCart = normalizeSaleCart(readJson(STORAGE_SALE_CART_KEY, {}));
+let saleCartOrder = normalizeSaleCartOrder(readJson(STORAGE_SALE_CART_ORDER_KEY, []), saleCart);
 let currentPage = 1;
 let allSelected = false;
 let editingIndex = null;
@@ -34,6 +36,8 @@ let currentSaleBarcode = '';
 let saleCartAllSelected = false;
 let salesStatsAllSelected = false;
 let openSalesSupplierKey = '';
+let productBarcodeIndexCache = null;
+let saleScannerSearchTimer = 0;
 let barcodeCameraControls = null;
 let barcodeCameraStream = null;
 let barcodeCameraAnimation = 0;
@@ -266,6 +270,21 @@ function normalizeSaleCart(cart){
   return totals;
 }
 
+function normalizeSaleCartOrder(order, cart){
+  const known = new Set(Object.keys(normalizeSaleCart(cart)));
+  const result = [];
+  if(Array.isArray(order)){
+    order.forEach(barcode => {
+      const code = textValue(barcode);
+      if(code && known.has(code) && !result.includes(code)) result.push(code);
+    });
+  }
+  Object.keys(normalizeSaleCart(cart)).forEach(code => {
+    if(code && !result.includes(code)) result.push(code);
+  });
+  return result;
+}
+
 function compactSaleCart(cart){
   return normalizeSaleCart(cart);
 }
@@ -315,6 +334,7 @@ function safeSetStorage(key, value){
 
 function persistProducts(touch = true){
   products = normalizeProductList(products);
+  invalidateProductBarcodeIndex();
   try{
     safeSetStorage(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
   }catch(error){
@@ -348,7 +368,10 @@ function persistSalesRecords(touch = true){
 }
 
 function persistSaleCart(){
+  saleCart = normalizeSaleCart(saleCart);
+  saleCartOrder = normalizeSaleCartOrder(saleCartOrder, saleCart);
   safeSetStorage(STORAGE_SALE_CART_KEY, JSON.stringify(compactSaleCart(saleCart)));
+  safeSetStorage(STORAGE_SALE_CART_ORDER_KEY, JSON.stringify(saleCartOrder));
 }
 
 function persistAll(touch = true){
@@ -1051,9 +1074,26 @@ function productMatchesSearch(p, search){
     .some(value => String(value).toLowerCase().includes(search));
 }
 
+function invalidateProductBarcodeIndex(){
+  productBarcodeIndexCache = null;
+}
+
+function productBarcodeIndex(){
+  if(productBarcodeIndexCache) return productBarcodeIndexCache;
+  const map = new Map();
+  products.forEach((product, index) => {
+    const code = getBarcode(product);
+    if(code && !map.has(code)) map.set(code, index);
+  });
+  productBarcodeIndexCache = map;
+  return map;
+}
+
 function productIndexByBarcode(barcode){
   const code = String(barcode || '');
-  return products.findIndex(p => String(getBarcode(p)) === code);
+  if(!code) return -1;
+  const map = productBarcodeIndex();
+  return map.has(code) ? map.get(code) : -1;
 }
 
 function productForBarcode(barcode){
@@ -1085,10 +1125,27 @@ function clearSaleCurrentProduct(){
   box.classList.add('hidden');
 }
 
+function renderUnregisteredSaleProduct(barcode){
+  const code = textValue(barcode);
+  const box = document.getElementById('saleSearchResults');
+  clearSaleCurrentProduct();
+  setSaleStatus('Prodotto non registrato.', 'err');
+  if(!box) return;
+  box.innerHTML = `
+    <div class="sale-unregistered-box">
+      <div>
+        <strong>Prodotto non registrato</strong>
+        <span>${escapeHTML(code || 'Barcode non trovato')}</span>
+      </div>
+      <button type="button" data-register-sale-barcode="${escapeAttr(code)}">Registra prodotto</button>
+    </div>`;
+}
+
 function renderSaleCurrentProduct(product, barcode){
   const box = document.getElementById('saleCurrentProduct');
   if(!box || !product) return;
   const code = textValue(barcode || getBarcode(product));
+  const supplier = getSupplier(product) || '-';
   const buyPrice = formatPriceDisplay(getBuy(product));
   const sellPrice = formatPriceDisplay(getSell(product));
   const cartQty = Number(saleCart[code] || 0);
@@ -1100,6 +1157,7 @@ function renderSaleCurrentProduct(product, barcode){
       <div>
         <div class="sale-current-name">${escapeHTML(getName(product) || 'Prodotto senza nome')}</div>
         <div class="sale-current-barcode">${escapeHTML(code)}</div>
+        <div class="sale-current-supplier">Fornitore: <strong>${escapeHTML(supplier)}</strong></div>
         <div class="sale-current-actions">
           <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(code)}">Modifica</button>
         </div>
@@ -1209,6 +1267,25 @@ function saleCartSellTotal(items){
   }, 0);
 }
 
+function saleProductSortMode(){
+  return document.getElementById('saleProductSort')?.value || 'last-first';
+}
+
+function touchSaleCartOrder(barcode){
+  const code = textValue(barcode);
+  if(!code) return;
+  saleCartOrder = [code, ...saleCartOrder.filter(item => item !== code)];
+}
+
+function orderedSaleCartRows(rows){
+  saleCartOrder = normalizeSaleCartOrder(saleCartOrder, saleCart);
+  const rowByBarcode = new Map(rows.map(row => [row.barcode, row]));
+  const ordered = saleCartOrder
+    .map(barcode => rowByBarcode.get(barcode))
+    .filter(Boolean);
+  return saleProductSortMode() === 'first-last' ? [...ordered].reverse() : ordered;
+}
+
 function addProductIndexToSaleCart(index, qty = 1){
   if(index < 0 || index >= products.length) return false;
   return addBarcodeToSaleCart(getBarcode(products[index]), qty);
@@ -1229,11 +1306,11 @@ function addBarcodeToSaleCart(barcode, qty = 1){
   if(!code) return false;
   const product = productForBarcode(code);
   if(!product){
-    setSaleStatus('Prodotto non trovato: ' + code, 'err');
-    clearSaleCurrentProduct();
+    renderUnregisteredSaleProduct(code);
     return false;
   }
   saleCart[code] = Math.max(0, Number(saleCart[code] || 0) + Number(qty || 1));
+  touchSaleCartOrder(code);
   persistSaleCart();
   renderSaleCart();
   renderSalesStats();
@@ -1246,7 +1323,10 @@ function changeSaleCartQty(barcode, delta){
   const code = textValue(barcode);
   if(!code || !saleCart[code]) return;
   saleCart[code] = Math.max(0, Number(saleCart[code] || 0) + delta);
-  if(saleCart[code] <= 0) delete saleCart[code];
+  if(saleCart[code] <= 0){
+    delete saleCart[code];
+    saleCartOrder = saleCartOrder.filter(item => item !== code);
+  }
   persistSaleCart();
   renderSaleCart();
   const product = productForBarcode(code);
@@ -1258,6 +1338,7 @@ function removeSaleCartItem(barcode){
   const code = textValue(barcode);
   if(!code) return;
   delete saleCart[code];
+  saleCartOrder = saleCartOrder.filter(item => item !== code);
   persistSaleCart();
   renderSaleCart();
   clearSaleCurrentProduct();
@@ -1287,6 +1368,7 @@ function deleteSelectedSaleCartItems(){
     return;
   }
   selected.forEach(barcode => delete saleCart[barcode]);
+  saleCartOrder = saleCartOrder.filter(barcode => !selected.includes(barcode));
   saleCartAllSelected = false;
   persistSaleCart();
   renderSaleCart();
@@ -1301,6 +1383,7 @@ function clearSaleCart(){
   }
   saleCartAllSelected = false;
   saleCart = {};
+  saleCartOrder = [];
   persistSaleCart();
   renderSaleCart();
   clearSaleCurrentProduct();
@@ -1326,6 +1409,7 @@ async function confirmSaleCart(){
   adjustProductQuantitiesForSaleItems(items, -1);
   saleCartAllSelected = false;
   saleCart = {};
+  saleCartOrder = [];
   persistProducts(false);
   persistSalesRecords(true);
   persistSaleCart();
@@ -1357,7 +1441,7 @@ function renderSaleSearchResults(query = null){
     return;
   }
   if(!matches.length){
-    box.innerHTML = '<div class="sale-status err">Nessun prodotto trovato.</div>';
+    renderUnregisteredSaleProduct(search);
     return;
   }
   box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Azioni</th></tr></thead><tbody>
@@ -1404,9 +1488,9 @@ function renderSaleCart(){
   updateSaleCartSelectionUI();
   const box = document.getElementById('saleCartBox');
   if(!box) return;
-  const items = Object.entries(saleCart)
+  const items = orderedSaleCartRows(Object.entries(saleCart)
     .filter(([, qty]) => Number(qty) > 0)
-    .map(([barcode, qty]) => ({ barcode, qty: Number(qty), product: productForBarcode(barcode) }));
+    .map(([barcode, qty]) => ({ barcode, qty: Number(qty), product: productForBarcode(barcode) })));
   const totalSell = saleCartSellTotal(items);
   updateSaleBottomTotal(totalSell);
   if(!items.length){
@@ -1417,14 +1501,16 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
       const buyPrice = item.product ? formatPriceDisplay(getBuy(item.product)) : '-';
       const sellPrice = item.product ? formatPriceDisplay(getSell(item.product)) : '-';
+      const supplier = item.product ? (getSupplier(item.product) || '-') : '-';
       return `<tr>
         <td><input type="checkbox" class="sale-cart-checkbox" data-barcode="${escapeAttr(item.barcode)}" ${saleCartAllSelected ? 'checked' : ''}></td>
         <td>${escapeHTML(item.barcode)}</td>
         <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
+        <td>${escapeHTML(supplier)}</td>
         <td>${escapeHTML(buyPrice)}</td>
         <td>${escapeHTML(sellPrice)}</td>
         <td>${item.qty}</td>
@@ -1935,22 +2021,42 @@ function renderSupplierSalesProductDetail(supplier, data){
   </tr>`;
 }
 
+function clearSaleScannerSearchTimer(){
+  if(saleScannerSearchTimer){
+    clearTimeout(saleScannerSearchTimer);
+    saleScannerSearchTimer = 0;
+  }
+}
+
+function scheduleSaleScannerSearch(value){
+  clearSaleScannerSearchTimer();
+  const snapshot = textValue(value);
+  saleScannerSearchTimer = setTimeout(() => {
+    saleScannerSearchTimer = 0;
+    const search = document.getElementById('search');
+    if(currentView !== 'sales' || textValue(search?.value) !== snapshot) return;
+    renderSaleSearchResults(snapshot);
+  }, 180);
+}
+
 function handleScannerInput(){
   const search = document.getElementById('search');
   if(currentView === 'sales'){
     const value = textValue(search?.value);
     if(!value){
+      clearSaleScannerSearchTimer();
       renderSaleSearchResults();
       return;
     }
     const exactIndex = productIndexByBarcode(value);
     if(exactIndex >= 0){
+      clearSaleScannerSearchTimer();
       addProductIndexToSaleCart(exactIndex);
       clearSaleSearchResults(true);
       if(search) search.value = '';
       return;
     }
-    renderSaleSearchResults(value);
+    scheduleSaleScannerSearch(value);
     return;
   }
   if(currentView === 'products'){
@@ -2385,6 +2491,9 @@ async function saveEditProduct(){
   if(oldBarcode && oldBarcode !== product.barcode && saleCart[oldBarcode]){
     saleCart[product.barcode] = Number(saleCart[product.barcode] || 0) + Number(saleCart[oldBarcode] || 0);
     delete saleCart[oldBarcode];
+    saleCartOrder = saleCartOrder
+      .map(barcode => barcode === oldBarcode ? product.barcode : barcode)
+      .filter((barcode, index, list) => barcode && list.indexOf(barcode) === index);
     currentSaleBarcode = product.barcode;
     persistSaleCart();
   }else if(currentSaleBarcode === oldBarcode){
@@ -2396,11 +2505,18 @@ async function saveEditProduct(){
   renderCurrentView();
 }
 
-function openNewProductModal(){
+function openNewProductModal(prefillBarcode = ''){
   updateSupplierOptions();
   ['newBarcode','newName','newSupplier','newCategory','newQuantity','newBuy','newSell'].forEach(id => document.getElementById(id).value = '');
+  const barcode = textValue(prefillBarcode);
+  if(barcode) document.getElementById('newBarcode').value = barcode;
   document.getElementById('newProductModal').style.display = 'flex';
-  setTimeout(() => document.getElementById('newBarcode').focus(), 100);
+  setTimeout(() => document.getElementById(barcode ? 'newName' : 'newBarcode').focus(), 100);
+}
+
+function openNewProductFromSaleBarcode(barcode){
+  const code = textValue(barcode);
+  openNewProductModal(code);
 }
 
 function closeNewProductModal(){
@@ -2988,6 +3104,12 @@ document.addEventListener('click', function(event){
   const saleAdd = event.target.closest('[data-sale-add-index]');
   if(saleAdd){
     addProductIndexToSaleCart(Number(saleAdd.dataset.saleAddIndex));
+    return;
+  }
+
+  const saleRegister = event.target.closest('[data-register-sale-barcode]');
+  if(saleRegister){
+    openNewProductFromSaleBarcode(saleRegister.dataset.registerSaleBarcode);
     return;
   }
 
