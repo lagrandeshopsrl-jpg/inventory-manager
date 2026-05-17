@@ -2626,6 +2626,18 @@ function importSellFromBuyIfMissing(buyValue, sellValue){
   return (buyNumber * 2).toFixed(2);
 }
 
+function confirmImportSuppliers(productsToImport){
+  const suppliers = Array.from(new Set((productsToImport || [])
+    .map(product => getSupplier(product))
+    .filter(Boolean)));
+  if(suppliers.length <= 1) return true;
+  const preview = suppliers.slice(0, 8).join(', ');
+  const more = suppliers.length > 8 ? ` e altri ${suppliers.length - 8}` : '';
+  return confirm(
+    `Questo file contiene ${suppliers.length} fornitori diversi:\n${preview}${more}\n\nVuoi continuare con l'importazione?`
+  );
+}
+
 async function importExcel(event){
   const file = event.target.files[0];
   if(!file) return;
@@ -2648,6 +2660,7 @@ async function importExcel(event){
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
       let imported = 0;
       let updated = 0;
+      const importProducts = [];
 
       for(const row of rows){
         const importBuyPrice = getValue(row, ['Acquisto','Prezzo Acquisto','BuyPrice','进价']);
@@ -2662,6 +2675,16 @@ async function importExcel(event){
           sellPrice: importSellFromBuyIfMissing(importBuyPrice, importSellPrice)
         });
         if(!product.barcode) continue;
+        importProducts.push(product);
+      }
+
+      if(!confirmImportSuppliers(importProducts)){
+        event.target.value = '';
+        setCloudStatus('☁ Import annullato', 'err');
+        return;
+      }
+
+      for(const product of importProducts){
         const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
         if(existing >= 0){
           products[existing] = product;
