@@ -1272,8 +1272,6 @@ function selectedSaleCartBarcodes(){
 function updateSaleCartSelectionUI(){
   const btn = document.getElementById('toggleSaleCartSelectBtn');
   if(btn) btn.innerText = saleCartAllSelected ? 'Deseleziona carrello' : 'Seleziona carrello';
-  const headerCheckbox = document.querySelector('.sale-cart-header-checkbox');
-  if(headerCheckbox) headerCheckbox.checked = saleCartAllSelected;
 }
 
 function toggleSaleCartSelection(){
@@ -1419,7 +1417,7 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th><input type="checkbox" class="sale-cart-header-checkbox" data-sale-cart-select-all ${saleCartAllSelected ? 'checked' : ''} aria-label="Seleziona tutto il carrello"></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
       const buyPrice = item.product ? formatPriceDisplay(getBuy(item.product)) : '-';
       const sellPrice = item.product ? formatPriceDisplay(getSell(item.product)) : '-';
@@ -2990,14 +2988,6 @@ document.addEventListener('click', function(event){
   const saleAdd = event.target.closest('[data-sale-add-index]');
   if(saleAdd){
     addProductIndexToSaleCart(Number(saleAdd.dataset.saleAddIndex));
-    return;
-  }
-
-  const saleCartSelectAll = event.target.closest('[data-sale-cart-select-all]');
-  if(saleCartSelectAll){
-    saleCartAllSelected = Boolean(saleCartSelectAll.checked);
-    document.querySelectorAll('.sale-cart-checkbox').forEach(cb => cb.checked = saleCartAllSelected);
-    updateSaleCartSelectionUI();
     return;
   }
 
