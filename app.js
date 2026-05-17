@@ -1543,7 +1543,11 @@ function renderSalesManualOptions(){
         <strong>${escapeHTML(name)}</strong>
         <span>${escapeHTML(barcode)} · ${escapeHTML(supplier)}</span>
       </button>
-      <input class="sales-manual-row-qty" data-sales-manual-row-qty="${escapeAttr(barcode)}" type="number" min="1" step="1" value="1" inputmode="numeric">
+      <div class="sales-manual-qty-stepper">
+        <button type="button" data-sales-manual-qty-action="minus" data-barcode="${escapeAttr(barcode)}">-</button>
+        <input class="sales-manual-row-qty" data-sales-manual-row-qty="${escapeAttr(barcode)}" type="text" value="1" inputmode="numeric" pattern="[0-9]*">
+        <button type="button" data-sales-manual-qty-action="plus" data-barcode="${escapeAttr(barcode)}">+</button>
+      </div>
       <button type="button" class="sales-manual-row-add" data-sales-manual-add-barcode="${escapeAttr(barcode)}">Aggiungi</button>
       <em>${escapeHTML(sell)}</em>
     </div>`;
@@ -1564,6 +1568,14 @@ function salesManualRowQty(barcode){
   const input = Array.from(document.querySelectorAll('[data-sales-manual-row-qty]'))
     .find(el => String(el.dataset.salesManualRowQty) === String(barcode));
   return input ? input.value : '1';
+}
+
+function changeSalesManualQty(barcode, delta){
+  const input = Array.from(document.querySelectorAll('[data-sales-manual-row-qty]'))
+    .find(el => String(el.dataset.salesManualRowQty) === String(barcode));
+  if(!input) return;
+  const current = Math.max(1, Math.round(Number(String(input.value || '1').replace(',', '.'))) || 1);
+  input.value = String(Math.max(1, current + Number(delta || 0)));
 }
 
 async function addManualSalesStat(barcodeValue = '', qtyValue = null){
@@ -2925,6 +2937,13 @@ document.addEventListener('keydown', function(e){
 }, true);
 
 document.addEventListener('click', function(event){
+  const manualQtyAction = event.target.closest('[data-sales-manual-qty-action]');
+  if(manualQtyAction){
+    const direction = manualQtyAction.dataset.salesManualQtyAction === 'plus' ? 1 : -1;
+    changeSalesManualQty(manualQtyAction.dataset.barcode, direction);
+    return;
+  }
+
   const manualAdd = event.target.closest('[data-sales-manual-add-barcode]');
   if(manualAdd){
     const barcode = manualAdd.dataset.salesManualAddBarcode || '';
