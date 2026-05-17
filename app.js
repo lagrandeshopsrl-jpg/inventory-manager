@@ -1469,6 +1469,11 @@ function applySalesQuickRange(render = true){
   let end = now;
   if(quick.value === 'today'){
     start = startOfDay(now);
+  }else if(quick.value === 'yesterday'){
+    const yesterday = startOfDay(new Date(now));
+    yesterday.setDate(yesterday.getDate() - 1);
+    start = yesterday;
+    end = endOfDay(yesterday);
   }else if(quick.value === 'week'){
     start = startOfDay(new Date(now));
     const mondayOffset = (start.getDay() + 6) % 7;
@@ -1678,6 +1683,16 @@ function saleRecordInRange(record, range){
   return true;
 }
 
+function salesRecordsSellTotal(records){
+  return (records || []).reduce((sum, record) => {
+    return sum + (record.items || []).reduce((itemSum, item) => {
+      const product = productForBarcode(item.barcode);
+      const sellPrice = product ? salePriceNumber(getSell(product)) : 0;
+      return itemSum + (sellPrice * (Number(item.qty) || 0));
+    }, 0);
+  }, 0);
+}
+
 function renderSalesStats(){
   const box = document.getElementById('salesStatsBox');
   if(!box) return;
@@ -1687,8 +1702,11 @@ function renderSalesStats(){
   const range = salesDateRange();
   const filtered = salesRecords.filter(record => saleRecordInRange(record, range));
   const totalPieces = filtered.reduce((sum, record) => sum + record.items.reduce((itemSum, item) => itemSum + item.qty, 0), 0);
+  const totalSales = salesRecordsSellTotal(filtered);
   const count = document.getElementById('salesStatsCount');
   if(count) count.innerText = totalPieces + ' pezzi';
+  const total = document.getElementById('salesStatsTotal');
+  if(total) total.innerText = 'Totale vendita ' + saleMoney(totalSales);
 
   if(!filtered.length){
     salesStatsAllSelected = false;

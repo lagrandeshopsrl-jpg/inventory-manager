@@ -247,6 +247,13 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   margin:0;
   font-size:22px;
 }
+.sales-summary-badges{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+}
 .sales-badge{
   flex-shrink:0;
   background:#e0f2fe;
@@ -255,6 +262,11 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   border-radius:999px;
   padding:8px 12px;
   font-weight:900;
+}
+.sales-total-badge{
+  background:#dcfce7;
+  color:#14532d;
+  border-color:#86efac;
 }
 .sales-controls,.sales-filters{
   display:flex;

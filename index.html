@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260517-fornitore-collegato" />
+  <link rel="stylesheet" href="style.css?v=20260517-piu-venduti-totale" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -124,11 +124,15 @@
           <div class="sales-panel">
             <div class="sales-panel-header">
               <h2>Più venduti</h2>
-              <span id="salesStatsCount" class="sales-badge">0 vendite</span>
+              <div class="sales-summary-badges">
+                <span id="salesStatsCount" class="sales-badge">0 pezzi</span>
+                <span id="salesStatsTotal" class="sales-badge sales-total-badge">Totale vendita € 0,00</span>
+              </div>
             </div>
             <div class="sales-filters">
               <select id="salesQuickRange" onchange="applySalesQuickRange()">
                 <option value="today">Oggi</option>
+                <option value="yesterday">Ieri</option>
                 <option value="week">Settimana</option>
                 <option value="month">Mese</option>
                 <option value="year">Anno</option>
@@ -286,6 +290,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260517-quantita-zero-prodotti"></script>
+  <script src="app.js?v=20260517-piu-venduti-totale"></script>
 </body>
 </html>
