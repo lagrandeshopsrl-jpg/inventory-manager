@@ -572,6 +572,25 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   overflow:auto;
   padding-right:2px;
 }
+.sale-cart-tools{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.sale-cart-tools button{
+  border:none;
+  border-radius:14px;
+  padding:12px 14px;
+  background:#64748b;
+  color:white;
+  cursor:pointer;
+  font-weight:900;
+}
+.sale-cart-tools .sale-delete-selected{
+  background:#ef4444;
+}
 .sale-cart-section th{
   position:sticky;
   top:0;
@@ -654,7 +673,7 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 @media(max-width:560px){
   .sales-panel{padding:12px;border-radius:14px}
   .sales-panel-header{align-items:flex-start;flex-direction:column}
-  .sales-controls button,.sales-controls input,.sales-filters input,.sales-filters select,.sales-stat-actions button{width:100%;min-width:0}
+  .sales-controls button,.sales-controls input,.sales-filters input,.sales-filters select,.sales-stat-actions button,.sale-cart-tools button{width:100%;min-width:0}
   .sales-manual-result{grid-template-columns:1fr}
   .sales-manual-qty-stepper{grid-template-columns:1fr 1fr 1fr}
   .sales-manual-row-qty,.sales-manual-row-add{width:100%}

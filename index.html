@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260517-pulisci-ricerca-vendite" />
+  <link rel="stylesheet" href="style.css?v=20260517-tasti-carrello-spostati" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -99,13 +99,15 @@
               <input id="saleProductSearch" placeholder="Cerca prodotto o barcode..." oninput="renderSaleSearchResults()" />
               <button type="button" onclick="addFirstSaleSearchResult()">Aggiungi primo risultato</button>
               <button type="button" onclick="clearSaleSearchResults(true)">Pulisci ricerca</button>
-              <button type="button" id="toggleSaleCartSelectBtn" onclick="toggleSaleCartSelection()">Seleziona carrello</button>
-              <button type="button" class="sale-delete-selected" onclick="deleteSelectedSaleCartItems()">Elimina selezionati</button>
             </div>
             <div id="saleStatus" class="sale-status">Scansiona o cerca un prodotto, poi conferma la vendita.</div>
             <div id="saleCurrentProduct" class="sale-current-product hidden"></div>
             <div id="saleSearchResults" class="sales-results"></div>
             <div class="sale-cart-section">
+              <div class="sale-cart-tools">
+                <button type="button" id="toggleSaleCartSelectBtn" onclick="toggleSaleCartSelection()">Seleziona carrello</button>
+                <button type="button" class="sale-delete-selected" onclick="deleteSelectedSaleCartItems()">Elimina selezionati</button>
+              </div>
               <div id="saleCartBox"></div>
             </div>
             <div class="sale-bottom-actions">
@@ -295,6 +297,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260517-pulisci-ricerca-vendite"></script>
+  <script src="app.js?v=20260517-tasti-carrello-spostati"></script>
 </body>
 </html>
