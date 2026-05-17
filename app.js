@@ -1089,7 +1089,6 @@ function renderSaleCurrentProduct(product, barcode){
   const box = document.getElementById('saleCurrentProduct');
   if(!box || !product) return;
   const code = textValue(barcode || getBarcode(product));
-  const supplier = getSupplier(product) || '-';
   const buyPrice = formatPriceDisplay(getBuy(product));
   const sellPrice = formatPriceDisplay(getSell(product));
   const cartQty = Number(saleCart[code] || 0);
@@ -1101,7 +1100,6 @@ function renderSaleCurrentProduct(product, barcode){
       <div>
         <div class="sale-current-name">${escapeHTML(getName(product) || 'Prodotto senza nome')}</div>
         <div class="sale-current-barcode">${escapeHTML(code)}</div>
-        <div class="sale-current-supplier">Fornitore: <strong>${escapeHTML(supplier)}</strong></div>
         <div class="sale-current-actions">
           <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(code)}">Modifica</button>
         </div>
@@ -1209,26 +1207,6 @@ function saleCartSellTotal(items){
     const sellPrice = item.product ? salePriceNumber(getSell(item.product)) : 0;
     return sum + (sellPrice * item.qty);
   }, 0);
-}
-
-function saleProductSortMode(){
-  return document.getElementById('saleProductSort')?.value || 'name-asc';
-}
-
-function saleProductSortText(row){
-  const product = row.product || null;
-  const name = product ? getName(product) : '';
-  const barcode = product ? getBarcode(product) : row.barcode;
-  return textValue(name || barcode).toLocaleLowerCase('it');
-}
-
-function sortSaleProductRows(rows){
-  const direction = saleProductSortMode() === 'name-desc' ? -1 : 1;
-  return [...rows].sort((a, b) => {
-    const first = saleProductSortText(a);
-    const second = saleProductSortText(b);
-    return first.localeCompare(second, 'it', { numeric: true, sensitivity: 'base' }) * direction;
-  });
 }
 
 function addProductIndexToSaleCart(index, qty = 1){
@@ -1365,7 +1343,7 @@ function saleSearchMatches(query){
   products.forEach((product, index) => {
     if(productMatchesSearch(product, search)) matches.push({ product, index });
   });
-  return sortSaleProductRows(matches).slice(0, 25);
+  return matches.slice(0, 25);
 }
 
 function renderSaleSearchResults(query = null){
@@ -1426,9 +1404,9 @@ function renderSaleCart(){
   updateSaleCartSelectionUI();
   const box = document.getElementById('saleCartBox');
   if(!box) return;
-  const items = sortSaleProductRows(Object.entries(saleCart)
+  const items = Object.entries(saleCart)
     .filter(([, qty]) => Number(qty) > 0)
-    .map(([barcode, qty]) => ({ barcode, qty: Number(qty), product: productForBarcode(barcode) })));
+    .map(([barcode, qty]) => ({ barcode, qty: Number(qty), product: productForBarcode(barcode) }));
   const totalSell = saleCartSellTotal(items);
   updateSaleBottomTotal(totalSell);
   if(!items.length){
@@ -1439,16 +1417,14 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
       const buyPrice = item.product ? formatPriceDisplay(getBuy(item.product)) : '-';
       const sellPrice = item.product ? formatPriceDisplay(getSell(item.product)) : '-';
-      const supplier = item.product ? (getSupplier(item.product) || '-') : '-';
       return `<tr>
         <td><input type="checkbox" class="sale-cart-checkbox" data-barcode="${escapeAttr(item.barcode)}" ${saleCartAllSelected ? 'checked' : ''}></td>
         <td>${escapeHTML(item.barcode)}</td>
         <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
-        <td>${escapeHTML(supplier)}</td>
         <td>${escapeHTML(buyPrice)}</td>
         <td>${escapeHTML(sellPrice)}</td>
         <td>${item.qty}</td>
