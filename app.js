@@ -28,6 +28,8 @@ let currentPage = 1;
 let allSelected = false;
 let editingIndex = null;
 let currentView = 'products';
+let openSupplierFolderName = '';
+let openCategoryFolderName = '';
 let cloudLoading = false;
 let __barcodeLastValue = '';
 let dropboxFolderPickerPath = '';
@@ -990,6 +992,7 @@ function showProducts(){
 
 function showSuppliers(){
   currentView = 'suppliers';
+  openSupplierFolderName = '';
   setActive('suppliers');
   setPageVisibility('suppliers');
   setTitle('Fornitori', 'Cartelle fornitori / 供应商文件夹');
@@ -1034,6 +1037,7 @@ function showHistory(){
 
 function showCategories(){
   currentView = 'categories';
+  openCategoryFolderName = '';
   setActive('categories');
   setPageVisibility('categories');
   setTitle('Categorie', 'Prodotti per categoria / 产品类别');
@@ -1071,11 +1075,23 @@ function showSettings(){
 }
 
 function renderCurrentView(){
-  if(currentView === 'suppliers') renderSupplierFolders();
+  if(currentView === 'suppliers'){
+    if(openSupplierFolderName && groupProductsBy(supplierNameOf)[openSupplierFolderName]){
+      openSupplierFolder(openSupplierFolderName);
+    }else{
+      renderSupplierFolders();
+    }
+  }
   else if(currentView === 'sales') showSales();
   else if(currentView === 'topSales') showTopSales();
   else if(currentView === 'history') renderImportSessions();
-  else if(currentView === 'categories') renderCategoryFolders();
+  else if(currentView === 'categories'){
+    if(openCategoryFolderName && groupProductsBy(categoryNameOf)[openCategoryFolderName]){
+      openCategoryFolder(openCategoryFolderName);
+    }else{
+      renderCategoryFolders();
+    }
+  }
   else if(currentView === 'settings') showSettings();
   else renderProducts();
 }
@@ -2156,14 +2172,30 @@ function handleScannerInput(){
   }
 }
 
+function getProductLockFilter(){
+  return document.getElementById('productLockFilter')?.value || 'all';
+}
+
+function productMatchesLockFilter(product, filter){
+  if(filter === 'locked') return getPriceLocked(product);
+  if(filter === 'unlocked') return !getPriceLocked(product);
+  return true;
+}
+
+function setProductLockFilter(){
+  currentPage = 1;
+  renderProducts();
+}
+
 function renderProducts(){
   const search = (document.getElementById('search')?.value || '').toLowerCase();
+  const lockFilter = getProductLockFilter();
   const table = document.getElementById('productTable');
   if(!table) return;
 
   const matches = [];
   products.forEach((p, idx) => {
-    if(productMatchesSearch(p, search)) matches.push(idx);
+    if(productMatchesSearch(p, search) && productMatchesLockFilter(p, lockFilter)) matches.push(idx);
   });
 
   const totalPages = Math.max(1, Math.ceil(matches.length / itemsPerPage));
@@ -2232,6 +2264,7 @@ function renderFolderCards(containerId, groups, kind, emptyText){
 }
 
 function renderSupplierFolders(){
+  openSupplierFolderName = '';
   const groups = groupProductsBy(supplierNameOf);
   document.getElementById('supplierStats').innerHTML = `<div class="stat-box">Fornitori totali: ${Object.keys(groups).length}</div><div class="stat-box">Prodotti totali: ${products.length}</div>`;
   document.getElementById('supplierDetail').classList.add('hidden');
@@ -2240,6 +2273,7 @@ function renderSupplierFolders(){
 }
 
 function renderCategoryFolders(){
+  openCategoryFolderName = '';
   const groups = groupProductsBy(categoryNameOf);
   document.getElementById('categoryStats').innerHTML = `<div class="stat-box">Categorie totali: ${Object.keys(groups).length}</div><div class="stat-box">Prodotti totali: ${products.length}</div>`;
   document.getElementById('categoryDetail').classList.add('hidden');
@@ -2283,6 +2317,7 @@ function renderDetail(name, items, options){
 }
 
 function openSupplierFolder(name){
+  openSupplierFolderName = String(name);
   const items = groupProductsBy(supplierNameOf)[String(name)] || [];
   renderDetail(String(name), items, {
     mode: 'supplier',
@@ -2292,11 +2327,12 @@ function openSupplierFolder(name){
     selectAllFn: 'selectAllSupplierProducts',
     deselectAllFn: 'deselectAllSupplierProducts',
     deleteSelectedFn: 'deleteSelectedSupplierProducts',
-    backFn: 'renderSupplierFolders'
+    backFn: 'closeSupplierFolder'
   });
 }
 
 function openCategoryFolder(name){
+  openCategoryFolderName = String(name);
   const items = groupProductsBy(categoryNameOf)[String(name)] || [];
   renderDetail(String(name), items, {
     mode: 'category',
@@ -2306,8 +2342,18 @@ function openCategoryFolder(name){
     selectAllFn: 'selectAllCategoryProducts',
     deselectAllFn: 'deselectAllCategoryProducts',
     deleteSelectedFn: 'deleteSelectedCategoryProducts',
-    backFn: 'renderCategoryFolders'
+    backFn: 'closeCategoryFolder'
   });
+}
+
+function closeSupplierFolder(){
+  openSupplierFolderName = '';
+  renderSupplierFolders();
+}
+
+function closeCategoryFolder(){
+  openCategoryFolderName = '';
+  renderCategoryFolders();
 }
 
 function selectAllSupplierProducts(){ document.querySelectorAll('.supplier-product-checkbox').forEach(cb => cb.checked = true); }
