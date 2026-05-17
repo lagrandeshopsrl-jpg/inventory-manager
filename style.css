@@ -268,6 +268,11 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   color:#14532d;
   border-color:#86efac;
 }
+.sales-total-cell{
+  color:#14532d;
+  font-weight:900;
+  white-space:nowrap;
+}
 .sales-controls,.sales-filters{
   display:flex;
   flex-wrap:wrap;

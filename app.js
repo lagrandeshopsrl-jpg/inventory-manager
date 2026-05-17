@@ -1693,6 +1693,12 @@ function salesRecordsSellTotal(records){
   }, 0);
 }
 
+function salesItemSellTotal(barcode, qty){
+  const product = productForBarcode(barcode);
+  const sellPrice = product ? salePriceNumber(getSell(product)) : 0;
+  return sellPrice * (Number(qty) || 0);
+}
+
 function renderSalesStats(){
   const box = document.getElementById('salesStatsBox');
   if(!box) return;
@@ -1755,8 +1761,9 @@ function renderSupplierSalesStats(box, records){
     record.items.forEach(item => {
       const p = productForBarcode(item.barcode);
       const supplier = p ? supplierNameOf(p) : 'Senza fornitore';
-      if(!totals[supplier]) totals[supplier] = { qty: 0, products: {}, productLast: {}, last: '' };
+      if(!totals[supplier]) totals[supplier] = { qty: 0, totalSales: 0, products: {}, productLast: {}, last: '' };
       totals[supplier].qty += item.qty;
+      totals[supplier].totalSales += salesItemSellTotal(item.barcode, item.qty);
       totals[supplier].products[item.barcode] = (totals[supplier].products[item.barcode] || 0) + item.qty;
       if(!totals[supplier].productLast[item.barcode] || record.time > totals[supplier].productLast[item.barcode]){
         totals[supplier].productLast[item.barcode] = record.time;
@@ -1765,7 +1772,7 @@ function renderSupplierSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Totale vendita</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
     ${rows.map(([supplier, data], index) => {
       const top = Object.entries(data.products).sort((a, b) => b[1] - a[1])[0];
       const p = top ? productForBarcode(top[0]) : null;
@@ -1776,6 +1783,7 @@ function renderSupplierSalesStats(box, records){
         <td>${index + 1}</td>
         <td><button class="supplier-sales-name" data-sales-supplier-details="${escapeAttr(supplier)}">${escapeHTML(supplier)} <span>${isOpen ? '▲' : '▼'}</span></button></td>
         <td><strong>${data.qty}</strong></td>
+        <td class="sales-total-cell">${escapeHTML(saleMoney(data.totalSales))}</td>
         <td>${Object.keys(data.products).length}</td>
         <td>${escapeHTML(topName)}</td>
         <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
@@ -1791,12 +1799,12 @@ function renderSupplierSalesProductDetail(supplier, data){
   const productsRows = Object.entries(data.products).sort((a, b) => b[1] - a[1]);
   if(!productsRows.length) return '';
   return `<tr class="supplier-sales-detail-row">
-    <td colspan="10">
+    <td colspan="11">
       <div class="supplier-sales-detail">
         <div class="supplier-sales-detail-title">Prodotti venduti di ${escapeHTML(supplier)}: ${productsRows.length}</div>
         <div class="table-card supplier-sales-products">
           <table>
-            <thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Qta venduta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead>
+            <thead><tr><th>#</th><th>Prodotto</th><th>Barcode</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Qta venduta</th><th>Totale vendita</th><th>Ultima vendita</th><th>Azioni</th></tr></thead>
             <tbody>
               ${productsRows.map(([barcode, qty], index) => {
                 const p = productForBarcode(barcode);
@@ -1807,6 +1815,7 @@ function renderSupplierSalesProductDetail(supplier, data){
                   <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
                   <td class="sell-price-cell">${escapeHTML(p ? formatPriceDisplay(getSell(p)) : '-')}</td>
                   <td><strong>${qty}</strong></td>
+                  <td class="sales-total-cell">${escapeHTML(saleMoney(salesItemSellTotal(barcode, qty)))}</td>
                   <td>${escapeHTML(formatDate(data.productLast[barcode] || data.last))}</td>
                   <td><button class="edit-btn" data-sales-qty-type="product" data-sales-qty-key="${escapeAttr(barcode)}" data-sales-qty-add-barcode="${escapeAttr(barcode)}">Modifica</button></td>
                 </tr>`;
