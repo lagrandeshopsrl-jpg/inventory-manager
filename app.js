@@ -1356,7 +1356,7 @@ function renderSaleSearchResults(query = null){
     box.innerHTML = '<div class="sale-status err">Nessun prodotto trovato.</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th class="sell-price-header">Vendita</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Azioni</th></tr></thead><tbody>
     ${matches.map(item => {
       const p = item.product;
       const barcode = getBarcode(p);
@@ -1364,6 +1364,7 @@ function renderSaleSearchResults(query = null){
         <td>${escapeHTML(barcode)}</td>
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
+        <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
         <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
         <td><div class="action-buttons">
           <button class="edit-btn" data-sale-add-index="${item.index}">Aggiungi</button>
