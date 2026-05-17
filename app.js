@@ -1853,7 +1853,7 @@ function renderProducts(){
         <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
         <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
         <td>${escapeHTML(getCategory(p) || '-')}</td>
-        <td>${escapeHTML(getQuantity(p) || '-')}</td>
+        <td>${escapeHTML(formatStockQuantity(stockQuantityNumber(getQuantity(p))))}</td>
         <td><div class="action-buttons"><button class="edit-btn" onclick="openEditModal(${realIndex})">✎</button><button class="delete-btn" onclick="deleteProduct(${realIndex})">🗑</button></div></td>
       </tr>`;
     }).join('');
@@ -1928,7 +1928,7 @@ function productRowsForDetail(items, mode){
       <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
       <td class="sell-price-cell">${escapeHTML(formatPriceDisplay(getSell(p)))}</td>
       <td>${escapeHTML(getCategory(p) || '-')}</td>
-      <td>${escapeHTML(getQuantity(p) || '-')}</td>
+      <td>${escapeHTML(formatStockQuantity(stockQuantityNumber(getQuantity(p))))}</td>
       <td><button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button><button class="delete-btn" onclick="deleteProduct(${item.index})">Elimina</button></td>
     </tr>`;
   }).join('');
