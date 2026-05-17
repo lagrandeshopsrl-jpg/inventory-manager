@@ -1513,13 +1513,24 @@ function setSalesStatsStatus(text, type = ''){
 
 function renderSalesManualOptions(){
   const list = document.getElementById('salesManualProductOptions');
+  const preview = document.getElementById('salesManualPreview');
   if(!list) return;
   const query = textValue(document.getElementById('salesManualProduct')?.value);
   if(!query){
     list.innerHTML = '';
+    if(preview){
+      preview.innerHTML = '';
+      preview.classList.add('hidden');
+    }
     return;
   }
-  list.innerHTML = saleSearchMatches(query).map(item => {
+  const exactIndex = productIndexByBarcode(query);
+  const exact = exactIndex >= 0 ? { product: products[exactIndex], index: exactIndex } : null;
+  const matches = saleSearchMatches(query);
+  const visibleMatches = exact
+    ? [exact, ...matches.filter(item => getBarcode(item.product) !== getBarcode(exact.product)).slice(0, 4)]
+    : matches.slice(0, 5);
+  list.innerHTML = visibleMatches.map(item => {
     const product = item.product;
     const barcode = getBarcode(product);
     const name = getName(product) || 'Prodotto senza nome';
@@ -1527,6 +1538,25 @@ function renderSalesManualOptions(){
     const label = name + (supplier ? ' - ' + supplier : '');
     return `<option value="${escapeAttr(barcode)}" label="${escapeAttr(label)}"></option>`;
   }).join('');
+  if(!preview) return;
+  if(!visibleMatches.length){
+    preview.innerHTML = '<div class="sale-status err">Nessun prodotto trovato per questo barcode.</div>';
+    preview.classList.remove('hidden');
+    return;
+  }
+  preview.innerHTML = visibleMatches.map(item => {
+    const product = item.product;
+    const barcode = getBarcode(product);
+    const name = getName(product) || 'Prodotto senza nome';
+    const supplier = getSupplier(product) || '-';
+    const sell = formatPriceDisplay(getSell(product));
+    const selected = String(barcode) === String(query);
+    return `<button type="button" class="sales-manual-result ${selected ? 'selected' : ''}" data-sales-manual-pick="${escapeAttr(barcode)}">
+      <span><strong>${escapeHTML(name)}</strong><span>${escapeHTML(barcode)} · ${escapeHTML(supplier)}</span></span>
+      <em>${escapeHTML(sell)}</em>
+    </button>`;
+  }).join('');
+  preview.classList.remove('hidden');
 }
 
 function selectedSalesManualProduct(){
@@ -2896,6 +2926,14 @@ document.addEventListener('keydown', function(e){
 }, true);
 
 document.addEventListener('click', function(event){
+  const manualPick = event.target.closest('[data-sales-manual-pick]');
+  if(manualPick){
+    const input = document.getElementById('salesManualProduct');
+    if(input) input.value = manualPick.dataset.salesManualPick || '';
+    renderSalesManualOptions();
+    return;
+  }
+
   const supplierDetails = event.target.closest('[data-sales-supplier-details]');
   if(supplierDetails){
     toggleSalesSupplierProducts(supplierDetails.dataset.salesSupplierDetails);
