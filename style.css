@@ -415,7 +415,8 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .sales-stat-actions .sale-delete-selected{
   background:#ef4444;
 }
-.sales-controls button:nth-of-type(2){background:#64748b}
+.sales-controls .sale-clear-search{background:#64748b}
+.sales-controls .sale-add-first{background:#0b63e5}
 .sales-controls .sale-delete-selected{background:#ef4444}
 .confirm-sale{background:#16a34a;color:white}
 .sale-bottom-actions{
@@ -590,6 +591,16 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 }
 .sale-cart-tools .sale-delete-selected{
   background:#ef4444;
+}
+.sale-cart-checkbox,.sale-cart-header-checkbox{
+  width:18px;
+  height:18px;
+  accent-color:#ef4444;
+  cursor:pointer;
+}
+.sale-cart-header-checkbox{
+  width:20px;
+  height:20px;
 }
 .sale-cart-section th{
   position:sticky;
