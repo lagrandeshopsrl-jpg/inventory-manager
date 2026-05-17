@@ -1223,10 +1223,20 @@ function autoSellPriceNumberFromBuy(buyValue){
   return (buy * 2) + 1;
 }
 
+function roundAutoSellPriceDecimal(price){
+  const number = Number(price);
+  if(!Number.isFinite(number)) return '';
+  const cents = Math.round(number * 100);
+  const remainder = cents % 10;
+  const roundedCents = cents - remainder + (remainder >= 4 ? 10 : 0);
+  return roundedCents / 100;
+}
+
 function autoSellPriceTextFromBuy(buyValue){
   const price = autoSellPriceNumberFromBuy(buyValue);
   if(price === '') return '';
-  const fixed = Number(price).toFixed(2);
+  const roundedPrice = roundAutoSellPriceDecimal(price);
+  const fixed = Number(roundedPrice).toFixed(2);
   return fixed.endsWith('.00') ? String(Math.round(Number(price))) : fixed;
 }
 
