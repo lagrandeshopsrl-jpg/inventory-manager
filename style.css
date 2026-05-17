@@ -288,22 +288,15 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .sales-manual-add input:first-child{
   flex:2 1 320px;
 }
-.sales-manual-qty{
-  max-width:150px;
-}
 .sales-manual-preview{
   display:grid;
   gap:8px;
   margin:-2px 0 12px;
-  padding:10px;
-  border:1px solid #dbeafe;
-  border-radius:14px;
-  background:white;
 }
 .sales-manual-result{
   width:100%;
   display:grid;
-  grid-template-columns:1fr auto;
+  grid-template-columns:minmax(0,1fr) 110px 110px auto;
   align-items:center;
   gap:10px;
   text-align:left;
@@ -312,11 +305,20 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   background:#f8fafc;
   color:#0f172a;
   padding:10px 12px;
-  cursor:pointer;
 }
 .sales-manual-result:hover,.sales-manual-result.selected{
   border-color:#22c55e;
   background:#ecfdf5;
+}
+.sales-manual-product-pick{
+  min-width:0;
+  border:none;
+  background:transparent;
+  color:inherit;
+  padding:0;
+  cursor:pointer;
+  text-align:left;
+  font:inherit;
 }
 .sales-manual-result strong{
   display:block;
@@ -334,6 +336,24 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   font-style:normal;
   font-weight:900;
   white-space:nowrap;
+}
+.sales-manual-row-qty{
+  width:100%;
+  min-width:0;
+  padding:10px;
+  border:1px solid #d8e0ef;
+  border-radius:10px;
+  font-weight:900;
+  text-align:center;
+}
+.sales-manual-row-add{
+  border:none;
+  border-radius:10px;
+  padding:11px 12px;
+  background:#16a34a;
+  color:white;
+  cursor:pointer;
+  font-weight:900;
 }
 .sales-stat-actions{
   display:flex;
@@ -617,6 +637,8 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   .sales-panel{padding:12px;border-radius:14px}
   .sales-panel-header{align-items:flex-start;flex-direction:column}
   .sales-controls button,.sales-controls input,.sales-filters input,.sales-filters select,.sales-stat-actions button{width:100%;min-width:0}
+  .sales-manual-result{grid-template-columns:1fr}
+  .sales-manual-row-qty,.sales-manual-row-add{width:100%}
   .sale-current-main{grid-template-columns:1fr}
   .sale-current-prices{grid-template-columns:1fr}
   .sale-bottom-actions{grid-template-columns:1fr}

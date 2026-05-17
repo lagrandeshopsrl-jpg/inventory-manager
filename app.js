@@ -1512,16 +1512,12 @@ function setSalesStatsStatus(text, type = ''){
 }
 
 function renderSalesManualOptions(){
-  const list = document.getElementById('salesManualProductOptions');
   const preview = document.getElementById('salesManualPreview');
-  if(!list) return;
+  if(!preview) return;
   const query = textValue(document.getElementById('salesManualProduct')?.value);
   if(!query){
-    list.innerHTML = '';
-    if(preview){
-      preview.innerHTML = '';
-      preview.classList.add('hidden');
-    }
+    preview.innerHTML = '';
+    preview.classList.add('hidden');
     return;
   }
   const exactIndex = productIndexByBarcode(query);
@@ -1530,15 +1526,6 @@ function renderSalesManualOptions(){
   const visibleMatches = exact
     ? [exact, ...matches.filter(item => getBarcode(item.product) !== getBarcode(exact.product)).slice(0, 4)]
     : matches.slice(0, 5);
-  list.innerHTML = visibleMatches.map(item => {
-    const product = item.product;
-    const barcode = getBarcode(product);
-    const name = getName(product) || 'Prodotto senza nome';
-    const supplier = getSupplier(product);
-    const label = name + (supplier ? ' - ' + supplier : '');
-    return `<option value="${escapeAttr(barcode)}" label="${escapeAttr(label)}"></option>`;
-  }).join('');
-  if(!preview) return;
   if(!visibleMatches.length){
     preview.innerHTML = '<div class="sale-status err">Nessun prodotto trovato per questo barcode.</div>';
     preview.classList.remove('hidden');
@@ -1551,10 +1538,15 @@ function renderSalesManualOptions(){
     const supplier = getSupplier(product) || '-';
     const sell = formatPriceDisplay(getSell(product));
     const selected = String(barcode) === String(query);
-    return `<button type="button" class="sales-manual-result ${selected ? 'selected' : ''}" data-sales-manual-pick="${escapeAttr(barcode)}">
-      <span><strong>${escapeHTML(name)}</strong><span>${escapeHTML(barcode)} · ${escapeHTML(supplier)}</span></span>
+    return `<div class="sales-manual-result ${selected ? 'selected' : ''}">
+      <button type="button" class="sales-manual-product-pick" data-sales-manual-pick="${escapeAttr(barcode)}">
+        <strong>${escapeHTML(name)}</strong>
+        <span>${escapeHTML(barcode)} · ${escapeHTML(supplier)}</span>
+      </button>
+      <input class="sales-manual-row-qty" data-sales-manual-row-qty="${escapeAttr(barcode)}" type="number" min="1" step="1" value="1" inputmode="numeric">
+      <button type="button" class="sales-manual-row-add" data-sales-manual-add-barcode="${escapeAttr(barcode)}">Aggiungi</button>
       <em>${escapeHTML(sell)}</em>
-    </button>`;
+    </div>`;
   }).join('');
   preview.classList.remove('hidden');
 }
@@ -1568,21 +1560,29 @@ function selectedSalesManualProduct(){
   return first || null;
 }
 
-async function addManualSalesStat(){
-  const selected = selectedSalesManualProduct();
-  if(!selected){
+function salesManualRowQty(barcode){
+  const input = Array.from(document.querySelectorAll('[data-sales-manual-row-qty]'))
+    .find(el => String(el.dataset.salesManualRowQty) === String(barcode));
+  return input ? input.value : '1';
+}
+
+async function addManualSalesStat(barcodeValue = '', qtyValue = null){
+  const code = textValue(barcodeValue);
+  const selected = code
+    ? { product: productForBarcode(code), index: productIndexByBarcode(code) }
+    : selectedSalesManualProduct();
+  if(!selected || !selected.product){
     setSalesStatsStatus('Cerca o seleziona un prodotto da aggiungere.', 'err');
     return;
   }
-  const qtyInput = document.getElementById('salesManualQty');
-  const qty = Math.round(Number(String(qtyInput?.value || '1').replace(',', '.')));
+  const qty = Math.round(Number(String(qtyValue ?? '1').replace(',', '.')));
   if(!Number.isFinite(qty) || qty <= 0){
     setSalesStatsStatus('Quantità non valida.', 'err');
     return;
   }
 
-  const barcode = getBarcode(selected.product);
-  const item = { barcode, qty };
+  const selectedBarcode = getBarcode(selected.product);
+  const item = { barcode: selectedBarcode, qty };
   salesRecords.unshift({
     id: 'sale_manual_' + Date.now(),
     time: salesAdjustmentTime(salesDateRange()),
@@ -1595,10 +1595,9 @@ async function addManualSalesStat(){
 
   const productInput = document.getElementById('salesManualProduct');
   if(productInput) productInput.value = '';
-  if(qtyInput) qtyInput.value = '1';
   renderSalesManualOptions();
   renderSalesStats();
-  setSalesStatsStatus('Aggiunta vendita: ' + (getName(selected.product) || barcode) + ' x ' + qty + '.', 'ok');
+  setSalesStatsStatus('Aggiunta vendita: ' + (getName(selected.product) || selectedBarcode) + ' x ' + qty + '.', 'ok');
   await saveCloudAfterChange('Vendita aggiunta', { silentDropboxError: true });
 }
 
@@ -2926,6 +2925,13 @@ document.addEventListener('keydown', function(e){
 }, true);
 
 document.addEventListener('click', function(event){
+  const manualAdd = event.target.closest('[data-sales-manual-add-barcode]');
+  if(manualAdd){
+    const barcode = manualAdd.dataset.salesManualAddBarcode || '';
+    addManualSalesStat(barcode, salesManualRowQty(barcode));
+    return;
+  }
+
   const manualPick = event.target.closest('[data-sales-manual-pick]');
   if(manualPick){
     const input = document.getElementById('salesManualProduct');
