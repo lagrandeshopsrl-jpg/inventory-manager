@@ -3209,7 +3209,13 @@ function __focusBarcodeIfAllowed(){
 
   const ae = document.activeElement;
   const userTypingElsewhere =
-    ae && ae !== s && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+    ae && ae !== s && (
+      ae.tagName === 'INPUT' ||
+      ae.tagName === 'TEXTAREA' ||
+      ae.tagName === 'SELECT' ||
+      ae.tagName === 'BUTTON' ||
+      ae.isContentEditable
+    );
 
   if(userTypingElsewhere) return;
   if(document.activeElement !== s) s.focus({ preventScroll: true });
