@@ -403,6 +403,27 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   cursor:pointer;
   font-weight:900;
 }
+.sale-order-toggle{
+  display:flex;
+  gap:6px;
+  flex:0 0 auto;
+  padding:4px;
+  border:1px solid #d8e0ef;
+  border-radius:14px;
+  background:#eef4ff;
+}
+.sales-controls .sale-order-btn{
+  min-width:110px;
+  padding:10px 12px;
+  background:transparent;
+  color:#475569;
+  border-radius:10px;
+}
+.sales-controls .sale-order-btn.active{
+  background:#0b63e5;
+  color:white;
+  box-shadow:0 6px 14px rgba(11,99,229,.18);
+}
 .sales-stat-actions button{
   border:none;
   border-radius:14px;
@@ -722,6 +743,8 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   .sales-panel{padding:12px;border-radius:14px}
   .sales-panel-header{align-items:flex-start;flex-direction:column}
   .sales-controls button,.sales-controls input,.sales-controls select,.sales-filters input,.sales-filters select,.sales-stat-actions button,.sale-cart-tools button{width:100%;min-width:0}
+  .sale-order-toggle{width:100%;flex:1 1 100%}
+  .sales-controls .sale-order-btn{width:50%;min-width:0}
   .sales-manual-result{grid-template-columns:1fr}
   .sales-manual-qty-stepper{grid-template-columns:1fr 1fr 1fr}
   .sales-manual-row-qty,.sales-manual-row-add{width:100%}

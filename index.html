@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260517-prodotto-non-registrato" />
+  <link rel="stylesheet" href="style.css?v=20260517-ordine-carrello-pulsanti" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -97,10 +97,10 @@
             </div>
             <div class="sales-controls">
               <input id="saleProductSearch" placeholder="Cerca prodotto o barcode..." oninput="renderSaleSearchResults()" />
-              <select id="saleProductSort" onchange="renderSaleCart()">
-                <option value="last-first">Ultimo prodotto sopra</option>
-                <option value="first-last">Primo prodotto sopra</option>
-              </select>
+              <div class="sale-order-toggle" aria-label="Ordine carrello vendita">
+                <button type="button" class="sale-order-btn active" data-sale-order-mode="last-first" aria-pressed="true">Ultimo sopra</button>
+                <button type="button" class="sale-order-btn" data-sale-order-mode="first-last" aria-pressed="false">Primo sopra</button>
+              </div>
               <button type="button" class="sale-clear-search" onclick="clearSaleSearchResults(true)">Pulisci ricerca</button>
               <button type="button" class="sale-add-first" onclick="addFirstSaleSearchResult()">Aggiungi primo risultato</button>
             </div>
@@ -301,6 +301,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260517-prodotto-non-registrato"></script>
+  <script src="app.js?v=20260517-ordine-carrello-pulsanti"></script>
 </body>
 </html>

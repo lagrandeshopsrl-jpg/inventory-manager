@@ -1268,7 +1268,17 @@ function saleCartSellTotal(items){
 }
 
 function saleProductSortMode(){
-  return document.getElementById('saleProductSort')?.value || 'last-first';
+  return document.querySelector('.sale-order-btn.active')?.dataset.saleOrderMode || 'last-first';
+}
+
+function setSaleProductSortMode(mode){
+  const nextMode = mode === 'first-last' ? 'first-last' : 'last-first';
+  document.querySelectorAll('.sale-order-btn').forEach(btn => {
+    const active = btn.dataset.saleOrderMode === nextMode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  renderSaleCart();
 }
 
 function touchSaleCartOrder(barcode){
@@ -3104,6 +3114,12 @@ document.addEventListener('click', function(event){
   const saleAdd = event.target.closest('[data-sale-add-index]');
   if(saleAdd){
     addProductIndexToSaleCart(Number(saleAdd.dataset.saleAddIndex));
+    return;
+  }
+
+  const saleOrder = event.target.closest('[data-sale-order-mode]');
+  if(saleOrder){
+    setSaleProductSortMode(saleOrder.dataset.saleOrderMode);
     return;
   }
 
