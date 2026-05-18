@@ -1228,6 +1228,7 @@ function autoSellPriceNumberFromBuy(buyValue){
     [1.20, 2.50],
     [1.70, 3.50],
     [2.20, 4.50],
+    [2.50, 5.50],
     [3.20, 6.80],
     [3.50, 7.50],
     [4.00, 8.50],
@@ -2808,6 +2809,14 @@ function getValue(row, keys){
   return '';
 }
 
+function supplierNameFromFileName(fileName){
+  return textValue(fileName)
+    .replace(/\.[^.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function importSellFromBuyIfMissing(buyValue, sellValue){
   const sellText = textValue(sellValue);
   if(sellText) return sellText;
@@ -2838,6 +2847,7 @@ async function importExcel(event){
   const before = new Set(products.map(p => String(getBarcode(p))));
   const reader = new FileReader();
   const fileName = file.name.toLowerCase();
+  const supplierFromFileName = supplierNameFromFileName(file.name);
 
   reader.onload = async function(e){
     try{
@@ -2854,10 +2864,11 @@ async function importExcel(event){
         const importBuyPrice = getValue(row, ['Acquisto','Prezzo Acquisto','BuyPrice','进价']);
         const importSellPrice = getValue(row, ['Vendita','Prezzo Vendita','SellPrice','售价']);
         const importPriceLocked = getValue(row, ['Prezzo Bloccato','Bloccato','Lock','Locked','Lucchetto']);
+        const importSupplier = textValue(getValue(row, ['Fornitore','Supplier','Nome Fornitore','供应商'])) || supplierFromFileName;
         const product = canonicalProduct({
           barcode: getValue(row, ['Barcode','Codice','EAN','条码']),
           name: getValue(row, ['Prodotto','Nome','Product','商品']),
-          supplier: getValue(row, ['Fornitore','Supplier','Nome Fornitore','供应商']),
+          supplier: importSupplier,
           category: getValue(row, ['Categoria','Category','类别']),
           quantity: getValue(row, ['Quantità','Quantita','Qta','Qty','Quantity','Giacenza','Stock','数量','库存']),
           buyPrice: importBuyPrice,
