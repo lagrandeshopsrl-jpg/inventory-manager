@@ -2282,6 +2282,23 @@ function renderFolderCards(containerId, groups, kind, emptyText){
     return;
   }
   const dataName = kind === 'supplier' ? 'data-supplier-folder' : 'data-category-folder';
+  if(kind === 'supplier'){
+    container.innerHTML = names.map(name => `<div class="folder-card supplier-folder-card" ${dataName}="${escapeAttr(name)}">
+      <label class="supplier-folder-select" onclick="event.stopPropagation()">
+        <input type="checkbox" class="supplier-folder-checkbox" data-supplier-name="${escapeAttr(name)}" onchange="updateSupplierFolderSelectionUI()">
+        Seleziona
+      </label>
+      <div class="folder-icon">📁</div>
+      <div class="folder-name">${escapeHTML(name)}</div>
+      <div class="folder-count">${groups[name].length} prodotti</div>
+      <div class="folder-card-actions">
+        <div class="folder-open-hint">Clicca per aprire</div>
+        <button type="button" class="folder-export-btn" data-supplier-export="${escapeAttr(name)}">Esporta</button>
+      </div>
+    </div>`).join('');
+    updateSupplierFolderSelectionUI();
+    return;
+  }
   container.innerHTML = names.map(name => `<button class="folder-card" ${dataName}="${escapeAttr(name)}">
     <div class="folder-icon">${kind === 'supplier' ? '📁' : '▤'}</div>
     <div class="folder-name">${escapeHTML(name)}</div>
@@ -2296,6 +2313,122 @@ function renderSupplierFolders(){
   document.getElementById('supplierDetail').classList.add('hidden');
   document.getElementById('supplierFolders').classList.remove('hidden');
   renderFolderCards('supplierFolders', groups, 'supplier', 'Nessun fornitore trovato.');
+}
+
+function supplierFolderCheckboxes(){
+  return Array.from(document.querySelectorAll('.supplier-folder-checkbox'));
+}
+
+function updateSupplierFolderSelectionUI(){
+  supplierFolderCheckboxes().forEach(cb => {
+    cb.closest('.supplier-folder-card')?.classList.toggle('selected', cb.checked);
+  });
+}
+
+function selectVisibleSupplierFolders(){
+  supplierFolderCheckboxes().forEach(cb => cb.checked = true);
+  updateSupplierFolderSelectionUI();
+}
+
+function deselectSupplierFolders(){
+  supplierFolderCheckboxes().forEach(cb => cb.checked = false);
+  updateSupplierFolderSelectionUI();
+}
+
+function selectedSupplierFolderNames(){
+  return supplierFolderCheckboxes()
+    .filter(cb => cb.checked)
+    .map(cb => cb.dataset.supplierName || '')
+    .filter(Boolean);
+}
+
+async function deleteSelectedSupplierFolders(){
+  const selected = selectedSupplierFolderNames();
+  if(!selected.length){
+    alert('Seleziona almeno un fornitore da eliminare.');
+    return;
+  }
+  const selectedSet = new Set(selected.map(String));
+  const indexes = [];
+  products.forEach((product, index) => {
+    if(selectedSet.has(supplierNameOf(product))) indexes.push(index);
+  });
+  if(!indexes.length){
+    alert('Nessun prodotto trovato per i fornitori selezionati.');
+    renderSupplierFolders();
+    return;
+  }
+  const supplierList = selected.slice(0, 6).join(', ') + (selected.length > 6 ? '...' : '');
+  if(!confirm(`Eliminare ${selected.length} fornitori selezionati e ${indexes.length} prodotti collegati?\n\nFornitori: ${supplierList}\n\nQuesta operazione elimina i prodotti dalla lista. Procedere?`)) return;
+  indexes.sort((a,b) => b - a).forEach(index => products.splice(index, 1));
+  openSupplierFolderName = '';
+  persistProducts(true);
+  await saveCloudAfterChange('Fornitori eliminati');
+  renderSupplierFolders();
+}
+
+function excelRowsForProducts(list){
+  return list.map(p => ({
+    Barcode: getBarcode(p),
+    Prodotto: getName(p),
+    Fornitore: getSupplier(p),
+    Acquisto: formatPriceDisplay(getBuy(p), ''),
+    Vendita: formatPriceDisplay(getSell(p), ''),
+    Categoria: getCategory(p),
+    Quantità: getQuantity(p),
+    'Prezzo Bloccato': getPriceLocked(p) ? 'SI' : ''
+  }));
+}
+
+function safeFileNamePart(value){
+  return String(value || 'fornitore')
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '_')
+    .slice(0, 80) || 'fornitore';
+}
+
+function exportProductListExcel(list, fileName, emptyMessage){
+  if(!window.XLSX){
+    alert('Libreria Excel non disponibile');
+    return;
+  }
+  if(!list.length){
+    alert(emptyMessage || 'Nessun prodotto da esportare');
+    return;
+  }
+  const ws = XLSX.utils.json_to_sheet(excelRowsForProducts(list));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Prodotti');
+  XLSX.writeFile(wb, fileName);
+}
+
+function productsForSupplierNames(names){
+  const selectedSet = new Set(names.map(String));
+  return products.filter(product => selectedSet.has(supplierNameOf(product)));
+}
+
+function exportSupplierExcel(name){
+  const supplierName = String(name || '');
+  const list = productsForSupplierNames([supplierName]);
+  exportProductListExcel(
+    list,
+    `fornitore_${safeFileNamePart(supplierName)}.xlsx`,
+    'Nessun prodotto trovato per questo fornitore.'
+  );
+}
+
+function exportSelectedSupplierFolders(){
+  const selected = selectedSupplierFolderNames();
+  if(!selected.length){
+    alert('Seleziona almeno un fornitore da esportare.');
+    return;
+  }
+  const list = productsForSupplierNames(selected);
+  const fileName = selected.length === 1
+    ? `fornitore_${safeFileNamePart(selected[0])}.xlsx`
+    : `fornitori_selezionati_${selected.length}.xlsx`;
+  exportProductListExcel(list, fileName, 'Nessun prodotto trovato per i fornitori selezionati.');
 }
 
 function renderCategoryFolders(){
@@ -2333,6 +2466,7 @@ function renderDetail(name, items, options){
   detail.innerHTML = `<div class="supplier-detail-header">
       <h2>${escapeHTML(options.icon + ' ' + name)}</h2>
       <div class="supplier-detail-actions">
+        ${options.mode === 'supplier' ? `<button type="button" data-supplier-export="${escapeAttr(name)}">Esporta fornitore</button>` : ''}
         <button onclick="${options.selectAllFn}()">Seleziona tutti</button>
         <button onclick="${options.deselectAllFn}()">Deseleziona</button>
         <button class="danger" onclick="${options.deleteSelectedFn}()">Elimina selezionati</button>
@@ -2825,24 +2959,7 @@ function prevPage(){
 }
 
 function exportExcel(){
-  if(!window.XLSX){
-    alert('Libreria Excel non disponibile');
-    return;
-  }
-  const rows = products.map(p => ({
-    Barcode: getBarcode(p),
-    Prodotto: getName(p),
-    Fornitore: getSupplier(p),
-    Acquisto: formatPriceDisplay(getBuy(p), ''),
-    Vendita: formatPriceDisplay(getSell(p), ''),
-    Categoria: getCategory(p),
-    Quantità: getQuantity(p),
-    'Prezzo Bloccato': getPriceLocked(p) ? 'SI' : ''
-  }));
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Prodotti');
-  XLSX.writeFile(wb, 'prodotti.xlsx');
+  exportProductListExcel(products, 'prodotti.xlsx', 'Nessun prodotto da esportare');
 }
 
 function normalizeKey(key){
@@ -3445,6 +3562,18 @@ document.addEventListener('click', function(event){
     if(action === 'plus') changeSaleCartQty(barcode, 1);
     else if(action === 'minus') changeSaleCartQty(barcode, -1);
     else if(action === 'remove') removeSaleCartItem(barcode);
+    return;
+  }
+
+  const supplierExport = event.target.closest('[data-supplier-export]');
+  if(supplierExport){
+    exportSupplierExcel(supplierExport.dataset.supplierExport);
+    return;
+  }
+
+  const supplierSelect = event.target.closest('.supplier-folder-select');
+  if(supplierSelect){
+    updateSupplierFolderSelectionUI();
     return;
   }
 

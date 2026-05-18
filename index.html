@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260518-cronologia-sicura" />
+  <link rel="stylesheet" href="style.css?v=20260518-fornitori-selezione-export" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -87,6 +87,10 @@
         <div class="supplier-top">
           <input id="supplierSearch" placeholder="Cerca fornitore..." oninput="renderSupplierFolders()" />
           <button tabindex="-1" onclick="showProducts()">Torna ai prodotti</button>
+          <button tabindex="-1" onclick="selectVisibleSupplierFolders()">Seleziona tutti</button>
+          <button tabindex="-1" onclick="deselectSupplierFolders()">Deseleziona</button>
+          <button tabindex="-1" onclick="exportSelectedSupplierFolders()">Esporta selezionati</button>
+          <button tabindex="-1" class="danger" onclick="deleteSelectedSupplierFolders()">Elimina fornitori selezionati</button>
           <select id="supplierLockFilter" class="supplier-lock-filter lock-filter-right" oninput="setSupplierLockFilter()" onchange="setSupplierLockFilter()">
             <option value="all">Tutti i prodotti</option>
             <option value="locked">Con lucchetto 🔒</option>
@@ -313,6 +317,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260518-cronologia-sicura"></script>
+  <script src="app.js?v=20260518-fornitori-selezione-export"></script>
 </body>
 </html>
