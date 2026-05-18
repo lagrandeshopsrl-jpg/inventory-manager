@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260518-cronologia-modifica" />
+  <link rel="stylesheet" href="style.css?v=20260518-cronologia-sicura" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -49,7 +49,6 @@
         <div class="top-actions">
           <span id="cloudStatus" class="cloud-status">☁ Locale</span>
           <button tabindex="-1" class="blue-btn" onclick="syncNow()">Sincronizza dati</button>
-          <button tabindex="-1" class="blue-btn" onclick="freeBrowserMemory()">Libera memoria</button>
           <button tabindex="-1" class="blue-btn" onclick="openNewProductModal()">＋ Nuovo Prodotto</button>
         </div>
       </div>
@@ -181,7 +180,7 @@
       <section id="historyPage" class="hidden">
         <div class="history-top">
           <input id="historySearch" placeholder="Cerca importazione..." oninput="renderImportSessions()" />
-          <button tabindex="-1" onclick="clearImportSessions()">Svuota cronologia</button>
+          <button tabindex="-1" onclick="clearImportSessions()">Svuota tutta la cronologia</button>
         </div>
         <div id="importSessionsList"></div>
       </section>
@@ -314,6 +313,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260518-cronologia-modifica"></script>
+  <script src="app.js?v=20260518-cronologia-sicura"></script>
 </body>
 </html>

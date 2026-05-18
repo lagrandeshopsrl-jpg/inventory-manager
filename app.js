@@ -16,6 +16,7 @@ const DROPBOX_OAUTH_VERIFIER_KEY = 'inventory_dropbox_oauth_verifier';
 const DROPBOX_OAUTH_REDIRECT_KEY = 'inventory_dropbox_oauth_redirect';
 const DEFAULT_DROPBOX_PATH = '/inventory_manager_snapshot.json';
 const DEFAULT_DROPBOX_BACKUP_FOLDER = '/inventory_manager_backups';
+const IMPORT_HISTORY_RETENTION_DAYS = 30;
 const itemsPerPage = 100;
 const importSessionPageSize = 200;
 
@@ -2415,6 +2416,7 @@ async function deleteSelectedCategoryProducts(){
 }
 
 function renderImportSessions(){
+  pruneOldImportSessions(false);
   const search = (document.getElementById('historySearch')?.value || '').toLowerCase();
   const box = document.getElementById('importSessionsList');
   const sessions = importSessions.filter(s => String(s.fileName || '').toLowerCase().includes(search));
@@ -2436,7 +2438,10 @@ function renderImportSessions(){
       </div>
       <div class="import-session-actions">
         <button class="session-open" data-history-action="toggle" data-session-id="${escapeAttr(session.id)}">Apri / Chiudi</button>
-        <button class="session-delete" data-history-action="delete-all" data-session-id="${escapeAttr(session.id)}">Elimina importazione</button>
+      </div>
+      <div class="history-cache-tools">
+        <span>Solo cronologia</span>
+        <button class="history-cache-delete" data-history-action="delete-history" data-session-id="${escapeAttr(session.id)}">Elimina da cronologia</button>
       </div>
     </div>
     <div class="import-session-body" data-session-id="${escapeAttr(session.id)}" style="${openImportSessionIds.has(String(session.id)) ? 'display:block' : ''}">
@@ -2554,16 +2559,35 @@ function deleteProductsByBarcodes(barcodes){
   persistProducts(false);
 }
 
-async function deleteWholeImportSession(id){
+function cleanupImportSessionState(id){
+  delete importSessionPages[id];
+  openImportSessionIds.delete(String(id));
+}
+
+function pruneOldImportSessions(touch = true){
+  const cutoff = Date.now() - (IMPORT_HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const before = importSessions.length;
+  importSessions = importSessions.filter(session => {
+    const time = new Date(session.time).getTime();
+    return !Number.isFinite(time) || time >= cutoff;
+  });
+  if(importSessions.length === before) return 0;
+  const remainingIds = new Set(importSessions.map(session => String(session.id)));
+  openImportSessionIds.forEach(id => {
+    if(!remainingIds.has(String(id))) cleanupImportSessionState(id);
+  });
+  persistImportSessions(touch);
+  return before - importSessions.length;
+}
+
+async function deleteImportSessionFromHistory(id){
   const session = importSessions.find(s => s.id === String(id));
   if(!session) return;
-  if(!confirm('Eliminare TUTTI i prodotti di questa importazione?')) return;
-  const barcodes = sessionBarcodes(session);
-  deleteProductsByBarcodes(barcodes);
+  if(!confirm('Eliminare questa voce dalla cronologia? I prodotti importati restano salvati.')) return;
   importSessions = importSessions.filter(s => s.id !== String(id));
-  openImportSessionIds.delete(String(id));
-  persistAll(true);
-  await saveCloudAfterChange('Importazione eliminata');
+  cleanupImportSessionState(id);
+  persistImportSessions(true);
+  await saveCloudAfterChange('Cronologia aggiornata');
   renderImportSessions();
 }
 
@@ -2584,7 +2608,7 @@ async function deleteSelectedImportProducts(id){
     session.count = session.barcodes.length;
     if(!session.barcodes.length){
       importSessions = importSessions.filter(s => s.id !== String(id));
-      openImportSessionIds.delete(String(id));
+      cleanupImportSessionState(id);
     }
   }
   persistAll(true);
@@ -2593,7 +2617,7 @@ async function deleteSelectedImportProducts(id){
 }
 
 async function clearImportSessions(){
-  if(!confirm('Svuotare cronologia importazioni?')) return;
+  if(!confirm('Svuotare tutta la cronologia importazioni? I prodotti restano salvati.')) return;
   importSessions = [];
   openImportSessionIds.clear();
   persistAll(true);
@@ -3441,7 +3465,7 @@ document.addEventListener('click', function(event){
     const id = historyAction.dataset.sessionId;
     const action = historyAction.dataset.historyAction;
     if(action === 'toggle') toggleImportSession(id);
-    else if(action === 'delete-all') deleteWholeImportSession(id);
+    else if(action === 'delete-history') deleteImportSessionFromHistory(id);
     else if(action === 'select-all') selectImportProducts(id);
     else if(action === 'deselect-all') deselectImportProducts(id);
     else if(action === 'delete-selected') deleteSelectedImportProducts(id);
@@ -3471,6 +3495,7 @@ window.onload = async function(){
       throw error;
     }
   }
+  pruneOldImportSessions(false);
   if(!localStorage.getItem(DROPBOX_PATH_KEY)) setDropboxPath(DEFAULT_DROPBOX_PATH);
   showSales();
   installAutoSellPriceFromBuy();
