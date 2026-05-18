@@ -1154,6 +1154,30 @@ function clearSaleCurrentProduct(){
   box.classList.add('hidden');
 }
 
+function clearMainScannerInput(expectedValue = null){
+  const search = document.getElementById('search');
+  clearSaleScannerSearchTimer();
+  if(!search) return;
+  const expected = expectedValue === null ? null : textValue(expectedValue);
+  if(expected !== null && textValue(search.value) !== expected) return;
+  search.value = '';
+  __barcodeLastValue = '';
+}
+
+function focusMainScannerForNextScan(){
+  const search = document.getElementById('search');
+  if(!search || !['products', 'sales'].includes(currentView) || __modalOpen()) return;
+  search.focus({ preventScroll: true });
+}
+
+function prepareScannerForNextSaleScan(){
+  clearMainScannerInput();
+  clearSaleSearchResults(true);
+  focusMainScannerForNextScan();
+  setTimeout(focusMainScannerForNextScan, 80);
+  setTimeout(focusMainScannerForNextScan, 250);
+}
+
 function renderUnregisteredSaleProduct(barcode){
   const code = textValue(barcode);
   const box = document.getElementById('saleSearchResults');
@@ -1168,6 +1192,7 @@ function renderUnregisteredSaleProduct(barcode){
       </div>
       <button type="button" data-register-sale-barcode="${escapeAttr(code)}">Registra prodotto</button>
     </div>`;
+  clearMainScannerInput(code);
 }
 
 function renderSaleCurrentProduct(product, barcode){
@@ -1430,6 +1455,22 @@ function addBarcodeToSaleCart(barcode, qty = 1){
   return true;
 }
 
+function prepareSalesAfterProductSave(product){
+  if(currentView !== 'sales' || !product) return;
+  const code = getBarcode(product);
+  clearMainScannerInput();
+  clearSaleSearchResults(true);
+  if(code){
+    currentSaleBarcode = code;
+    renderSaleCurrentProduct(product, code);
+  }
+  setSaleStatus('Prodotto salvato. Scansiona per aggiungerlo al carrello.', 'ok');
+  setTimeout(() => {
+    const search = document.getElementById('search');
+    if(search) search.focus({ preventScroll: true });
+  }, 80);
+}
+
 function changeSaleCartQty(barcode, delta){
   const code = textValue(barcode);
   if(!code || !saleCart[code]) return;
@@ -1490,6 +1531,7 @@ function deleteSelectedSaleCartItems(){
 function clearSaleCart(){
   if(!saleCartTotal()){
     setSaleStatus('Carrello gia vuoto.');
+    prepareScannerForNextSaleScan();
     return;
   }
   saleCartAllSelected = false;
@@ -1498,6 +1540,7 @@ function clearSaleCart(){
   persistSaleCart();
   renderSaleCart();
   clearSaleCurrentProduct();
+  prepareScannerForNextSaleScan();
   setSaleStatus('Carrello svuotato.', 'ok');
 }
 
@@ -1507,6 +1550,7 @@ async function confirmSaleCart(){
     .filter(item => item.barcode && item.qty > 0);
   if(!items.length){
     setSaleStatus('Aggiungi almeno un prodotto prima di confermare.', 'err');
+    prepareScannerForNextSaleScan();
     return;
   }
 
@@ -1526,9 +1570,11 @@ async function confirmSaleCart(){
   persistSaleCart();
   renderSaleCart();
   clearSaleCurrentProduct();
+  prepareScannerForNextSaleScan();
   renderSalesStats();
   const cloudResult = await saveCloudAfterChange('Vendita salvata', { silentDropboxError: true });
   setSaleStatus(cloudResult.synced ? 'Vendita confermata e sincronizzata.' : 'Vendita confermata sul dispositivo.', cloudResult.synced ? 'ok' : '');
+  prepareScannerForNextSaleScan();
 }
 
 function saleSearchMatches(query){
@@ -2919,11 +2965,14 @@ async function saveNewProduct(){
   if(existing >= 0) products[existing] = product;
   else products.unshift(product);
 
+  const wasSalesView = currentView === 'sales';
   persistProducts(true);
   closeNewProductModal();
   currentPage = 1;
+  if(wasSalesView) prepareSalesAfterProductSave(product);
   await saveCloudAfterChange('Salvato');
   renderCurrentView();
+  if(wasSalesView) prepareSalesAfterProductSave(product);
 }
 
 async function deleteProduct(index){
