@@ -2284,9 +2284,8 @@ function renderFolderCards(containerId, groups, kind, emptyText){
   const dataName = kind === 'supplier' ? 'data-supplier-folder' : 'data-category-folder';
   if(kind === 'supplier'){
     container.innerHTML = names.map(name => `<div class="folder-card supplier-folder-card" ${dataName}="${escapeAttr(name)}">
-      <label class="supplier-folder-select" onclick="event.stopPropagation()">
+      <label class="supplier-folder-select" title="Seleziona fornitore" aria-label="Seleziona fornitore" onclick="event.stopPropagation()">
         <input type="checkbox" class="supplier-folder-checkbox" data-supplier-name="${escapeAttr(name)}" onchange="updateSupplierFolderSelectionUI()">
-        Seleziona
       </label>
       <div class="folder-icon">📁</div>
       <div class="folder-name">${escapeHTML(name)}</div>
