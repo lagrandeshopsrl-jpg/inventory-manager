@@ -34,6 +34,7 @@ let cloudLoading = false;
 let __barcodeLastValue = '';
 let dropboxFolderPickerPath = '';
 let importSessionPages = {};
+let openImportSessionIds = new Set();
 let currentSaleBarcode = '';
 let saleCartAllSelected = false;
 let salesStatsAllSelected = false;
@@ -2417,6 +2418,7 @@ function renderImportSessions(){
   const search = (document.getElementById('historySearch')?.value || '').toLowerCase();
   const box = document.getElementById('importSessionsList');
   const sessions = importSessions.filter(s => String(s.fileName || '').toLowerCase().includes(search));
+  const visibleSessionIds = new Set(sessions.map(session => String(session.id)));
 
   if(!sessions.length){
     box.innerHTML = '<div class="import-session"><div class="import-session-header"><div><div class="import-session-title">Nessuna importazione salvata</div><div class="import-session-meta">Le prossime importazioni compariranno qui.</div></div></div></div>';
@@ -2437,11 +2439,14 @@ function renderImportSessions(){
         <button class="session-delete" data-history-action="delete-all" data-session-id="${escapeAttr(session.id)}">Elimina importazione</button>
       </div>
     </div>
-    <div class="import-session-body" data-session-id="${escapeAttr(session.id)}">
+    <div class="import-session-body" data-session-id="${escapeAttr(session.id)}" style="${openImportSessionIds.has(String(session.id)) ? 'display:block' : ''}">
       <div class="import-session-page-info">Apri questa importazione per vedere i prodotti a pagine.</div>
     </div>
   </div>`;
   }).join('');
+  openImportSessionIds.forEach(id => {
+    if(visibleSessionIds.has(String(id))) renderImportSessionBody(id);
+  });
 }
 
 function importSessionPageFor(id){
@@ -2472,9 +2477,10 @@ function renderImportSessionBody(id){
         <button data-history-action="next-page" data-session-id="${escapeAttr(session.id)}" ${page >= totalPages ? 'disabled' : ''}>Successivi</button>
       </div>
       <div class="import-session-page-info">Prodotti ${from}-${to} di ${total} · Pagina ${page} di ${totalPages}</div>
-      <table class="import-products-table"><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Categoria</th><th>Quantità</th></tr></thead><tbody>
+      <table class="import-products-table"><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Categoria</th><th>Quantità</th><th>Azioni</th></tr></thead><tbody>
         ${visibleBarcodes.map(barcode => {
           const p = displayProductForSession(session, barcode);
+          const productIndex = productIndexByBarcode(p.barcode);
           return `<tr>
           <td><input type="checkbox" class="import-product-checkbox" data-session-id="${escapeAttr(session.id)}" data-barcode="${escapeAttr(p.barcode)}"></td>
           <td>${escapeHTML(p.barcode || '')}</td>
@@ -2484,6 +2490,7 @@ function renderImportSessionBody(id){
           <td class="sell-price-cell">${sellPriceDisplayHTML(p, '')}</td>
           <td>${escapeHTML(p.category || '')}</td>
           <td>${escapeHTML(p.quantity || '')}</td>
+          <td><button class="edit-btn" data-history-edit-barcode="${escapeAttr(p.barcode)}" data-session-id="${escapeAttr(session.id)}" ${productIndex < 0 ? 'disabled' : ''}>Modifica</button></td>
         </tr>`;
         }).join('')}
       </tbody></table>`;
@@ -2509,6 +2516,8 @@ function toggleImportSession(id){
   if(!body) return;
   const opening = body.style.display !== 'block';
   body.style.display = opening ? 'block' : 'none';
+  if(opening) openImportSessionIds.add(String(id));
+  else openImportSessionIds.delete(String(id));
   if(opening && body.dataset.loaded !== '1') renderImportSessionBody(id);
 }
 
@@ -2528,6 +2537,17 @@ function deselectImportProducts(id){
   importCheckboxesFor(id).forEach(cb => cb.checked = false);
 }
 
+function editHistoryProduct(sessionId, barcode){
+  const code = textValue(barcode);
+  const index = productIndexByBarcode(code);
+  if(index < 0){
+    alert('Questo prodotto non è più presente nella lista prodotti.');
+    return;
+  }
+  if(sessionId) openImportSessionIds.add(String(sessionId));
+  openEditModal(index);
+}
+
 function deleteProductsByBarcodes(barcodes){
   const set = new Set(barcodes.map(String));
   products = products.filter(p => !set.has(String(getBarcode(p))));
@@ -2541,6 +2561,7 @@ async function deleteWholeImportSession(id){
   const barcodes = sessionBarcodes(session);
   deleteProductsByBarcodes(barcodes);
   importSessions = importSessions.filter(s => s.id !== String(id));
+  openImportSessionIds.delete(String(id));
   persistAll(true);
   await saveCloudAfterChange('Importazione eliminata');
   renderImportSessions();
@@ -2561,7 +2582,10 @@ async function deleteSelectedImportProducts(id){
     session.barcodes = sessionBarcodes(session).filter(barcode => !set.has(String(barcode)));
     session.products = session.products.filter(p => !set.has(String(p.barcode)));
     session.count = session.barcodes.length;
-    if(!session.barcodes.length) importSessions = importSessions.filter(s => s.id !== String(id));
+    if(!session.barcodes.length){
+      importSessions = importSessions.filter(s => s.id !== String(id));
+      openImportSessionIds.delete(String(id));
+    }
   }
   persistAll(true);
   await saveCloudAfterChange('Prodotti eliminati');
@@ -2571,6 +2595,7 @@ async function deleteSelectedImportProducts(id){
 async function clearImportSessions(){
   if(!confirm('Svuotare cronologia importazioni?')) return;
   importSessions = [];
+  openImportSessionIds.clear();
   persistAll(true);
   await saveCloudAfterChange('Cronologia svuotata');
   renderImportSessions();
@@ -2580,6 +2605,7 @@ function freeBrowserMemory(){
   if(!confirm('Liberare memoria? Verrà svuotata solo la cronologia importazioni. I prodotti restano salvati.')) return;
   importSessions = [];
   importSessionPages = {};
+  openImportSessionIds.clear();
   localStorage.removeItem(STORAGE_IMPORTS_KEY);
   persistProducts(true);
   setCloudStatus('☁ Memoria liberata', 'ok');
@@ -3421,6 +3447,12 @@ document.addEventListener('click', function(event){
     else if(action === 'delete-selected') deleteSelectedImportProducts(id);
     else if(action === 'prev-page') changeImportSessionPage(id, -1);
     else if(action === 'next-page') changeImportSessionPage(id, 1);
+  }
+
+  const historyEdit = event.target.closest('[data-history-edit-barcode]');
+  if(historyEdit){
+    editHistoryProduct(historyEdit.dataset.sessionId, historyEdit.dataset.historyEditBarcode);
+    return;
   }
 });
 
