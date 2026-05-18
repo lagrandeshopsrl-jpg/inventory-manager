@@ -1015,6 +1015,7 @@ function showSales(){
   }else{
     clearSaleCurrentProduct();
   }
+  prepareScannerForSalesEntry();
 }
 
 function showTopSales(){
@@ -1173,6 +1174,13 @@ function focusMainScannerForNextScan(){
 function prepareScannerForNextSaleScan(){
   clearMainScannerInput();
   clearSaleSearchResults(true);
+  focusMainScannerForNextScan();
+  setTimeout(focusMainScannerForNextScan, 80);
+  setTimeout(focusMainScannerForNextScan, 250);
+}
+
+function prepareScannerForSalesEntry(){
+  clearMainScannerInput();
   focusMainScannerForNextScan();
   setTimeout(focusMainScannerForNextScan, 80);
   setTimeout(focusMainScannerForNextScan, 250);
