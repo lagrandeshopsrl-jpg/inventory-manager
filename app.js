@@ -1721,9 +1721,9 @@ function removeSaleCartItem(barcode){
 }
 
 function selectedSaleCartBarcodes(){
-  return Array.from(document.querySelectorAll('.sale-cart-checkbox:checked'))
+  return Array.from(new Set(Array.from(document.querySelectorAll('.sale-cart-checkbox:checked'))
     .map(cb => cb.dataset.barcode)
-    .filter(Boolean);
+    .filter(Boolean)));
 }
 
 function updateSaleCartSelectionUI(){
@@ -1884,26 +1884,52 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th>${showBuyPrice ? '<th>Acquisto</th>' : ''}<th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
-    ${items.map(item => {
-      const supplier = item.product ? (getSupplier(item.product) || '-') : '-';
-      return `<tr>
-        <td><input type="checkbox" class="sale-cart-checkbox" data-barcode="${escapeAttr(item.barcode)}" ${saleCartAllSelected ? 'checked' : ''}></td>
-        <td>${escapeHTML(item.barcode)}</td>
-        <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
-        <td>${escapeHTML(supplier)}</td>
-        ${showBuyPrice ? `<td>${buyPriceDisplayHTML(item.product)}</td>` : ''}
-        <td>${sellPriceDisplayHTML(item.product)}</td>
-        <td>${item.qty}</td>
-        <td><div class="action-buttons">
-          <button class="edit-btn" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
-          <button class="edit-btn" data-sale-cart-action="plus" data-barcode="${escapeAttr(item.barcode)}">+</button>
-          <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(item.barcode)}">Modifica</button>
-          <button class="delete-btn" data-sale-cart-action="remove" data-barcode="${escapeAttr(item.barcode)}">Rimuovi</button>
-        </div></td>
-      </tr>`;
-    }).join('')}
-  </tbody></table></div>`;
+  const desktopRows = items.map(item => {
+    const supplier = item.product ? (getSupplier(item.product) || '-') : '-';
+    return `<tr>
+      <td><input type="checkbox" class="sale-cart-checkbox" data-barcode="${escapeAttr(item.barcode)}" ${saleCartAllSelected ? 'checked' : ''}></td>
+      <td>${escapeHTML(item.barcode)}</td>
+      <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
+      <td>${escapeHTML(supplier)}</td>
+      ${showBuyPrice ? `<td>${buyPriceDisplayHTML(item.product)}</td>` : ''}
+      <td>${sellPriceDisplayHTML(item.product)}</td>
+      <td>${item.qty}</td>
+      <td><div class="action-buttons">
+        <button class="edit-btn sale-square-action" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
+        <button class="edit-btn sale-square-action" data-sale-cart-action="plus" data-barcode="${escapeAttr(item.barcode)}">+</button>
+        <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(item.barcode)}">Modifica</button>
+        <button class="delete-btn" data-sale-cart-action="remove" data-barcode="${escapeAttr(item.barcode)}">Rimuovi</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  const mobileCards = items.map(item => {
+    const supplier = item.product ? (getSupplier(item.product) || '-') : '-';
+    const productName = item.product ? getName(item.product) : 'Prodotto non trovato';
+    return `<div class="sale-cart-mobile-card">
+      <div class="sale-mobile-card-top">
+        <label class="sale-mobile-select"><input type="checkbox" class="sale-cart-checkbox" data-barcode="${escapeAttr(item.barcode)}" ${saleCartAllSelected ? 'checked' : ''}> Seleziona</label>
+        <strong>${escapeHTML(item.qty)} pz</strong>
+      </div>
+      <div class="sale-mobile-name">${escapeHTML(productName)}</div>
+      <div class="sale-mobile-grid">
+        <span>Barcode</span><strong>${escapeHTML(item.barcode)}</strong>
+        <span>Fornitore</span><strong>${escapeHTML(supplier)}</strong>
+        ${showBuyPrice ? `<span>Acquisto</span><strong>${buyPriceDisplayHTML(item.product)}</strong>` : ''}
+        <span>Vendita</span><strong class="sale-mobile-sell">${sellPriceDisplayHTML(item.product)}</strong>
+        <span>Qta</span><strong>${item.qty}</strong>
+      </div>
+      <div class="sale-mobile-actions">
+        <button class="edit-btn sale-square-action" data-sale-cart-action="minus" data-barcode="${escapeAttr(item.barcode)}">-</button>
+        <button class="edit-btn sale-square-action" data-sale-cart-action="plus" data-barcode="${escapeAttr(item.barcode)}">+</button>
+        <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(item.barcode)}">Modifica</button>
+        <button class="delete-btn" data-sale-cart-action="remove" data-barcode="${escapeAttr(item.barcode)}">Rimuovi</button>
+      </div>
+    </div>`;
+  }).join('');
+  box.innerHTML = `<div class="table-card sale-cart-desktop-table"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th>${showBuyPrice ? '<th>Acquisto</th>' : ''}<th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+    ${desktopRows}
+  </tbody></table></div>
+  <div class="sale-cart-mobile-list">${mobileCards}</div>`;
 }
 
 function dateInputValue(date){
