@@ -2932,14 +2932,16 @@ function renderDetail(name, items, options){
   document.getElementById(options.folderId).classList.add('hidden');
   detail.classList.remove('hidden');
   detail.innerHTML = `<div class="supplier-detail-header">
-      <h2>${escapeHTML(options.icon + ' ' + name)}</h2>
+      <div class="folder-detail-titlebar">
+        <button class="back-folder folder-back-arrow" onclick="${options.backFn}()" aria-label="Torna alle cartelle">‹</button>
+        <h2>${escapeHTML(options.icon + ' ' + name)}</h2>
+      </div>
       <div class="supplier-detail-actions">
         ${options.mode === 'supplier' ? `<button type="button" data-supplier-rename="${escapeAttr(name)}">Rinomina fornitore</button>` : ''}
         ${options.mode === 'supplier' ? `<button type="button" data-supplier-export="${escapeAttr(name)}">Esporta fornitore</button>` : ''}
         <button onclick="${options.selectAllFn}()">${selectText}</button>
         <button onclick="${options.deselectAllFn}()">${deselectText}</button>
         <button class="danger" onclick="${options.deleteSelectedFn}()">Elimina selezionati</button>
-        <button class="back-folder" onclick="${options.backFn}()">Torna alle cartelle</button>
       </div>
     </div>
     ${pagination}
