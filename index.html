@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260519-categorie-automatiche" />
+  <link rel="stylesheet" href="style.css?v=20260519-categoria-giardinaggio" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -305,7 +305,7 @@
       <div class="edit-row price-lock-row"><div class="left-icon">🔒</div><div class="field"><label class="price-lock-control"><input id="editPriceLocked" type="checkbox"> Blocca prezzo vendita manuale</label></div></div>
       <div class="edit-row"><div class="left-icon">♟</div><div class="field"><label>Fornitore / 供应商</label><div class="modern-input"><input id="editSupplier" list="supplierOptions" placeholder="Scegli o scrivi fornitore"><span>⌄</span></div></div></div>
       <div class="edit-row"><div class="left-icon">#</div><div class="field"><label>Quantità / 数量</label><div class="modern-input"><input id="editQuantity" type="number" step="1" inputmode="numeric"></div></div></div>
-      <div class="edit-row"><div class="left-icon">▤</div><div class="field"><label>Categoria / 类别</label><div class="modern-input"><input id="editCategory"><span>⌄</span></div></div></div>
+      <div class="edit-row"><div class="left-icon">▤</div><div class="field"><label>Categoria / 类别</label><div class="modern-input"><input id="editCategory" list="categoryOptions" placeholder="Scegli o scrivi categoria"><span>⌄</span></div></div></div>
       <div class="info">ⓘ Modifica i campi e premi Salva per aggiornare</div>
       <div class="modal-actions"><button tabindex="-1" class="cancel" onclick="closeEditModal()">Annulla</button><button tabindex="-1" class="save" onclick="saveEditProduct()">▣ Salva Modifiche</button></div>
     </div>
@@ -322,14 +322,15 @@
       <div class="edit-row price-lock-row"><div class="left-icon">🔒</div><div class="field"><label class="price-lock-control"><input id="newPriceLocked" type="checkbox"> Blocca prezzo vendita manuale</label></div></div>
       <div class="edit-row"><div class="left-icon">♟</div><div class="field"><label>Fornitore / 供应商</label><div class="modern-input"><input id="newSupplier" list="supplierOptions" placeholder="Scegli o scrivi fornitore"><span>⌄</span></div></div></div>
       <div class="edit-row"><div class="left-icon">#</div><div class="field"><label>Quantità / 数量</label><div class="modern-input"><input id="newQuantity" type="number" step="1" inputmode="numeric"></div></div></div>
-      <div class="edit-row"><div class="left-icon">▤</div><div class="field"><label>Categoria / 类别</label><div class="modern-input"><input id="newCategory"><span>⌄</span></div></div></div>
+      <div class="edit-row"><div class="left-icon">▤</div><div class="field"><label>Categoria / 类别</label><div class="modern-input"><input id="newCategory" list="categoryOptions" placeholder="Scegli o scrivi categoria"><span>⌄</span></div></div></div>
       <div class="info">ⓘ Compila i campi e premi Salva per aggiungere il prodotto</div>
       <div class="modal-actions"><button tabindex="-1" class="cancel" onclick="closeNewProductModal()">Annulla</button><button tabindex="-1" class="save" onclick="saveNewProduct()">▣ Salva Prodotto</button></div>
     </div>
   </div>
 
   <datalist id="supplierOptions"></datalist>
+  <datalist id="categoryOptions"></datalist>
 
-  <script src="app.js?v=20260519-categorie-automatiche"></script>
+  <script src="app.js?v=20260519-categoria-giardinaggio"></script>
 </body>
 </html>

@@ -3294,6 +3294,10 @@ function productNeedsAutoCategory(product){
 function autoCategoryRules(){
   return [
     {
+      category: 'Giardinaggio',
+      keywords: ['GIARDINO','GIARDINAGGIO','PISTOLA ACQUA GIARDINO','PISTOLA IRRIGAZIONE','LANCIA IRRIGAZIONE','IRRIGAZIONE','TUBO GIARDINO','ANNAFFIATOIO','RACCORDO GIARDINO']
+    },
+    {
       category: 'Giocattoli',
       keywords: ['GIOCATTOLO','GIOCHI','PALLONE','SUPER SANTOS','BOLLE DI SAPONE','BAMBOLA','PUZZLE','PISTOLA','MACCHINA GIOCATTOLO','TOYS']
     },
@@ -3310,12 +3314,16 @@ function autoCategoryRules(){
       keywords: ['DETERSIVO','DETERGENTE','SGRASSANTE','SAPONE LIQUIDO','SAPONE MANI','SPUGNA','PANNI','PANNO','SCOPA','MOCIO','CANDEGGINA','ANTIALGHE','WC','DISINFETTANTE']
     },
     {
+      category: 'Bagno',
+      keywords: ['SOFFIONE','SOFFIONE DOCCIA','DOCCIA','DOCCETTA','TUBO DOCCIA','TENDA DOCCIA','RUBINETTO','FILTRO RUBINETTO','FILTRO PER RUBINETTO','COPRIWATER','COPRI WATER','SEDILE WC','SEDILE WATER','PORTASAPONE','PORTA SAPONE','SCOPINO WC','TAPPETO BAGNO','BAGNO']
+    },
+    {
       category: 'Casa',
       keywords: ['SECCHIELLO','SECCHELLO','CONTENITORE','BARATTOLO','CESTINO','CENTRINI','TOVAGLIA','PIATTO','PIATTI','BICCHIERE','BICCHIERI','POSATE','TUBO DI SCARICO','SUPPORTO DA PARETE','GANCIO','MOLLETTE','APPENDINO','VASSOIO']
     },
     {
       category: 'Bellezza',
-      keywords: ['CREMA','SOLARE','SHAMPOO','BAGNOSCHIUMA','DOCCIA','PROFUMO','PETTINE','SPAZZOLA','GEL','TRUCCO','COSMETICO']
+      keywords: ['CREMA','SOLARE','SHAMPOO','BAGNOSCHIUMA','PROFUMO','PETTINE','SPAZZOLA','GEL','TRUCCO','COSMETICO']
     },
     {
       category: 'Ferramenta',
@@ -3392,9 +3400,30 @@ function updateSupplierOptions(){
   list.innerHTML = options.join('');
 }
 
+function categoryOptions(){
+  return Array.from(new Set(products
+    .map(p => getCategory(p))
+    .map(textValue)
+    .filter(Boolean)
+    .filter(name => normalizeCategoryText(name) !== 'SENZA CATEGORIA')))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function updateCategoryOptions(){
+  const list = document.getElementById('categoryOptions');
+  if(!list) return;
+  const options = categoryOptions().map(name => `<option value="${escapeAttr(name)}"></option>`);
+  list.innerHTML = options.join('');
+}
+
+function updateProductFormOptions(){
+  updateSupplierOptions();
+  updateCategoryOptions();
+}
+
 function openEditModal(index){
   if(index < 0 || index >= products.length) return;
-  updateSupplierOptions();
+  updateProductFormOptions();
   editingIndex = index;
   const p = products[index];
   document.getElementById('editBarcode').value = getBarcode(p);
@@ -3474,7 +3503,7 @@ async function saveEditProduct(){
 }
 
 function openNewProductModal(prefillBarcode = ''){
-  updateSupplierOptions();
+  updateProductFormOptions();
   ['newBarcode','newName','newSupplier','newCategory','newQuantity','newBuy','newSell'].forEach(id => document.getElementById(id).value = '');
   const newLock = document.getElementById('newPriceLocked');
   if(newLock) newLock.checked = false;
