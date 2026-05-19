@@ -21,6 +21,7 @@ const DEFAULT_DROPBOX_BACKUP_FOLDER = '/inventory_manager_backups';
 const IMPORT_HISTORY_RETENTION_DAYS = 30;
 const itemsPerPage = 100;
 const importSessionPageSize = 200;
+const folderDetailPageSize = 100;
 
 let products = normalizeProductList(readJson(STORAGE_PRODUCTS_KEY, []));
 let importSessions = normalizeImportSessions(readJson(STORAGE_IMPORTS_KEY, []));
@@ -53,6 +54,7 @@ let barcodeCameraFound = false;
 let barcodeCameraReader = null;
 let buyPriceTrendPopover = null;
 let autoSellPriceUpdating = false;
+let folderDetailPages = {};
 
 function readJson(key, fallback){
   try{
@@ -2899,8 +2901,33 @@ function productRowsForDetail(items, mode){
   }).join('');
 }
 
+function folderDetailPageKey(mode, name){
+  return `${mode}:${String(name || '')}`;
+}
+
+function folderDetailPageControls(mode, name, page, totalPages, totalItems){
+  if(totalItems <= folderDetailPageSize) return '';
+  const from = ((page - 1) * folderDetailPageSize) + 1;
+  const to = Math.min(totalItems, page * folderDetailPageSize);
+  return `<div class="folder-detail-pagination">
+    <button type="button" data-folder-detail-page="${page - 1}" data-folder-detail-mode="${escapeAttr(mode)}" data-folder-detail-name="${escapeAttr(name)}" ${page <= 1 ? 'disabled' : ''}>‹ Precedente</button>
+    <span>${from}-${to} di ${totalItems} prodotti · Pagina ${page} di ${totalPages}</span>
+    <button type="button" data-folder-detail-page="${page + 1}" data-folder-detail-mode="${escapeAttr(mode)}" data-folder-detail-name="${escapeAttr(name)}" ${page >= totalPages ? 'disabled' : ''}>Successiva ›</button>
+  </div>`;
+}
+
 function renderDetail(name, items, options){
-  const rows = productRowsForDetail(items, options.mode);
+  const pageKey = folderDetailPageKey(options.mode, name);
+  const totalPages = Math.max(1, Math.ceil(items.length / folderDetailPageSize));
+  let page = Number(folderDetailPages[pageKey] || 1);
+  if(page < 1) page = 1;
+  if(page > totalPages) page = totalPages;
+  folderDetailPages[pageKey] = page;
+  const visibleItems = items.slice((page - 1) * folderDetailPageSize, page * folderDetailPageSize);
+  const rows = productRowsForDetail(visibleItems, options.mode);
+  const pagination = folderDetailPageControls(options.mode, name, page, totalPages, items.length);
+  const selectText = items.length > folderDetailPageSize ? 'Seleziona pagina' : 'Seleziona tutti';
+  const deselectText = items.length > folderDetailPageSize ? 'Deseleziona pagina' : 'Deseleziona';
   const detail = document.getElementById(options.detailId);
   document.getElementById(options.folderId).classList.add('hidden');
   detail.classList.remove('hidden');
@@ -2909,13 +2936,15 @@ function renderDetail(name, items, options){
       <div class="supplier-detail-actions">
         ${options.mode === 'supplier' ? `<button type="button" data-supplier-rename="${escapeAttr(name)}">Rinomina fornitore</button>` : ''}
         ${options.mode === 'supplier' ? `<button type="button" data-supplier-export="${escapeAttr(name)}">Esporta fornitore</button>` : ''}
-        <button onclick="${options.selectAllFn}()">Seleziona tutti</button>
-        <button onclick="${options.deselectAllFn}()">Deseleziona</button>
+        <button onclick="${options.selectAllFn}()">${selectText}</button>
+        <button onclick="${options.deselectAllFn}()">${deselectText}</button>
         <button class="danger" onclick="${options.deleteSelectedFn}()">Elimina selezionati</button>
         <button class="back-folder" onclick="${options.backFn}()">Torna alle cartelle</button>
       </div>
     </div>
-    <div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Categoria</th><th>Quantità</th><th>Azioni</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="empty-row">Nessun prodotto trovato</td></tr>'}</tbody></table></div>`;
+    ${pagination}
+    <div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Categoria</th><th>Quantità</th><th>Azioni</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="empty-row">Nessun prodotto trovato</td></tr>'}</tbody></table></div>
+    ${pagination}`;
 }
 
 function openSupplierFolder(name){
@@ -4207,13 +4236,29 @@ document.addEventListener('click', function(event){
 
   const supplierFolder = event.target.closest('[data-supplier-folder]');
   if(supplierFolder){
-    openSupplierFolder(supplierFolder.dataset.supplierFolder);
+    const name = supplierFolder.dataset.supplierFolder;
+    folderDetailPages[folderDetailPageKey('supplier', name)] = 1;
+    openSupplierFolder(name);
     return;
   }
 
   const categoryFolder = event.target.closest('[data-category-folder]');
   if(categoryFolder){
-    openCategoryFolder(categoryFolder.dataset.categoryFolder);
+    const name = categoryFolder.dataset.categoryFolder;
+    folderDetailPages[folderDetailPageKey('category', name)] = 1;
+    openCategoryFolder(name);
+    return;
+  }
+
+  const folderPage = event.target.closest('[data-folder-detail-page]');
+  if(folderPage){
+    const mode = folderPage.dataset.folderDetailMode || '';
+    const name = folderPage.dataset.folderDetailName || '';
+    const page = Number(folderPage.dataset.folderDetailPage || 1);
+    if(!Number.isFinite(page) || page < 1) return;
+    folderDetailPages[folderDetailPageKey(mode, name)] = page;
+    if(mode === 'supplier') openSupplierFolder(name);
+    if(mode === 'category') openCategoryFolder(name);
     return;
   }
 
