@@ -142,6 +142,18 @@ function getBuyPriceTrend(p){
     ? normalizeBuyPriceTrend(p[8])
     : normalizeBuyPriceTrend(valueOf(p, ['buyPriceTrend','buy_price_trend','trendAcquisto','andamentoAcquisto','variazioneAcquisto','prezzoAcquistoTrend']));
 }
+function getBuyPricePrevious(p){
+  return Array.isArray(p) ? textValue(p[9]) : textValue(valueOf(p, ['buyPricePrevious','previousBuyPrice','prezzoAcquistoPrecedente','acquistoPrecedente']));
+}
+function getBuyPriceChange(p){
+  const stored = Array.isArray(p) ? textValue(p[10]) : textValue(valueOf(p, ['buyPriceChange','buy_price_change','differenzaAcquisto','variazioneAcquistoValore']));
+  if(stored) return stored;
+  const previous = salePriceNumber(getBuyPricePrevious(p));
+  const current = salePriceNumber(getBuy(p));
+  if(!getBuyPriceTrend(p) || previous <= 0 || current <= 0) return '';
+  const diff = current - previous;
+  return Math.abs(diff) < 0.0001 ? '' : diff.toFixed(2);
+}
 
 function canonicalProduct(p){
   const barcode = getBarcode(p);
@@ -153,6 +165,8 @@ function canonicalProduct(p){
   const quantity = getQuantity(p);
   const priceLocked = getPriceLocked(p);
   const buyPriceTrend = getBuyPriceTrend(p);
+  const buyPricePrevious = getBuyPricePrevious(p);
+  const buyPriceChange = getBuyPriceChange(p);
   return {
     barcode,
     name,
@@ -163,6 +177,8 @@ function canonicalProduct(p){
     quantity,
     priceLocked,
     buyPriceTrend,
+    buyPricePrevious,
+    buyPriceChange,
     prodotto: name,
     fornitore: supplier,
     categoria: category,
@@ -171,7 +187,9 @@ function canonicalProduct(p){
     quantita: quantity,
     quantità: quantity,
     prezzoBloccato: priceLocked,
-    andamentoAcquisto: buyPriceTrend
+    andamentoAcquisto: buyPriceTrend,
+    acquistoPrecedente: buyPricePrevious,
+    variazioneAcquistoValore: buyPriceChange
   };
 }
 
@@ -190,7 +208,9 @@ function compactProduct(p){
     product.sellPrice,
     product.quantity,
     product.priceLocked ? 1 : 0,
-    product.buyPriceTrend
+    product.buyPriceTrend,
+    product.buyPricePrevious,
+    product.buyPriceChange
   ];
 }
 
@@ -209,7 +229,9 @@ function importSessionProduct(p){
     sellPrice: product.sellPrice,
     quantity: product.quantity,
     priceLocked: product.priceLocked,
-    buyPriceTrend: product.buyPriceTrend
+    buyPriceTrend: product.buyPriceTrend,
+    buyPricePrevious: product.buyPricePrevious,
+    buyPriceChange: product.buyPriceChange
   };
 }
 
@@ -1387,16 +1409,37 @@ function buyPriceDisplayHTML(product, fallback = '-'){
   if(!trend) return escapeHTML(price);
   const label = trend === 'up' ? 'Prezzo acquisto aumentato' : 'Prezzo acquisto abbassato';
   const arrow = trend === 'up' ? '▲' : '▼';
-  return `<span class="buy-price-with-trend">${escapeHTML(price)}<span class="buy-price-trend ${trend}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${arrow}</span></span>`;
+  const previous = formatPriceDisplay(getBuyPricePrevious(product), '');
+  const change = formatSignedPriceChange(getBuyPriceChange(product));
+  const detailTitle = change ? `${label}: ${change}` : `${label}: clicca per dettagli`;
+  return `<span class="buy-price-with-trend">${escapeHTML(price)}<button type="button" class="buy-price-trend ${trend}" data-buy-price-trend="${escapeAttr(trend)}" data-buy-previous="${escapeAttr(previous)}" data-buy-current="${escapeAttr(price)}" data-buy-change="${escapeAttr(change)}" title="${escapeAttr(detailTitle)}" aria-label="${escapeAttr(detailTitle)}">${arrow}</button></span>`;
 }
 
-function compareBuyPriceTrend(oldProduct, newProduct){
+function buyPriceChangeData(oldProduct, newProduct){
   const oldBuy = salePriceNumber(getBuy(oldProduct));
   const newBuy = salePriceNumber(getBuy(newProduct));
-  if(!Number.isFinite(oldBuy) || !Number.isFinite(newBuy) || oldBuy <= 0 || newBuy <= 0) return '';
+  if(!Number.isFinite(oldBuy) || !Number.isFinite(newBuy) || oldBuy <= 0 || newBuy <= 0){
+    return emptyBuyPriceChangeData();
+  }
   const diff = newBuy - oldBuy;
-  if(Math.abs(diff) < 0.0001) return '';
-  return diff > 0 ? 'up' : 'down';
+  if(Math.abs(diff) < 0.0001) return emptyBuyPriceChangeData();
+  return {
+    buyPriceTrend: diff > 0 ? 'up' : 'down',
+    buyPricePrevious: oldBuy.toFixed(2),
+    buyPriceChange: diff.toFixed(2)
+  };
+}
+
+function emptyBuyPriceChangeData(){
+  return { buyPriceTrend: '', buyPricePrevious: '', buyPriceChange: '' };
+}
+
+function formatSignedPriceChange(value){
+  const raw = textValue(value);
+  if(!raw) return '';
+  const number = salePriceNumber(raw);
+  if(!Number.isFinite(number) || Math.abs(number) < 0.0001) return '';
+  return `${number > 0 ? '+' : '-'}${Math.abs(number).toFixed(2)}`;
 }
 
 function preserveBuyPriceTrendIfSame(oldProduct, newProduct){
@@ -1406,6 +1449,33 @@ function preserveBuyPriceTrendIfSame(oldProduct, newProduct){
   const newBuy = salePriceNumber(getBuy(newProduct));
   if(!Number.isFinite(oldBuy) || !Number.isFinite(newBuy)) return '';
   return Math.abs(newBuy - oldBuy) < 0.0001 ? oldTrend : '';
+}
+
+function preserveBuyPriceChangeDataIfSame(oldProduct, newProduct){
+  if(!getBuyPriceTrend(oldProduct)) return emptyBuyPriceChangeData();
+  const oldBuy = salePriceNumber(getBuy(oldProduct));
+  const newBuy = salePriceNumber(getBuy(newProduct));
+  if(!Number.isFinite(oldBuy) || !Number.isFinite(newBuy)) return emptyBuyPriceChangeData();
+  if(Math.abs(newBuy - oldBuy) >= 0.0001) return emptyBuyPriceChangeData();
+  return {
+    buyPriceTrend: getBuyPriceTrend(oldProduct),
+    buyPricePrevious: getBuyPricePrevious(oldProduct),
+    buyPriceChange: getBuyPriceChange(oldProduct)
+  };
+}
+
+function showBuyPriceTrendDetails(button){
+  if(!button) return;
+  const trend = button.dataset.buyPriceTrend;
+  const previous = textValue(button.dataset.buyPrevious);
+  const current = textValue(button.dataset.buyCurrent);
+  const change = textValue(button.dataset.buyChange);
+  const direction = trend === 'down' ? 'abbassato' : 'aumentato';
+  if(!previous || !current || !change){
+    alert('Dettaglio non disponibile per questa freccia. Sara disponibile dal prossimo import fatto con questa versione.');
+    return;
+  }
+  alert(`Prezzo acquisto ${direction}\nPrima: ${previous}\nOra: ${current}\nDifferenza: ${change}`);
 }
 
 function saleMoney(value){
@@ -2998,10 +3068,13 @@ async function saveEditProduct(){
   const previousProduct = canonicalProduct(products[editingIndex]);
   const oldBarcode = getBarcode(previousProduct);
   const formProduct = productFromForm('edit');
+  const preservedBuyChange = preserveBuyPriceChangeDataIfSame(previousProduct, formProduct);
   const product = canonicalProduct({
     ...formProduct,
-    buyPriceTrend: preserveBuyPriceTrendIfSame(previousProduct, formProduct),
-    andamentoAcquisto: preserveBuyPriceTrendIfSame(previousProduct, formProduct)
+    ...preservedBuyChange,
+    andamentoAcquisto: preservedBuyChange.buyPriceTrend,
+    acquistoPrecedente: preservedBuyChange.buyPricePrevious,
+    variazioneAcquistoValore: preservedBuyChange.buyPriceChange
   });
   if(!validateProduct(product, editingIndex)) return;
   products[editingIndex] = product;
@@ -3052,11 +3125,13 @@ async function saveNewProduct(){
   const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
   if(existing >= 0){
     const previousProduct = canonicalProduct(products[existing]);
-    const preservedTrend = preserveBuyPriceTrendIfSame(previousProduct, product);
+    const preservedBuyChange = preserveBuyPriceChangeDataIfSame(previousProduct, product);
     products[existing] = canonicalProduct({
       ...product,
-      buyPriceTrend: preservedTrend,
-      andamentoAcquisto: preservedTrend
+      ...preservedBuyChange,
+      andamentoAcquisto: preservedBuyChange.buyPriceTrend,
+      acquistoPrecedente: preservedBuyChange.buyPricePrevious,
+      variazioneAcquistoValore: preservedBuyChange.buyPriceChange
     });
   }
   else products.unshift(product);
@@ -3202,13 +3277,15 @@ async function importExcel(event){
         const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
         if(existing >= 0){
           const currentProduct = canonicalProduct(products[existing]);
-          const buyPriceTrend = compareBuyPriceTrend(currentProduct, product);
-          if(buyPriceTrend === 'up') buyIncreased++;
-          if(buyPriceTrend === 'down') buyDecreased++;
+          const buyChange = buyPriceChangeData(currentProduct, product);
+          if(buyChange.buyPriceTrend === 'up') buyIncreased++;
+          if(buyChange.buyPriceTrend === 'down') buyDecreased++;
           const importedProduct = canonicalProduct({
             ...product,
-            buyPriceTrend,
-            andamentoAcquisto: buyPriceTrend
+            ...buyChange,
+            andamentoAcquisto: buyChange.buyPriceTrend,
+            acquistoPrecedente: buyChange.buyPricePrevious,
+            variazioneAcquistoValore: buyChange.buyPriceChange
           });
           products[existing] = getPriceLocked(currentProduct)
             ? canonicalProduct({
@@ -3224,7 +3301,11 @@ async function importExcel(event){
           products.push(canonicalProduct({
             ...product,
             buyPriceTrend: '',
-            andamentoAcquisto: ''
+            buyPricePrevious: '',
+            buyPriceChange: '',
+            andamentoAcquisto: '',
+            acquistoPrecedente: '',
+            variazioneAcquistoValore: ''
           }));
           imported++;
         }
@@ -3643,6 +3724,13 @@ document.addEventListener('keydown', function(e){
 }, true);
 
 document.addEventListener('click', function(event){
+  const buyTrend = event.target.closest('[data-buy-price-trend]');
+  if(buyTrend){
+    showBuyPriceTrendDetails(buyTrend);
+    event.stopPropagation();
+    return;
+  }
+
   const manualQtyAction = event.target.closest('[data-sales-manual-qty-action]');
   if(manualQtyAction){
     const direction = manualQtyAction.dataset.salesManualQtyAction === 'plus' ? 1 : -1;
