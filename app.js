@@ -199,7 +199,7 @@ function normalizeProductList(list){
 
 function compactProduct(p){
   const product = canonicalProduct(p);
-  return [
+  const row = [
     product.barcode,
     product.name,
     product.supplier,
@@ -207,11 +207,19 @@ function compactProduct(p){
     product.buyPrice,
     product.sellPrice,
     product.quantity,
-    product.priceLocked ? 1 : 0,
-    product.buyPriceTrend,
-    product.buyPricePrevious,
-    product.buyPriceChange
+    product.priceLocked ? 1 : 0
   ];
+  const trend = getBuyPriceTrend(product);
+  const previous = textValue(product.buyPricePrevious);
+  const change = textValue(product.buyPriceChange);
+  if(trend){
+    row.push(trend);
+    if(previous || change){
+      row.push(previous);
+      if(change) row.push(change);
+    }
+  }
+  return row;
 }
 
 function compactProductList(list){
