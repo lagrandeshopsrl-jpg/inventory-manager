@@ -703,6 +703,130 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .sales-panel .action-buttons button{
   min-width:38px;
 }
+body.view-sales .titlebar{
+  align-items:center;
+  gap:10px;
+  margin-bottom:12px;
+}
+body.view-sales .titlebar h1{
+  font-size:28px;
+  line-height:1;
+}
+body.view-sales .titlebar p{
+  margin-top:4px;
+  max-width:280px;
+  font-size:17px;
+  line-height:1.15;
+}
+body.view-sales .top-actions{
+  gap:8px;
+  justify-content:flex-end;
+}
+body.view-sales .cloud-status{
+  padding:8px 12px;
+  font-size:15px;
+  white-space:nowrap;
+}
+body.view-sales .blue-btn{
+  padding:10px 14px;
+  border-radius:12px;
+  white-space:nowrap;
+}
+body.view-sales .sales-panel{
+  padding:14px 16px;
+  border-radius:16px;
+}
+body.view-sales .sales-panel-header{
+  margin-bottom:10px;
+}
+body.view-sales .sales-panel-header h2{
+  font-size:21px;
+}
+body.view-sales .sales-badge{
+  padding:7px 11px;
+}
+body.view-sales .sales-controls{
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+}
+body.view-sales .sales-controls input{
+  flex:1 1 260px;
+  padding:10px 12px;
+  border-radius:12px;
+}
+body.view-sales .sales-controls button{
+  min-height:42px;
+  padding:10px 12px;
+  border-radius:12px;
+}
+body.view-sales .sale-order-toggle{
+  gap:4px;
+  padding:3px;
+  border-radius:12px;
+}
+body.view-sales .sales-controls .sale-order-btn{
+  min-width:96px;
+  padding:8px 10px;
+  border-radius:9px;
+}
+body.view-sales .sale-status{
+  margin-bottom:8px;
+  padding:9px 12px;
+  border-radius:12px;
+}
+body.view-sales .sale-current-product{
+  margin:8px 0 12px;
+  padding:12px;
+  border-radius:14px;
+}
+body.view-sales .sale-current-label{
+  margin-bottom:5px;
+  font-size:13px;
+}
+body.view-sales .sale-current-main{
+  gap:12px;
+}
+body.view-sales .sale-current-name{
+  font-size:21px;
+}
+body.view-sales .sale-current-barcode{
+  margin-top:3px;
+}
+body.view-sales .sale-current-supplier{
+  margin-top:4px;
+}
+body.view-sales .sale-current-prices{
+  gap:8px;
+}
+body.view-sales .sale-current-prices div{
+  padding:8px 10px;
+  border-radius:12px;
+}
+body.view-sales .sale-current-prices span{
+  margin-bottom:3px;
+}
+body.view-sales .sale-current-prices strong,
+body.view-sales .sale-current-prices .sale-current-sell-price strong{
+  font-size:18px;
+}
+body.view-sales .sale-current-edit{
+  min-width:78px;
+  padding:8px 10px;
+}
+body.view-sales .sale-cart-section{
+  margin-top:14px;
+  padding-top:12px;
+  max-height:min(44vh,420px);
+}
+body.view-sales .sale-cart-tools{
+  gap:8px;
+  margin-bottom:8px;
+}
+body.view-sales .sale-cart-tools button{
+  padding:10px 12px;
+  border-radius:12px;
+}
 .supplier-sales-name{
   border:none;
   background:#e8f1ff;

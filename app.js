@@ -980,6 +980,7 @@ function setActive(view){
 }
 
 function setPageVisibility(view){
+  document.body.classList.toggle('view-sales', view === 'sales');
   const pages = {
     products: 'productsPage',
     suppliers: 'suppliersPage',
