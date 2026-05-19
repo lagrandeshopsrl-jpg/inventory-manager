@@ -44,6 +44,7 @@ let salesStatsAllSelected = false;
 let openSalesSupplierKey = '';
 let productBarcodeIndexCache = null;
 let saleScannerSearchTimer = 0;
+let quickScanTimer = 0;
 let barcodeCameraControls = null;
 let barcodeCameraStream = null;
 let barcodeCameraAnimation = 0;
@@ -1014,6 +1015,7 @@ function setActive(view){
   document.getElementById('menuProducts')?.classList.toggle('active', view === 'products');
   document.getElementById('menuSuppliers')?.classList.toggle('active', view === 'suppliers');
   document.getElementById('menuSales')?.classList.toggle('active', view === 'sales');
+  document.getElementById('menuQuickScan')?.classList.toggle('active', view === 'quickScan');
   document.getElementById('menuTopSales')?.classList.toggle('active', view === 'topSales');
   document.getElementById('menuHistory')?.classList.toggle('active', view === 'history');
   document.getElementById('menuCategories')?.classList.toggle('active', view === 'categories');
@@ -1026,6 +1028,7 @@ function setPageVisibility(view){
     products: 'productsPage',
     suppliers: 'suppliersPage',
     sales: 'salesPage',
+    quickScan: 'quickScanPage',
     topSales: 'topSalesPage',
     history: 'historyPage',
     categories: 'categoriesPage',
@@ -1039,6 +1042,18 @@ function setPageVisibility(view){
 function setTitle(title, subtitle){
   document.getElementById('pageTitle').innerText = title;
   document.getElementById('pageSubtitle').innerText = subtitle;
+}
+
+function showQuickScan(){
+  currentView = 'quickScan';
+  setActive('quickScan');
+  setPageVisibility('quickScan');
+  setTitle('Scanner', 'Scansiona per modificare o registrare prodotto');
+  const search = document.getElementById('search');
+  if(search) search.placeholder = 'SCANSIONA BARCODE PER MODIFICA';
+  setQuickScanStatus('Pronto per scansionare.');
+  clearMainScannerInput();
+  setTimeout(focusMainScannerForNextScan, 80);
 }
 
 function showProducts(){
@@ -1146,6 +1161,7 @@ function renderCurrentView(){
     }
   }
   else if(currentView === 'sales') showSales();
+  else if(currentView === 'quickScan') showQuickScan();
   else if(currentView === 'topSales') showTopSales();
   else if(currentView === 'history') renderImportSessions();
   else if(currentView === 'categories'){
@@ -1227,7 +1243,7 @@ function clearMainScannerInput(expectedValue = null){
 
 function focusMainScannerForNextScan(){
   const search = document.getElementById('search');
-  if(!search || !['products', 'sales'].includes(currentView) || __modalOpen()) return;
+  if(!search || !['products', 'sales', 'quickScan'].includes(currentView) || __modalOpen()) return;
   search.focus({ preventScroll: true });
 }
 
@@ -2436,6 +2452,56 @@ function clearSaleScannerSearchTimer(){
   }
 }
 
+function clearQuickScanTimer(){
+  if(quickScanTimer){
+    clearTimeout(quickScanTimer);
+    quickScanTimer = 0;
+  }
+}
+
+function setQuickScanStatus(text, type = ''){
+  const el = document.getElementById('quickScanStatus');
+  if(!el) return;
+  el.className = 'quick-scan-status' + (type ? ' ' + type : '');
+  el.innerText = text;
+}
+
+function processQuickScanBarcode(value){
+  const code = textValue(value).replace(/\s/g, '');
+  if(!code) return;
+  clearQuickScanTimer();
+  const search = document.getElementById('search');
+  if(search){
+    search.value = '';
+    __barcodeLastValue = '';
+  }
+  if(__modalOpen()) return;
+  const index = productIndexByBarcode(code);
+  if(index >= 0){
+    setQuickScanStatus('Prodotto trovato. Apro modifica: ' + code, 'ok');
+    openEditModal(index);
+  }else{
+    setQuickScanStatus('Prodotto non registrato. Apro nuovo prodotto: ' + code, 'err');
+    openNewProductModal(code);
+  }
+}
+
+function scheduleQuickScan(value){
+  clearQuickScanTimer();
+  const snapshot = textValue(value).replace(/\s/g, '');
+  if(!snapshot){
+    setQuickScanStatus('Pronto per scansionare.');
+    return;
+  }
+  setQuickScanStatus('Barcode letto, controllo prodotto...');
+  quickScanTimer = setTimeout(() => {
+    quickScanTimer = 0;
+    const search = document.getElementById('search');
+    if(currentView !== 'quickScan' || textValue(search?.value).replace(/\s/g, '') !== snapshot) return;
+    processQuickScanBarcode(snapshot);
+  }, 360);
+}
+
 function scheduleSaleScannerSearch(value){
   clearSaleScannerSearchTimer();
   const snapshot = textValue(value);
@@ -2449,6 +2515,10 @@ function scheduleSaleScannerSearch(value){
 
 function handleScannerInput(){
   const search = document.getElementById('search');
+  if(currentView === 'quickScan'){
+    scheduleQuickScan(search?.value || '');
+    return;
+  }
   if(currentView === 'sales'){
     const value = textValue(search?.value);
     if(!value){
@@ -3716,6 +3786,19 @@ function applyBarcodeFromCamera(code){
     setBarcodeCameraStatus('Barcode non leggibile. Riprova.', 'err');
     return;
   }
+  if(currentView === 'quickScan'){
+    const search = document.getElementById('search');
+    if(search){
+      search.value = '';
+      __barcodeLastValue = '';
+    }
+    setBarcodeCameraStatus('Barcode letto: ' + value, 'ok');
+    setTimeout(() => {
+      stopBarcodeCameraScanner();
+      processQuickScanBarcode(value);
+    }, 180);
+    return;
+  }
   const search = document.getElementById('search');
   if(search){
     search.value = value;
@@ -3856,8 +3939,10 @@ function __focusBarcodeIfAllowed(){
   const s = document.getElementById('search');
   const activePage = currentView === 'sales'
     ? document.getElementById('salesPage')
-    : document.getElementById('productsPage');
-  if(!s || !activePage || !['products', 'sales'].includes(currentView) || activePage.classList.contains('hidden') || __modalOpen() || __hasSelection()) return;
+    : currentView === 'quickScan'
+      ? document.getElementById('quickScanPage')
+      : document.getElementById('productsPage');
+  if(!s || !activePage || !['products', 'sales', 'quickScan'].includes(currentView) || activePage.classList.contains('hidden') || __modalOpen() || __hasSelection()) return;
 
   const ae = document.activeElement;
   const userTypingElsewhere =
@@ -3922,7 +4007,7 @@ document.addEventListener('keydown', function(e){
   if(inOtherInput) return;
 
   if(e.key && e.key.length === 1 && __barcodeOnlyDigits(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey){
-    if(document.activeElement !== s && ['products', 'sales'].includes(currentView)){
+    if(document.activeElement !== s && ['products', 'sales', 'quickScan'].includes(currentView)){
       e.preventDefault();
       s.value = '';
       s.focus({ preventScroll: true });

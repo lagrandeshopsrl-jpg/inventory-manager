@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260519-ios-carrello-camera-fix" />
+  <link rel="stylesheet" href="style.css?v=20260519-scanner-modifica-ios" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -13,6 +13,7 @@
     <aside class="sidebar">
       <div class="logo">Inventory Manager</div>
       <button tabindex="-1" class="menu active" id="menuSales" onclick="showSales()">€ Vendite</button>
+      <button tabindex="-1" class="menu" id="menuQuickScan" onclick="showQuickScan()">▥ Scanner</button>
       <button tabindex="-1" class="menu" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
       <button tabindex="-1" class="menu" id="menuSuppliers" onclick="showSuppliers()">📁 Fornitori</button>
       <button tabindex="-1" class="menu" id="menuTopSales" onclick="showTopSales()">★ Più venduti</button>
@@ -100,6 +101,16 @@
         <div id="supplierStats" class="supplier-stats"></div>
         <div id="supplierFolders" class="supplier-folders"></div>
         <div id="supplierDetail" class="supplier-detail hidden"></div>
+      </section>
+
+      <section id="quickScanPage" class="hidden">
+        <div class="quick-scan-panel">
+          <div class="quick-scan-icon">▥</div>
+          <h2>Scanner modifica prodotti</h2>
+          <p>Scansiona un barcode: se il prodotto esiste si apre Modifica, se non esiste si apre Nuovo Prodotto con barcode compilato.</p>
+          <div id="quickScanStatus" class="quick-scan-status">Pronto per scansionare.</div>
+          <button type="button" class="quick-scan-camera" onclick="startBarcodeCameraScanner()">Apri fotocamera scanner</button>
+        </div>
       </section>
 
       <section id="salesPage" class="hidden">
@@ -318,6 +329,6 @@
 
   <datalist id="supplierOptions"></datalist>
 
-  <script src="app.js?v=20260519-ios-carrello-camera-fix"></script>
+  <script src="app.js?v=20260519-scanner-modifica-ios"></script>
 </body>
 </html>
