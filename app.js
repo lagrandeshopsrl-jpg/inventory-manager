@@ -49,6 +49,7 @@ let barcodeCameraAnimation = 0;
 let barcodeCameraDetector = null;
 let barcodeCameraFound = false;
 let barcodeCameraReader = null;
+let buyPriceTrendPopover = null;
 
 function readJson(key, fallback){
   try{
@@ -1485,6 +1486,56 @@ function preserveBuyPriceChangeDataIfSame(oldProduct, newProduct){
 }
 
 function showBuyPriceTrendDetails(button){
+  if(!button) return;
+  closeBuyPriceTrendDetails();
+  const trend = button.dataset.buyPriceTrend;
+  const previous = textValue(button.dataset.buyPrevious);
+  const current = textValue(button.dataset.buyCurrent);
+  const change = textValue(button.dataset.buyChange);
+  const date = textValue(button.dataset.buyDate);
+  const direction = trend === 'down' ? 'abbassato' : 'aumentato';
+  const directionClass = trend === 'down' ? 'down' : 'up';
+  const box = document.createElement('div');
+  box.className = `buy-price-popover ${directionClass}`;
+  box.innerHTML = previous && current && change
+    ? `<div class="buy-price-popover-title">Prezzo acquisto ${escapeHTML(direction)}</div>
+       <div class="buy-price-popover-grid">
+         <span>Prima</span><strong>${escapeHTML(previous)}</strong>
+         <span>Ora</span><strong>${escapeHTML(current)}</strong>
+         <span>Differenza</span><strong>${escapeHTML(change)}</strong>
+         <span>Data</span><strong>${escapeHTML(date || 'Dalla prossima importazione')}</strong>
+       </div>`
+    : `<div class="buy-price-popover-title">Dettaglio non disponibile</div>
+       <div class="buy-price-popover-note">Sara disponibile dal prossimo import fatto con questa versione.</div>`;
+  document.body.appendChild(box);
+  buyPriceTrendPopover = box;
+  button.setAttribute('aria-expanded', 'true');
+  const buttonRect = button.getBoundingClientRect();
+  const boxRect = box.getBoundingClientRect();
+  let left = buttonRect.right + 8;
+  let leftOfButton = false;
+  if(left + boxRect.width > window.innerWidth - 8){
+    left = buttonRect.left - boxRect.width - 8;
+    leftOfButton = true;
+  }
+  if(left < 8) left = 8;
+  let top = buttonRect.top + (buttonRect.height / 2) - (boxRect.height / 2);
+  if(top + boxRect.height > window.innerHeight - 8) top = window.innerHeight - boxRect.height - 8;
+  if(top < 8) top = 8;
+  box.style.left = `${left}px`;
+  box.style.top = `${top}px`;
+  box.classList.toggle('left-of-button', leftOfButton);
+  box.dataset.ownerTrendButton = '1';
+}
+
+function closeBuyPriceTrendDetails(){
+  if(!buyPriceTrendPopover) return;
+  document.querySelectorAll('[data-buy-price-trend][aria-expanded="true"]').forEach(button => button.setAttribute('aria-expanded', 'false'));
+  buyPriceTrendPopover.remove();
+  buyPriceTrendPopover = null;
+}
+
+function showBuyPriceTrendDetailsAlertFallback(button){
   if(!button) return;
   const trend = button.dataset.buyPriceTrend;
   const previous = textValue(button.dataset.buyPrevious);
@@ -3757,6 +3808,11 @@ document.addEventListener('click', function(event){
     event.stopPropagation();
     return;
   }
+  if(event.target.closest('.buy-price-popover')){
+    event.stopPropagation();
+    return;
+  }
+  closeBuyPriceTrendDetails();
 
   const manualQtyAction = event.target.closest('[data-sales-manual-qty-action]');
   if(manualQtyAction){

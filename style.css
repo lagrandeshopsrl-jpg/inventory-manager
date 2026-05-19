@@ -963,3 +963,71 @@ body.view-sales .sale-cart-tools button{
     display:none;
   }
 }
+
+.buy-price-popover{
+  position:fixed;
+  z-index:3000;
+  width:min(260px, calc(100vw - 16px));
+  padding:12px 14px;
+  border:1px solid #dbe7f6;
+  border-radius:14px;
+  background:white;
+  box-shadow:0 14px 34px rgba(15,23,42,.20);
+  color:#0f172a;
+  text-align:left;
+}
+.buy-price-popover::before{
+  content:"";
+  position:absolute;
+  left:-7px;
+  top:50%;
+  width:12px;
+  height:12px;
+  background:white;
+  border-left:1px solid #dbe7f6;
+  border-bottom:1px solid #dbe7f6;
+  transform:translateY(-50%) rotate(45deg);
+}
+.buy-price-popover.left-of-button::before{
+  left:auto;
+  right:-7px;
+  border-left:none;
+  border-bottom:none;
+  border-right:1px solid #dbe7f6;
+  border-top:1px solid #dbe7f6;
+}
+.buy-price-popover-title{
+  margin-bottom:8px;
+  font-size:14px;
+  font-weight:900;
+}
+.buy-price-popover.up .buy-price-popover-title{color:#dc2626}
+.buy-price-popover.down .buy-price-popover-title{color:#16a34a}
+.buy-price-popover-grid{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:6px 12px;
+  align-items:center;
+  font-size:13px;
+}
+.buy-price-popover-grid span{
+  color:#64748b;
+  font-weight:800;
+}
+.buy-price-popover-grid strong{
+  color:#0f172a;
+  font-weight:900;
+}
+.buy-price-popover-note{
+  color:#64748b;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.35;
+}
+
+@media(max-width:560px){
+  .buy-price-popover{
+    width:min(240px, calc(100vw - 16px));
+    padding:10px 12px;
+  }
+}
