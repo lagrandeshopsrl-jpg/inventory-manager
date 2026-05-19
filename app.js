@@ -3,6 +3,7 @@ const STORAGE_IMPORTS_KEY = 'importSessions';
 const STORAGE_SALES_KEY = 'salesRecords';
 const STORAGE_SALE_CART_KEY = 'saleCart';
 const STORAGE_SALE_CART_ORDER_KEY = 'saleCartOrder';
+const SALES_HIDE_BUY_PRICE_KEY = 'inventory_sales_hide_buy_price';
 const LAST_MODIFIED_KEY = 'inventory_lastModified';
 const DROPBOX_TOKEN_KEY = 'inventory_dropbox_token';
 const DROPBOX_TOKEN_EXPIRES_KEY = 'inventory_dropbox_token_expires_at';
@@ -1008,6 +1009,7 @@ function showSales(){
   setTitle('Vendite', 'Scansiona prodotti e conferma la vendita');
   const search = document.getElementById('search');
   if(search) search.placeholder = 'SCANSIONA BARCODE PER VENDITA';
+  updateSaleBuyPriceToggle();
   renderSaleCart();
   renderSaleSearchResults();
   if(currentSaleBarcode && productForBarcode(currentSaleBarcode)){
@@ -1186,6 +1188,32 @@ function prepareScannerForSalesEntry(){
   setTimeout(focusMainScannerForNextScan, 250);
 }
 
+function hideSalesBuyPrice(){
+  return localStorage.getItem(SALES_HIDE_BUY_PRICE_KEY) === '1';
+}
+
+function setSalesBuyPriceHidden(hidden){
+  localStorage.setItem(SALES_HIDE_BUY_PRICE_KEY, hidden ? '1' : '0');
+}
+
+function updateSaleBuyPriceToggle(){
+  const button = document.getElementById('saleBuyPriceToggle');
+  if(!button) return;
+  const hidden = hideSalesBuyPrice();
+  button.innerText = hidden ? 'Mostra acquisto' : 'Nascondi acquisto';
+  button.classList.toggle('active', hidden);
+  button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+}
+
+function toggleSaleBuyPriceVisibility(){
+  setSalesBuyPriceHidden(!hideSalesBuyPrice());
+  updateSaleBuyPriceToggle();
+  renderSaleCart();
+  renderSaleSearchResults();
+  const product = productForBarcode(currentSaleBarcode);
+  if(product) renderSaleCurrentProduct(product, currentSaleBarcode);
+}
+
 function renderUnregisteredSaleProduct(barcode){
   const code = textValue(barcode);
   const box = document.getElementById('saleSearchResults');
@@ -1210,6 +1238,7 @@ function renderSaleCurrentProduct(product, barcode){
   const supplier = getSupplier(product) || '-';
   const buyPrice = formatPriceDisplay(getBuy(product));
   const cartQty = Number(saleCart[code] || 0);
+  const showBuyPrice = !hideSalesBuyPrice();
   currentSaleBarcode = code;
   box.classList.remove('hidden');
   box.innerHTML = `
@@ -1221,7 +1250,7 @@ function renderSaleCurrentProduct(product, barcode){
         <div class="sale-current-supplier">Fornitore: <strong>${escapeHTML(supplier)}</strong></div>
       </div>
       <div class="sale-current-prices">
-        <div><span>Acquisto</span><strong>${escapeHTML(buyPrice)}</strong></div>
+        ${showBuyPrice ? `<div><span>Acquisto</span><strong>${escapeHTML(buyPrice)}</strong></div>` : ''}
         <div class="sale-current-sell-price"><span>Vendita</span><strong>${sellPriceDisplayHTML(product)}</strong></div>
         <div><span>Nel carrello</span><strong>${cartQty}</strong></div>
         <button class="edit-btn sale-current-edit" data-sale-edit-barcode="${escapeAttr(code)}">Modifica</button>
@@ -1608,7 +1637,8 @@ function renderSaleSearchResults(query = null){
     renderUnregisteredSaleProduct(search);
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Azioni</th></tr></thead><tbody>
+  const showBuyPrice = !hideSalesBuyPrice();
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th>Barcode</th><th>Prodotto</th><th>Fornitore</th>${showBuyPrice ? '<th>Acquisto</th>' : ''}<th class="sell-price-header">Vendita</th><th>Azioni</th></tr></thead><tbody>
     ${matches.map(item => {
       const p = item.product;
       const barcode = getBarcode(p);
@@ -1616,7 +1646,7 @@ function renderSaleSearchResults(query = null){
         <td>${escapeHTML(barcode)}</td>
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
-        <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
+        ${showBuyPrice ? `<td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>` : ''}
         <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td><div class="action-buttons">
           <button class="edit-btn" data-sale-add-index="${item.index}">Aggiungi</button>
@@ -1656,6 +1686,7 @@ function renderSaleCart(){
     .filter(([, qty]) => Number(qty) > 0)
     .map(([barcode, qty]) => ({ barcode, qty: Number(qty), product: productForBarcode(barcode) })));
   const totalSell = saleCartSellTotal(items);
+  const showBuyPrice = !hideSalesBuyPrice();
   updateSaleBottomTotal(totalSell);
   if(!items.length){
     saleCartAllSelected = false;
@@ -1665,7 +1696,7 @@ function renderSaleCart(){
     box.innerHTML = '<div class="empty-row">Carrello vendita vuoto</div>';
     return;
   }
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th><th>Acquisto</th><th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th>${showBuyPrice ? '<th>Acquisto</th>' : ''}<th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
       const buyPrice = item.product ? formatPriceDisplay(getBuy(item.product)) : '-';
       const supplier = item.product ? (getSupplier(item.product) || '-') : '-';
@@ -1674,7 +1705,7 @@ function renderSaleCart(){
         <td>${escapeHTML(item.barcode)}</td>
         <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
         <td>${escapeHTML(supplier)}</td>
-        <td>${escapeHTML(buyPrice)}</td>
+        ${showBuyPrice ? `<td>${escapeHTML(buyPrice)}</td>` : ''}
         <td>${sellPriceDisplayHTML(item.product)}</td>
         <td>${item.qty}</td>
         <td><div class="action-buttons">

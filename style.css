@@ -440,6 +440,8 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .sales-controls .sale-clear-search{background:#64748b}
 .sales-controls .sale-add-first{background:#0b63e5}
 .sales-controls .sale-delete-selected{background:#ef4444}
+.sales-controls .sale-buy-toggle{background:#64748b}
+.sales-controls .sale-buy-toggle.active{background:#0f172a}
 .confirm-sale{background:#16a34a;color:white}
 .sale-bottom-actions{
   display:grid;
