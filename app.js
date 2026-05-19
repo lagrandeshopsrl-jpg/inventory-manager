@@ -1219,14 +1219,12 @@ function renderSaleCurrentProduct(product, barcode){
         <div class="sale-current-name">${escapeHTML(getName(product) || 'Prodotto senza nome')}</div>
         <div class="sale-current-barcode">${escapeHTML(code)}</div>
         <div class="sale-current-supplier">Fornitore: <strong>${escapeHTML(supplier)}</strong></div>
-        <div class="sale-current-actions">
-          <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(code)}">Modifica</button>
-        </div>
       </div>
       <div class="sale-current-prices">
         <div><span>Acquisto</span><strong>${escapeHTML(buyPrice)}</strong></div>
         <div class="sale-current-sell-price"><span>Vendita</span><strong>${sellPriceDisplayHTML(product)}</strong></div>
         <div><span>Nel carrello</span><strong>${cartQty}</strong></div>
+        <button class="edit-btn sale-current-edit" data-sale-edit-barcode="${escapeAttr(code)}">Modifica</button>
       </div>
     </div>`;
 }

@@ -575,13 +575,11 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   font-size:.9em;
   vertical-align:baseline;
 }
-.sale-current-actions{
-  margin-top:10px;
-}
 .sale-current-prices{
   display:grid;
-  grid-template-columns:repeat(3,minmax(105px,1fr));
+  grid-template-columns:repeat(3,minmax(98px,1fr)) auto;
   gap:10px;
+  align-items:stretch;
 }
 .sale-current-prices div{
   background:white;
@@ -617,6 +615,11 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   color:#14532d;
   font-size:20px;
   line-height:normal;
+}
+.sale-current-edit{
+  align-self:stretch;
+  min-width:86px;
+  padding:10px 12px;
 }
 .sales-results{
   margin-bottom:12px;
@@ -657,7 +660,7 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
   margin-top:24px;
   padding-top:18px;
   border-top:2px solid #e5eaf3;
-  max-height:min(30vh,260px);
+  max-height:min(40vh,360px);
   overflow:auto;
   padding-right:2px;
 }
@@ -785,7 +788,7 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 }
 
 @media(max-height:760px){
-  .sale-cart-section{max-height:min(24vh,200px)}
+  .sale-cart-section{max-height:min(34vh,300px)}
   .large-sale-action{min-height:56px;padding:14px 18px;font-size:19px}
   .sale-bottom-total{min-height:56px;padding:8px 14px}
   .sale-bottom-total strong{font-size:22px}
