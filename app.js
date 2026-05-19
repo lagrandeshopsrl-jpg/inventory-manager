@@ -2682,7 +2682,10 @@ function renderFolderCards(containerId, groups, kind, emptyText){
       <div class="folder-count">${groups[name].length} prodotti</div>
       <div class="folder-card-actions">
         <div class="folder-open-hint">Clicca per aprire</div>
-        <button type="button" class="folder-export-btn" data-supplier-export="${escapeAttr(name)}">Esporta</button>
+        <div class="folder-card-buttons">
+          <button type="button" class="folder-export-btn" data-supplier-rename="${escapeAttr(name)}">Rinomina</button>
+          <button type="button" class="folder-export-btn" data-supplier-export="${escapeAttr(name)}">Esporta</button>
+        </div>
       </div>
     </div>`).join('');
     updateSupplierFolderSelectionUI();
@@ -2820,6 +2823,55 @@ function exportSelectedSupplierFolders(){
   exportProductListExcel(list, fileName, 'Nessun prodotto trovato per i fornitori selezionati.');
 }
 
+async function renameSupplierFolder(oldName){
+  const previousName = String(oldName || '');
+  const defaultValue = previousName === 'Senza fornitore' ? '' : previousName;
+  const nextNameRaw = prompt('Nuovo nome fornitore:', defaultValue);
+  if(nextNameRaw === null) return;
+  const nextName = textValue(nextNameRaw);
+  if(!nextName){
+    alert('Inserisci un nome fornitore valido.');
+    return;
+  }
+  if(nextName === previousName) return;
+
+  const matchingIndexes = [];
+  products.forEach((product, index) => {
+    if(supplierNameOf(product) === previousName) matchingIndexes.push(index);
+  });
+  if(!matchingIndexes.length){
+    alert('Nessun prodotto trovato per questo fornitore.');
+    renderSupplierFolders();
+    return;
+  }
+
+  const matchingSet = new Set(matchingIndexes);
+  const alreadyExists = products.some((product, index) =>
+    !matchingSet.has(index) && supplierNameOf(product) === nextName
+  );
+  const mergeText = alreadyExists
+    ? `\n\nEsiste già un fornitore chiamato "${nextName}": i prodotti verranno uniti sotto lo stesso nome.`
+    : '';
+  if(!confirm(`Rinominare "${previousName}" in "${nextName}"?\n\nProdotti collegati aggiornati: ${matchingIndexes.length}${mergeText}`)) return;
+
+  matchingIndexes.forEach(index => {
+    const current = canonicalProduct(products[index]);
+    products[index] = canonicalProduct({
+      ...current,
+      supplier: nextName,
+      fornitore: nextName
+    });
+  });
+
+  openSupplierFolderName = nextName;
+  const searchInput = document.getElementById('supplierSearch');
+  if(searchInput && textValue(searchInput.value)) searchInput.value = nextName;
+  persistProducts(true);
+  updateSupplierOptions();
+  await saveCloudAfterChange('Fornitore rinominato');
+  openSupplierFolder(nextName);
+}
+
 function renderCategoryFolders(){
   openCategoryFolderName = '';
   const groups = groupProductsBy(categoryNameOf);
@@ -2855,6 +2907,7 @@ function renderDetail(name, items, options){
   detail.innerHTML = `<div class="supplier-detail-header">
       <h2>${escapeHTML(options.icon + ' ' + name)}</h2>
       <div class="supplier-detail-actions">
+        ${options.mode === 'supplier' ? `<button type="button" data-supplier-rename="${escapeAttr(name)}">Rinomina fornitore</button>` : ''}
         ${options.mode === 'supplier' ? `<button type="button" data-supplier-export="${escapeAttr(name)}">Esporta fornitore</button>` : ''}
         <button onclick="${options.selectAllFn}()">Seleziona tutti</button>
         <button onclick="${options.deselectAllFn}()">Deseleziona</button>
@@ -4137,6 +4190,12 @@ document.addEventListener('click', function(event){
   const supplierExport = event.target.closest('[data-supplier-export]');
   if(supplierExport){
     exportSupplierExcel(supplierExport.dataset.supplierExport);
+    return;
+  }
+
+  const supplierRename = event.target.closest('[data-supplier-rename]');
+  if(supplierRename){
+    renameSupplierFolder(supplierRename.dataset.supplierRename);
     return;
   }
 
