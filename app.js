@@ -52,6 +52,7 @@ let barcodeCameraDetector = null;
 let barcodeCameraFound = false;
 let barcodeCameraReader = null;
 let buyPriceTrendPopover = null;
+let autoSellPriceUpdating = false;
 
 function readJson(key, fallback){
   try{
@@ -1401,18 +1402,39 @@ function updateSellPriceFromBuy(prefix){
   const lockInput = document.getElementById(prefix + 'PriceLocked');
   if(!buyInput || !sellInput) return;
   if(lockInput && lockInput.checked) return;
-  sellInput.value = autoSellPriceTextFromBuy(buyInput.value);
+  autoSellPriceUpdating = true;
+  try{
+    sellInput.value = autoSellPriceTextFromBuy(buyInput.value);
+  }finally{
+    autoSellPriceUpdating = false;
+  }
+}
+
+function lockSellPriceAfterManualEdit(prefix){
+  if(autoSellPriceUpdating) return;
+  const sellInput = document.getElementById(prefix + 'Sell');
+  const lockInput = document.getElementById(prefix + 'PriceLocked');
+  if(!sellInput || !lockInput) return;
+  if(textValue(sellInput.value)) lockInput.checked = true;
 }
 
 function installAutoSellPriceFromBuy(){
   ['new', 'edit'].forEach(prefix => {
     const buyInput = document.getElementById(prefix + 'Buy');
-    if(!buyInput || buyInput.dataset.autoSellPrice === '1') return;
-    buyInput.dataset.autoSellPrice = '1';
-    buyInput.addEventListener('input', () => updateSellPriceFromBuy(prefix));
+    if(buyInput && buyInput.dataset.autoSellPrice !== '1'){
+      buyInput.dataset.autoSellPrice = '1';
+      buyInput.addEventListener('input', () => updateSellPriceFromBuy(prefix));
+    }
+
+    const sellInput = document.getElementById(prefix + 'Sell');
+    if(sellInput && sellInput.dataset.manualPriceLock !== '1'){
+      sellInput.dataset.manualPriceLock = '1';
+      sellInput.addEventListener('input', () => lockSellPriceAfterManualEdit(prefix));
+      sellInput.addEventListener('change', () => lockSellPriceAfterManualEdit(prefix));
+    }
+
     const lockInput = document.getElementById(prefix + 'PriceLocked');
-    if(lockInput && lockInput.dataset.autoSellPrice === '1') return;
-    if(lockInput){
+    if(lockInput && lockInput.dataset.autoSellPrice !== '1'){
       lockInput.dataset.autoSellPrice = '1';
       lockInput.addEventListener('change', () => {
         if(!lockInput.checked) updateSellPriceFromBuy(prefix);
