@@ -154,6 +154,9 @@ function getBuyPriceChange(p){
   const diff = current - previous;
   return Math.abs(diff) < 0.0001 ? '' : diff.toFixed(2);
 }
+function getBuyPriceChangedAt(p){
+  return Array.isArray(p) ? textValue(p[11]) : textValue(valueOf(p, ['buyPriceChangedAt','prezzoAcquistoData','dataVariazioneAcquisto','dataAcquistoCambiato']));
+}
 
 function canonicalProduct(p){
   const barcode = getBarcode(p);
@@ -167,6 +170,7 @@ function canonicalProduct(p){
   const buyPriceTrend = getBuyPriceTrend(p);
   const buyPricePrevious = getBuyPricePrevious(p);
   const buyPriceChange = getBuyPriceChange(p);
+  const buyPriceChangedAt = getBuyPriceChangedAt(p);
   return {
     barcode,
     name,
@@ -179,6 +183,7 @@ function canonicalProduct(p){
     buyPriceTrend,
     buyPricePrevious,
     buyPriceChange,
+    buyPriceChangedAt,
     prodotto: name,
     fornitore: supplier,
     categoria: category,
@@ -189,7 +194,8 @@ function canonicalProduct(p){
     prezzoBloccato: priceLocked,
     andamentoAcquisto: buyPriceTrend,
     acquistoPrecedente: buyPricePrevious,
-    variazioneAcquistoValore: buyPriceChange
+    variazioneAcquistoValore: buyPriceChange,
+    dataVariazioneAcquisto: buyPriceChangedAt
   };
 }
 
@@ -212,11 +218,13 @@ function compactProduct(p){
   const trend = getBuyPriceTrend(product);
   const previous = textValue(product.buyPricePrevious);
   const change = textValue(product.buyPriceChange);
+  const changedAt = textValue(product.buyPriceChangedAt);
   if(trend){
     row.push(trend);
-    if(previous || change){
+    if(previous || change || changedAt){
       row.push(previous);
-      if(change) row.push(change);
+      if(change || changedAt) row.push(change);
+      if(changedAt) row.push(changedAt);
     }
   }
   return row;
@@ -239,7 +247,8 @@ function importSessionProduct(p){
     priceLocked: product.priceLocked,
     buyPriceTrend: product.buyPriceTrend,
     buyPricePrevious: product.buyPricePrevious,
-    buyPriceChange: product.buyPriceChange
+    buyPriceChange: product.buyPriceChange,
+    buyPriceChangedAt: product.buyPriceChangedAt
   };
 }
 
@@ -1419,11 +1428,12 @@ function buyPriceDisplayHTML(product, fallback = '-'){
   const arrow = trend === 'up' ? '▲' : '▼';
   const previous = formatPriceDisplay(getBuyPricePrevious(product), '');
   const change = formatSignedPriceChange(getBuyPriceChange(product));
-  const detailTitle = change ? `${label}: ${change}` : `${label}: clicca per dettagli`;
-  return `<span class="buy-price-with-trend">${escapeHTML(price)}<button type="button" class="buy-price-trend ${trend}" data-buy-price-trend="${escapeAttr(trend)}" data-buy-previous="${escapeAttr(previous)}" data-buy-current="${escapeAttr(price)}" data-buy-change="${escapeAttr(change)}" title="${escapeAttr(detailTitle)}" aria-label="${escapeAttr(detailTitle)}">${arrow}</button></span>`;
+  const changedAt = formatDate(getBuyPriceChangedAt(product));
+  const detailTitle = change ? `${label}: ${change}${changedAt ? ' - ' + changedAt : ''}` : `${label}: clicca per dettagli`;
+  return `<span class="buy-price-with-trend">${escapeHTML(price)}<button type="button" class="buy-price-trend ${trend}" data-buy-price-trend="${escapeAttr(trend)}" data-buy-previous="${escapeAttr(previous)}" data-buy-current="${escapeAttr(price)}" data-buy-change="${escapeAttr(change)}" data-buy-date="${escapeAttr(changedAt)}" title="${escapeAttr(detailTitle)}" aria-label="${escapeAttr(detailTitle)}">${arrow}</button></span>`;
 }
 
-function buyPriceChangeData(oldProduct, newProduct){
+function buyPriceChangeData(oldProduct, newProduct, changedAt = new Date().toISOString()){
   const oldBuy = salePriceNumber(getBuy(oldProduct));
   const newBuy = salePriceNumber(getBuy(newProduct));
   if(!Number.isFinite(oldBuy) || !Number.isFinite(newBuy) || oldBuy <= 0 || newBuy <= 0){
@@ -1434,12 +1444,13 @@ function buyPriceChangeData(oldProduct, newProduct){
   return {
     buyPriceTrend: diff > 0 ? 'up' : 'down',
     buyPricePrevious: oldBuy.toFixed(2),
-    buyPriceChange: diff.toFixed(2)
+    buyPriceChange: diff.toFixed(2),
+    buyPriceChangedAt: changedAt
   };
 }
 
 function emptyBuyPriceChangeData(){
-  return { buyPriceTrend: '', buyPricePrevious: '', buyPriceChange: '' };
+  return { buyPriceTrend: '', buyPricePrevious: '', buyPriceChange: '', buyPriceChangedAt: '' };
 }
 
 function formatSignedPriceChange(value){
@@ -1468,7 +1479,8 @@ function preserveBuyPriceChangeDataIfSame(oldProduct, newProduct){
   return {
     buyPriceTrend: getBuyPriceTrend(oldProduct),
     buyPricePrevious: getBuyPricePrevious(oldProduct),
-    buyPriceChange: getBuyPriceChange(oldProduct)
+    buyPriceChange: getBuyPriceChange(oldProduct),
+    buyPriceChangedAt: getBuyPriceChangedAt(oldProduct)
   };
 }
 
@@ -1478,12 +1490,13 @@ function showBuyPriceTrendDetails(button){
   const previous = textValue(button.dataset.buyPrevious);
   const current = textValue(button.dataset.buyCurrent);
   const change = textValue(button.dataset.buyChange);
+  const date = textValue(button.dataset.buyDate);
   const direction = trend === 'down' ? 'abbassato' : 'aumentato';
   if(!previous || !current || !change){
     alert('Dettaglio non disponibile per questa freccia. Sara disponibile dal prossimo import fatto con questa versione.');
     return;
   }
-  alert(`Prezzo acquisto ${direction}\nPrima: ${previous}\nOra: ${current}\nDifferenza: ${change}`);
+  alert(`Prezzo acquisto ${direction}\nPrima: ${previous}\nOra: ${current}\nDifferenza: ${change}${date ? '\nData: ' + date : ''}`);
 }
 
 function saleMoney(value){
@@ -3082,7 +3095,8 @@ async function saveEditProduct(){
     ...preservedBuyChange,
     andamentoAcquisto: preservedBuyChange.buyPriceTrend,
     acquistoPrecedente: preservedBuyChange.buyPricePrevious,
-    variazioneAcquistoValore: preservedBuyChange.buyPriceChange
+    variazioneAcquistoValore: preservedBuyChange.buyPriceChange,
+    dataVariazioneAcquisto: preservedBuyChange.buyPriceChangedAt
   });
   if(!validateProduct(product, editingIndex)) return;
   products[editingIndex] = product;
@@ -3139,7 +3153,8 @@ async function saveNewProduct(){
       ...preservedBuyChange,
       andamentoAcquisto: preservedBuyChange.buyPriceTrend,
       acquistoPrecedente: preservedBuyChange.buyPricePrevious,
-      variazioneAcquistoValore: preservedBuyChange.buyPriceChange
+      variazioneAcquistoValore: preservedBuyChange.buyPriceChange,
+      dataVariazioneAcquisto: preservedBuyChange.buyPriceChangedAt
     });
   }
   else products.unshift(product);
@@ -3281,11 +3296,12 @@ async function importExcel(event){
         return;
       }
 
+      const importChangedAt = new Date().toISOString();
       for(const product of importProducts){
         const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
         if(existing >= 0){
           const currentProduct = canonicalProduct(products[existing]);
-          const buyChange = buyPriceChangeData(currentProduct, product);
+          const buyChange = buyPriceChangeData(currentProduct, product, importChangedAt);
           if(buyChange.buyPriceTrend === 'up') buyIncreased++;
           if(buyChange.buyPriceTrend === 'down') buyDecreased++;
           const importedProduct = canonicalProduct({
@@ -3293,7 +3309,8 @@ async function importExcel(event){
             ...buyChange,
             andamentoAcquisto: buyChange.buyPriceTrend,
             acquistoPrecedente: buyChange.buyPricePrevious,
-            variazioneAcquistoValore: buyChange.buyPriceChange
+            variazioneAcquistoValore: buyChange.buyPriceChange,
+            dataVariazioneAcquisto: buyChange.buyPriceChangedAt
           });
           products[existing] = getPriceLocked(currentProduct)
             ? canonicalProduct({
@@ -3311,9 +3328,11 @@ async function importExcel(event){
             buyPriceTrend: '',
             buyPricePrevious: '',
             buyPriceChange: '',
+            buyPriceChangedAt: '',
             andamentoAcquisto: '',
             acquistoPrecedente: '',
-            variazioneAcquistoValore: ''
+            variazioneAcquistoValore: '',
+            dataVariazioneAcquisto: ''
           }));
           imported++;
         }
