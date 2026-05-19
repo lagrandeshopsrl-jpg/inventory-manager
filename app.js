@@ -3440,6 +3440,23 @@ async function requestChatGPTCategories(batch, categories){
   return data.items;
 }
 
+function chatGPTSetupErrorMessage(error){
+  const status = Number(error?.status || 0);
+  if([404, 405, 501].includes(status)){
+    return 'Funzione ChatGPT non trovata sul sito. Carica anche la cartella api con il file api/categorize-products.js, poi fai Redeploy su Vercel.';
+  }
+  if(status === 401 || status === 403){
+    return 'Chiave OpenAI non valida o senza permesso. Controlla la chiave salvata su Vercel e fai Redeploy.';
+  }
+  if(status === 429){
+    return 'OpenAI ha bloccato temporaneamente la richiesta per limite credito o troppe richieste. Controlla credito e limiti OpenAI.';
+  }
+  if(status >= 500){
+    return 'ChatGPT non è configurato sul server. Controlla che la chiave OpenAI sia salvata su Vercel e fai Redeploy.';
+  }
+  return 'ChatGPT non è raggiungibile. Controlla di usare il sito Vercel aggiornato, con cartella api caricata e Redeploy completato.';
+}
+
 async function categorizeWithChatGPT(){
   if(location.protocol === 'file:'){
     alert('ChatGPT funziona dal sito pubblicato o da localhost con server API, non aprendo il file diretto.');
@@ -3488,7 +3505,7 @@ async function categorizeWithChatGPT(){
       console.error('Errore categorizzazione ChatGPT blocco', batchNumber, error);
       if(updated === 0 && processed === 0){
         setCloudStatus('☁ ChatGPT non configurato', 'err');
-        alert('ChatGPT non è ancora configurato sul server. Serve pubblicare la funzione API e impostare la chiave OpenAI su Vercel.');
+        alert(chatGPTSetupErrorMessage(error));
         return;
       }
       failedBatches++;
