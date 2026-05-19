@@ -22,6 +22,8 @@ const IMPORT_HISTORY_RETENTION_DAYS = 30;
 const itemsPerPage = 100;
 const importSessionPageSize = 200;
 const folderDetailPageSize = 100;
+const chatGPTCategoryBatchSize = 80;
+const chatGPTCategoryEndpoint = '/api/categorize-products';
 
 let products = normalizeProductList(readJson(STORAGE_PRODUCTS_KEY, []));
 let importSessions = normalizeImportSessions(readJson(STORAGE_IMPORTS_KEY, []));
@@ -3291,6 +3293,11 @@ function productNeedsAutoCategory(product){
   return !category || category === 'SENZA CATEGORIA';
 }
 
+function productNeedsChatGPTCategory(product){
+  const category = normalizeCategoryText(getCategory(product));
+  return !category || category === 'SENZA CATEGORIA' || category === 'DA CONTROLLARE';
+}
+
 function autoCategoryRules(){
   return [
     {
@@ -3386,6 +3393,118 @@ async function autoCategorizeMissingProducts(){
   const cloudResult = await saveCloudAfterChange('Categorie aggiornate', { silentDropboxError: true });
   const syncText = cloudResult.synced ? 'Dropbox aggiornato.' : 'Salvato sul dispositivo.';
   alert(`Categorie aggiornate: ${updates.length}\n${syncText}`);
+}
+
+function chatGPTCategoryList(){
+  const existing = categoryOptions();
+  const automatic = autoCategoryRules().map(rule => rule.category);
+  return Array.from(new Set([...existing, ...automatic, 'Da controllare'].map(textValue).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function chatGPTProductPayload(index){
+  const product = products[index];
+  return {
+    barcode: getBarcode(product),
+    name: getName(product),
+    supplier: getSupplier(product)
+  };
+}
+
+function normalizeSuggestedCategory(value){
+  const category = textValue(value);
+  if(!category) return 'Da controllare';
+  return category.length > 40 ? category.slice(0, 40).trim() : category;
+}
+
+async function requestChatGPTCategories(batch, categories){
+  const response = await fetch(chatGPTCategoryEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ products: batch, categories })
+  });
+  let data = null;
+  try{
+    data = await response.json();
+  }catch(error){
+    data = null;
+  }
+  if(!response.ok){
+    const error = new Error(data?.error || 'ChatGPT non disponibile');
+    error.status = response.status;
+    throw error;
+  }
+  if(!Array.isArray(data?.items)){
+    throw new Error('Risposta ChatGPT non valida');
+  }
+  return data.items;
+}
+
+async function categorizeWithChatGPT(){
+  if(location.protocol === 'file:'){
+    alert('ChatGPT funziona dal sito pubblicato o da localhost con server API, non aprendo il file diretto.');
+    return;
+  }
+  const candidateIndexes = [];
+  products.forEach((product, index) => {
+    if(productNeedsChatGPTCategory(product)) candidateIndexes.push(index);
+  });
+  if(!candidateIndexes.length){
+    alert('Nessun prodotto senza categoria o Da controllare da inviare a ChatGPT.');
+    return;
+  }
+
+  const batches = Math.ceil(candidateIndexes.length / chatGPTCategoryBatchSize);
+  if(!confirm(`Chiedere a ChatGPT di categorizzare ${candidateIndexes.length} prodotti?\n\nL'app li invia in ${batches} blocchi da massimo ${chatGPTCategoryBatchSize} prodotti, così evita blocchi e memoria piena.\n\nVengono inviati solo barcode, nome prodotto e fornitore. I prezzi non vengono inviati.`)) return;
+
+  const categories = chatGPTCategoryList();
+  let updated = 0;
+  let processed = 0;
+  let failedBatches = 0;
+
+  for(let start = 0; start < candidateIndexes.length; start += chatGPTCategoryBatchSize){
+    const indexes = candidateIndexes.slice(start, start + chatGPTCategoryBatchSize);
+    const batch = indexes.map(chatGPTProductPayload);
+    const batchNumber = Math.floor(start / chatGPTCategoryBatchSize) + 1;
+    setCloudStatus(`☁ ChatGPT categorie ${processed}/${candidateIndexes.length}`, '');
+
+    try{
+      const suggestions = await requestChatGPTCategories(batch, categories);
+      const byBarcode = new Map(suggestions.map(item => [textValue(item.barcode), normalizeSuggestedCategory(item.category)]));
+      indexes.forEach(index => {
+        const barcode = getBarcode(products[index]);
+        const category = byBarcode.get(barcode) || 'Da controllare';
+        const current = canonicalProduct(products[index]);
+        products[index] = canonicalProduct({
+          ...current,
+          category,
+          categoria: category
+        });
+        updated++;
+      });
+      processed += indexes.length;
+      persistProducts(false);
+    }catch(error){
+      console.error('Errore categorizzazione ChatGPT blocco', batchNumber, error);
+      if(updated === 0 && processed === 0){
+        setCloudStatus('☁ ChatGPT non configurato', 'err');
+        alert('ChatGPT non è ancora configurato sul server. Serve pubblicare la funzione API e impostare la chiave OpenAI su Vercel.');
+        return;
+      }
+      failedBatches++;
+      processed += indexes.length;
+    }
+
+    if(batchNumber % 5 === 0) renderCurrentView();
+    await new Promise(resolve => setTimeout(resolve, 60));
+  }
+
+  persistProducts(true);
+  renderCurrentView();
+  const cloudResult = await saveCloudAfterChange('Categorie ChatGPT aggiornate', { silentDropboxError: true });
+  const syncText = cloudResult.synced ? 'Dropbox aggiornato.' : 'Salvato sul dispositivo.';
+  const failText = failedBatches ? `\nBlocchi con errore: ${failedBatches}. Quei prodotti sono in Da controllare.` : '';
+  alert(`Categorie ChatGPT aggiornate: ${updated}\n${syncText}${failText}`);
 }
 
 function supplierOptions(){

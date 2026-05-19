@@ -6,5 +6,6 @@ Problema risolto:
 - se Dropbox contiene dati, vengono scaricati automaticamente
 - se il locale contiene dati e Dropbox è vuoto, viene caricato il locale
 - senza token l'app mostra stato chiaro e salva solo in locale
+- ogni caricamento su Dropbox crea anche un backup separato con data e ora
 
 Carica index.html, app.js e style.css nella root del repository GitHub.
