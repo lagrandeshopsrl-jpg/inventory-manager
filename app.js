@@ -3279,6 +3279,107 @@ async function bulkUpdateAutoSellPrices(){
   alert(`Prezzi vendita aggiornati: ${updated}\nProtetti con lucchetto: ${locked}\nSenza prezzo acquisto valido: ${skipped}\n${syncText}`);
 }
 
+function normalizeCategoryText(value){
+  return textValue(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+function productNeedsAutoCategory(product){
+  const category = normalizeCategoryText(getCategory(product));
+  return !category || category === 'SENZA CATEGORIA';
+}
+
+function autoCategoryRules(){
+  return [
+    {
+      category: 'Giocattoli',
+      keywords: ['GIOCATTOLO','GIOCHI','PALLONE','SUPER SANTOS','BOLLE DI SAPONE','BAMBOLA','PUZZLE','PISTOLA','MACCHINA GIOCATTOLO','TOYS']
+    },
+    {
+      category: 'Cancelleria',
+      keywords: ['PENNA','PENNE','MATITA','MATITE','EVIDENZIATORE','MARCATORE','MARCATORI','POSCA','TRATTO','QUADERNO','QUADERNI','RISMA','CARTA','CARTONCINO','FOGLI','BLOCCO','DORSINO','RILEGAFOLI','GONIOMETRO','SQUADRA','RIGHELLO','TEMPERA','COLLA','SCOTCH','NASTRO ADESIVO','ETICHETTA','ETICHETTE','PENNARELLO','PENNARELLI','CORRETTORE','CUCITRICE','FERMAGLI']
+    },
+    {
+      category: 'Elettronica',
+      keywords: ['CARICATORE','CAVO','USB','TYPE C','TYPE-C','AURICOLARE','AURICOLARI','WIRELESS','ADATTATORE','ADAPTOR','SPINA','MULTIFUNZIONE','TERMOMETRO','LUCE','LAMPADA','LED','BATTERIA','PILE']
+    },
+    {
+      category: 'Pulizia',
+      keywords: ['DETERSIVO','DETERGENTE','SGRASSANTE','SAPONE LIQUIDO','SAPONE MANI','SPUGNA','PANNI','PANNO','SCOPA','MOCIO','CANDEGGINA','ANTIALGHE','WC','DISINFETTANTE']
+    },
+    {
+      category: 'Casa',
+      keywords: ['SECCHIELLO','SECCHELLO','CONTENITORE','BARATTOLO','CESTINO','CENTRINI','TOVAGLIA','PIATTO','PIATTI','BICCHIERE','BICCHIERI','POSATE','TUBO DI SCARICO','SUPPORTO DA PARETE','GANCIO','MOLLETTE','APPENDINO','VASSOIO']
+    },
+    {
+      category: 'Bellezza',
+      keywords: ['CREMA','SOLARE','SHAMPOO','BAGNOSCHIUMA','DOCCIA','PROFUMO','PETTINE','SPAZZOLA','GEL','TRUCCO','COSMETICO']
+    },
+    {
+      category: 'Ferramenta',
+      keywords: ['VITE','VITI','CACCIAVITE','CHIAVE INGLESE','MARTELLO','PINZA','NASTRO ISOLANTE','SILICONE','COLLA A CALDO','FASCETTA','FASCETTE']
+    },
+    {
+      category: 'Feste',
+      keywords: ['FESTA','NATALE','HALLOWEEN','CARNEVALE','PALLONCINI','CANDELINE','ADDOBBO','DECORAZIONE']
+    }
+  ];
+}
+
+function guessProductCategory(product){
+  const haystack = normalizeCategoryText([
+    getName(product),
+    getSupplier(product),
+    getBarcode(product)
+  ].join(' '));
+  if(!haystack) return 'Da controllare';
+  const rules = autoCategoryRules();
+  const match = rules.find(rule => rule.keywords.some(keyword => haystack.includes(keyword)));
+  return match ? match.category : 'Da controllare';
+}
+
+async function autoCategorizeMissingProducts(){
+  const updates = [];
+  const counts = {};
+
+  products.forEach((product, index) => {
+    if(!productNeedsAutoCategory(product)) return;
+    const category = guessProductCategory(product);
+    updates.push({ index, category });
+    counts[category] = (counts[category] || 0) + 1;
+  });
+
+  if(!updates.length){
+    alert('Nessun prodotto senza categoria da aggiornare.');
+    return;
+  }
+
+  const summary = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 10)
+    .map(([category, count]) => `${category}: ${count}`)
+    .join('\n');
+  if(!confirm(`Categorizzare automaticamente ${updates.length} prodotti senza categoria?\n\n${summary}\n\nI prodotti già categorizzati non verranno modificati.`)) return;
+
+  updates.forEach(({ index, category }) => {
+    const current = canonicalProduct(products[index]);
+    products[index] = canonicalProduct({
+      ...current,
+      category,
+      categoria: category
+    });
+  });
+
+  openCategoryFolderName = '';
+  persistProducts(true);
+  renderCurrentView();
+  const cloudResult = await saveCloudAfterChange('Categorie aggiornate', { silentDropboxError: true });
+  const syncText = cloudResult.synced ? 'Dropbox aggiornato.' : 'Salvato sul dispositivo.';
+  alert(`Categorie aggiornate: ${updates.length}\n${syncText}`);
+}
+
 function supplierOptions(){
   return Array.from(new Set(products.map(p => getSupplier(p)).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b));
