@@ -11,6 +11,7 @@ const DROPBOX_APP_KEY_KEY = 'inventory_dropbox_app_key';
 const DROPBOX_REFRESH_TOKEN_KEY = 'inventory_dropbox_refresh_token';
 const DROPBOX_PATH_KEY = 'inventory_dropbox_path';
 const DROPBOX_BACKUP_FOLDER_KEY = 'inventory_dropbox_backup_folder';
+const BARCODE_CAMERA_DEVICE_KEY = 'inventory_barcode_camera_device_id';
 const SYNC_FIX_VERSION_KEY = 'inventory_sync_fix_version';
 const DROPBOX_OAUTH_STATE_KEY = 'inventory_dropbox_oauth_state';
 const DROPBOX_OAUTH_VERIFIER_KEY = 'inventory_dropbox_oauth_verifier';
@@ -3614,7 +3615,8 @@ function barcodeCameraConstraints(deviceId = ''){
   const video = {
     width: { ideal: 1280 },
     height: { ideal: 720 },
-    frameRate: { ideal: 30, max: 30 }
+    frameRate: { ideal: 30, max: 30 },
+    advanced: [{ zoom: 1 }]
   };
   if(deviceId) video.deviceId = { exact: deviceId };
   else video.facingMode = { ideal: 'environment' };
@@ -3632,8 +3634,9 @@ function barcodeCameraDeviceScore(device){
   if(!label) return 0;
   let score = 0;
   if(/back|rear|environment|posteriore|trasera|arriere|arrière|后|背面/.test(label)) score += 100;
-  if(/main|wide angle|wide-angle|wide|1x|principale/.test(label)) score += 35;
-  if(label === 'back camera' || label === 'rear camera') score += 45;
+  if(/main|1x|principale/.test(label)) score += 55;
+  if(/wide angle|wide-angle|wide/.test(label)) score += 35;
+  if(label === 'back camera' || label === 'rear camera') score += 80;
   if(/front|user|face|selfie|facetime|desk|continuity/.test(label)) score -= 200;
   if(/ultra|ultrawide|ultra-wide|0\\.5|0,5/.test(label)) score -= 90;
   if(/tele|telephoto|zoom/.test(label)) score -= 60;
@@ -3647,6 +3650,8 @@ async function preferredBarcodeCameraDeviceId(){
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cameras = devices.filter(device => device.kind === 'videoinput' && device.deviceId);
     if(!cameras.length || !cameras.some(device => device.label)) return '';
+    const saved = textValue(localStorage.getItem(BARCODE_CAMERA_DEVICE_KEY));
+    if(saved && cameras.some(device => device.deviceId === saved)) return saved;
     return cameras
       .map((device, index) => ({ device, index, score: barcodeCameraDeviceScore(device) }))
       .sort((a, b) => (b.score - a.score) || (a.index - b.index))[0]?.device?.deviceId || '';
@@ -3663,12 +3668,25 @@ function streamVideoDeviceId(stream){
 
 async function openPreferredBarcodeCameraStream(){
   const base = barcodeCameraConstraints();
+  const savedDeviceId = textValue(localStorage.getItem(BARCODE_CAMERA_DEVICE_KEY));
+  if(savedDeviceId){
+    try{
+      const savedStream = await navigator.mediaDevices.getUserMedia(barcodeCameraConstraints(savedDeviceId));
+      await stabilizeBarcodeCameraStream(savedStream);
+      return savedStream;
+    }catch(error){
+      localStorage.removeItem(BARCODE_CAMERA_DEVICE_KEY);
+    }
+  }
   let stream = await navigator.mediaDevices.getUserMedia(base);
   const preferredDeviceId = await preferredBarcodeCameraDeviceId();
   const currentDeviceId = streamVideoDeviceId(stream);
-  if(preferredDeviceId && currentDeviceId && preferredDeviceId !== currentDeviceId){
+  if(preferredDeviceId && preferredDeviceId !== currentDeviceId){
     stopMediaStream(stream);
     stream = await navigator.mediaDevices.getUserMedia(barcodeCameraConstraints(preferredDeviceId));
+    localStorage.setItem(BARCODE_CAMERA_DEVICE_KEY, preferredDeviceId);
+  }else if(preferredDeviceId){
+    localStorage.setItem(BARCODE_CAMERA_DEVICE_KEY, preferredDeviceId);
   }
   await stabilizeBarcodeCameraStream(stream);
   return stream;

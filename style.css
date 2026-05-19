@@ -1700,3 +1700,26 @@ body.view-sales .sale-cart-tools button{
     display:none;
   }
 }
+
+@media(max-width:900px), (hover:none) and (pointer:coarse){
+  body.view-sales .sale-bottom-actions{
+    position:relative!important;
+    inset:auto!important;
+    top:auto!important;
+    right:auto!important;
+    bottom:auto!important;
+    left:auto!important;
+    z-index:1!important;
+    transform:none!important;
+    margin:16px 0 0!important;
+    padding:12px 0 0!important;
+    background:white!important;
+    box-shadow:none!important;
+    border-top:2px solid #e5eaf3!important;
+  }
+  body.view-sales .sale-cart-section{
+    max-height:none!important;
+    overflow:visible!important;
+    padding-bottom:0!important;
+  }
+}
