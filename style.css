@@ -1031,3 +1031,552 @@ body.view-sales .sale-cart-tools button{
     padding:10px 12px;
   }
 }
+
+@media(max-width:720px){
+  html{
+    -webkit-text-size-adjust:100%;
+  }
+  body{
+    overflow-x:hidden;
+    padding-bottom:calc(74px + env(safe-area-inset-bottom));
+    background:#f4f7fb;
+  }
+  .app-root{
+    display:block!important;
+    min-height:100dvh;
+  }
+  .sidebar{
+    position:fixed;
+    left:0;
+    right:0;
+    top:auto;
+    bottom:0;
+    z-index:2500;
+    width:100%;
+    min-width:0;
+    height:auto;
+    max-height:none;
+    flex-direction:row;
+    align-items:center;
+    gap:6px;
+    padding:8px 8px calc(8px + env(safe-area-inset-bottom));
+    overflow-x:auto;
+    overflow-y:hidden;
+    border-top:1px solid rgba(255,255,255,.12);
+    box-shadow:0 -12px 30px rgba(2,6,23,.28);
+  }
+  .sidebar .logo,
+  .sidebar .copyright{
+    display:none;
+  }
+  .menu{
+    flex:0 0 82px;
+    min-height:52px;
+    padding:8px 6px;
+    border-radius:14px;
+    text-align:center;
+    font-size:12px;
+    line-height:1.15;
+    white-space:normal;
+  }
+  .main{
+    width:100%;
+    min-width:0;
+    padding:10px 10px calc(92px + env(safe-area-inset-bottom));
+    overflow:visible;
+  }
+  .scanner-bar{
+    top:0;
+    z-index:1200;
+    margin:0 -10px 10px;
+    padding:8px 10px 10px;
+    box-shadow:0 8px 20px rgba(244,247,251,.96);
+  }
+  .scanner-line{
+    grid-template-columns:minmax(0,1fr) 58px;
+    gap:8px;
+  }
+  .scanner-search{
+    min-height:58px;
+    padding:12px;
+    border-width:3px;
+    border-radius:16px;
+    font-size:17px;
+    box-shadow:0 0 0 4px rgba(22,163,74,.15),0 6px 18px rgba(15,23,42,.08);
+  }
+  .scanner-camera-btn{
+    min-width:0;
+    min-height:58px;
+    padding:0;
+    border-width:3px;
+    border-radius:16px;
+  }
+  .scanner-camera-btn .camera-label{
+    display:none;
+  }
+  .titlebar{
+    flex-direction:column;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .titlebar h1{
+    font-size:28px;
+    line-height:1.05;
+  }
+  .titlebar p{
+    margin-top:5px;
+    font-size:16px;
+    line-height:1.2;
+  }
+  .top-actions{
+    width:100%;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .cloud-status{
+    grid-column:1/-1;
+    display:block;
+    text-align:center;
+    padding:9px 10px;
+    font-size:13px;
+    white-space:normal;
+  }
+  .blue-btn,
+  .toolbar button,
+  .file-label,
+  .supplier-top button,
+  .history-top button,
+  .settings-actions button,
+  .folder-picker-actions button,
+  .oauth-box button{
+    min-height:46px;
+    padding:11px 12px;
+    border-radius:13px;
+    font-size:14px;
+  }
+  .toolbar,
+  .supplier-top,
+  .history-top,
+  .settings-actions,
+  .folder-picker-actions,
+  .oauth-box{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    align-items:stretch;
+  }
+  .toolbar input,
+  .toolbar select,
+  .supplier-top input,
+  .supplier-top select,
+  .history-top input,
+  .settings-row input,
+  .settings-row select,
+  .sales-controls input,
+  .sales-controls select,
+  .sales-filters input,
+  .sales-filters select{
+    min-width:0;
+    width:100%;
+    font-size:16px;
+  }
+  .toolbar input,
+  .toolbar select,
+  .supplier-top input,
+  .supplier-top select,
+  .history-top input{
+    grid-column:1/-1;
+  }
+  .lock-filter-right{
+    margin-left:0;
+  }
+  .table-card,
+  .import-products-table{
+    overflow:visible;
+    border:none;
+    background:transparent;
+    box-shadow:none;
+  }
+  .table-card table,
+  .table-card thead,
+  .table-card tbody,
+  .table-card tr,
+  .table-card td,
+  .import-products-table,
+  .import-products-table thead,
+  .import-products-table tbody,
+  .import-products-table tr,
+  .import-products-table td{
+    display:block;
+    width:100%;
+  }
+  .table-card thead,
+  .import-products-table thead{
+    display:none;
+  }
+  .table-card tr,
+  .import-products-table tr{
+    margin:0 0 10px;
+    padding:11px;
+    border:1px solid #e5eaf3;
+    border-radius:16px;
+    background:white;
+    box-shadow:0 7px 18px rgba(15,23,42,.07);
+  }
+  .table-card td,
+  .import-products-table td{
+    display:grid;
+    grid-template-columns:96px minmax(0,1fr);
+    gap:10px;
+    align-items:center;
+    padding:7px 4px;
+    border:0;
+    text-align:right;
+    font-size:15px;
+    word-break:break-word;
+  }
+  .table-card td::before,
+  .import-products-table td::before{
+    content:"";
+    color:#64748b;
+    font-size:12px;
+    font-weight:900;
+    text-align:left;
+    text-transform:uppercase;
+  }
+  .action-buttons{
+    justify-content:flex-end;
+    flex-wrap:wrap;
+  }
+  .edit-btn,
+  .delete-btn,
+  .folder-export-btn{
+    min-height:42px;
+    padding:10px 12px;
+    border-radius:12px;
+  }
+  #productTable td:nth-child(1)::before{content:"Sel."}
+  #productTable td:nth-child(2)::before{content:"Barcode"}
+  #productTable td:nth-child(3)::before{content:"Prodotto"}
+  #productTable td:nth-child(4)::before{content:"Fornitore"}
+  #productTable td:nth-child(5)::before{content:"Acquisto"}
+  #productTable td:nth-child(6)::before{content:"Vendita"}
+  #productTable td:nth-child(7)::before{content:"Categoria"}
+  #productTable td:nth-child(8)::before{content:"Quantita"}
+  #productTable td:nth-child(9)::before{content:"Azioni"}
+  #saleCartBox td:nth-child(1)::before{content:"Sel."}
+  #saleCartBox td:nth-child(2)::before{content:"Barcode"}
+  #saleCartBox td:nth-child(3)::before{content:"Prodotto"}
+  #saleCartBox td:nth-child(4)::before{content:"Fornitore"}
+  #saleCartBox td:nth-child(5)::before{content:"Acquisto"}
+  #saleCartBox td:nth-child(6)::before{content:"Vendita"}
+  #saleCartBox td:nth-child(7)::before{content:"Qta"}
+  #saleCartBox td:nth-child(8)::before{content:"Azioni"}
+  body.sales-buy-hidden #saleCartBox td:nth-child(5)::before{content:"Vendita"}
+  body.sales-buy-hidden #saleCartBox td:nth-child(6)::before{content:"Qta"}
+  body.sales-buy-hidden #saleCartBox td:nth-child(7)::before{content:"Azioni"}
+  .supplier-detail td:nth-child(1)::before,
+  .import-products-table td:nth-child(1)::before{content:"Sel."}
+  .supplier-detail td:nth-child(2)::before,
+  .import-products-table td:nth-child(2)::before{content:"Barcode"}
+  .supplier-detail td:nth-child(3)::before,
+  .import-products-table td:nth-child(3)::before{content:"Prodotto"}
+  .supplier-detail td:nth-child(4)::before,
+  .import-products-table td:nth-child(4)::before{content:"Fornitore"}
+  .supplier-detail td:nth-child(5)::before,
+  .import-products-table td:nth-child(5)::before{content:"Acquisto"}
+  .supplier-detail td:nth-child(6)::before,
+  .import-products-table td:nth-child(6)::before{content:"Vendita"}
+  .supplier-detail td:nth-child(7)::before,
+  .import-products-table td:nth-child(7)::before{content:"Categoria"}
+  .supplier-detail td:nth-child(8)::before,
+  .import-products-table td:nth-child(8)::before{content:"Quantita"}
+  .supplier-detail td:nth-child(9)::before,
+  .import-products-table td:nth-child(9)::before{content:"Azioni"}
+  .sales-products-table td:nth-child(1)::before{content:"Sel."}
+  .sales-products-table td:nth-child(2)::before{content:"#"}
+  .sales-products-table td:nth-child(3)::before{content:"Prodotto"}
+  .sales-products-table td:nth-child(4)::before{content:"Barcode"}
+  .sales-products-table td:nth-child(5)::before{content:"Fornitore"}
+  .sales-products-table td:nth-child(6)::before{content:"Categoria"}
+  .sales-products-table td:nth-child(7)::before{content:"Acquisto"}
+  .sales-products-table td:nth-child(8)::before{content:"Vendita"}
+  .sales-products-table td:nth-child(9)::before{content:"Qta"}
+  .sales-products-table td:nth-child(10)::before{content:"Ultima"}
+  .sales-products-table td:nth-child(11)::before{content:"Azioni"}
+  .sales-suppliers-table td:nth-child(1)::before{content:"Sel."}
+  .sales-suppliers-table td:nth-child(2)::before{content:"#"}
+  .sales-suppliers-table td:nth-child(3)::before{content:"Fornitore"}
+  .sales-suppliers-table td:nth-child(4)::before{content:"Pezzi"}
+  .sales-suppliers-table td:nth-child(5)::before{content:"Totale"}
+  .sales-suppliers-table td:nth-child(6)::before{content:"Diversi"}
+  .sales-suppliers-table td:nth-child(7)::before{content:"Migliore"}
+  .sales-suppliers-table td:nth-child(8)::before{content:"Acquisto"}
+  .sales-suppliers-table td:nth-child(9)::before{content:"Vendita"}
+  .sales-suppliers-table td:nth-child(10)::before{content:"Ultima"}
+  .sales-suppliers-table td:nth-child(11)::before{content:"Azioni"}
+  .supplier-sales-detail-row > td{
+    display:block;
+    padding:0;
+  }
+  .supplier-sales-detail-row > td::before{
+    content:none!important;
+  }
+  .supplier-sales-products td:nth-child(1)::before{content:"#"}
+  .supplier-sales-products td:nth-child(2)::before{content:"Prodotto"}
+  .supplier-sales-products td:nth-child(3)::before{content:"Barcode"}
+  .supplier-sales-products td:nth-child(4)::before{content:"Acquisto"}
+  .supplier-sales-products td:nth-child(5)::before{content:"Vendita"}
+  .supplier-sales-products td:nth-child(6)::before{content:"Qta"}
+  .supplier-sales-products td:nth-child(7)::before{content:"Totale"}
+  .supplier-sales-products td:nth-child(8)::before{content:"Ultima"}
+  .supplier-sales-products td:nth-child(9)::before{content:"Azioni"}
+  .sell-price-cell{
+    border-left:0;
+    border-right:0;
+    border-radius:10px;
+    padding:10px!important;
+  }
+  .supplier-stats{
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .stat-box{
+    padding:12px;
+    border-radius:14px;
+    font-size:14px;
+  }
+  .supplier-folders{
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+  .folder-card{
+    padding:15px;
+    border-radius:16px;
+  }
+  .folder-name{
+    font-size:18px;
+  }
+  .supplier-detail{
+    padding:12px;
+    border-radius:16px;
+  }
+  .supplier-detail-header,
+  .import-session-header{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .supplier-detail-actions,
+  .import-session-actions,
+  .history-cache-tools,
+  .import-selected-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    border-left:0;
+    padding-left:0;
+    margin-left:0;
+  }
+  .history-cache-tools span{
+    grid-column:1/-1;
+    text-align:center;
+  }
+  .sales-panel{
+    padding:12px;
+    border-radius:16px;
+  }
+  .sales-panel-header{
+    flex-direction:row;
+    align-items:center;
+  }
+  .sales-panel-header h2{
+    font-size:22px;
+  }
+  .sales-badge{
+    padding:7px 10px;
+    font-size:14px;
+  }
+  .sales-controls,
+  .sales-filters,
+  .sales-stat-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .sales-controls input,
+  .sales-filters input,
+  .sales-filters select,
+  .sales-controls button{
+    min-height:48px;
+    border-radius:13px;
+  }
+  .sales-controls input,
+  .sales-manual-add,
+  .sales-manual-preview,
+  .sale-order-toggle{
+    grid-column:1/-1;
+  }
+  .sales-controls .sale-order-btn{
+    min-width:0;
+    width:50%;
+  }
+  .sales-manual-result{
+    grid-template-columns:1fr;
+  }
+  .sales-manual-qty-stepper{
+    grid-template-columns:48px minmax(0,1fr) 48px;
+  }
+  .sale-status{
+    padding:10px 12px;
+    border-radius:13px;
+  }
+  .sale-current-product{
+    margin:10px 0 14px;
+    padding:12px;
+    border-radius:16px;
+  }
+  .sale-current-main{
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+  .sale-current-name{
+    font-size:20px;
+    line-height:1.15;
+  }
+  .sale-current-prices{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:8px;
+  }
+  .sale-current-edit{
+    grid-column:1/-1;
+    width:100%;
+    min-height:42px;
+  }
+  .sale-current-prices div{
+    padding:8px;
+  }
+  .sale-current-prices strong,
+  .sale-current-prices .sale-current-sell-price strong{
+    font-size:18px;
+  }
+  .sale-cart-section{
+    max-height:none;
+    overflow:visible;
+    margin-top:14px;
+    padding-top:12px;
+  }
+  .sale-cart-tools{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .sale-bottom-actions{
+    grid-template-columns:1fr 1fr;
+    bottom:calc(72px + env(safe-area-inset-bottom));
+    gap:8px;
+    margin:12px -2px 0;
+    padding:8px 0;
+  }
+  .sale-bottom-total{
+    grid-column:1/-1;
+    min-height:54px;
+    align-items:center;
+    text-align:center;
+  }
+  .large-sale-action{
+    min-height:56px;
+    padding:14px 10px;
+    font-size:18px;
+    border-radius:15px;
+  }
+  .settings-panel{
+    padding:14px;
+    border-radius:16px;
+  }
+  .settings-row{
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+  .advanced-settings{
+    margin-left:0;
+  }
+  .oauth-help{
+    grid-template-columns:1fr;
+  }
+  .modal-overlay{
+    align-items:stretch;
+    padding:0;
+  }
+  .edit-box,
+  .barcode-camera-box{
+    max-width:none;
+    max-height:100dvh;
+    min-height:100dvh;
+    border-radius:0;
+    padding:18px 14px calc(20px + env(safe-area-inset-bottom));
+  }
+  .close-btn{
+    right:12px;
+    top:12px;
+    width:46px;
+    height:46px;
+  }
+  .edit-title{
+    padding-right:54px;
+    gap:12px;
+  }
+  .edit-title h2{
+    font-size:26px;
+  }
+  .edit-row{
+    grid-template-columns:44px 1fr;
+    gap:8px;
+  }
+  .big-icon,
+  .left-icon{
+    width:42px;
+    height:42px;
+    font-size:19px;
+  }
+  .field label{
+    font-size:15px;
+  }
+  .modern-input input{
+    min-height:50px;
+    padding:12px 14px;
+    font-size:18px;
+  }
+  .modal-actions{
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+  .modal-actions button{
+    min-height:56px;
+    font-size:19px;
+  }
+  .pagination{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .pagination span{
+    grid-column:1/-1;
+    order:-1;
+    text-align:center;
+  }
+  .pagination button{
+    min-height:44px;
+  }
+  .buy-price-popover{
+    left:8px!important;
+    right:8px!important;
+    top:auto!important;
+    bottom:calc(86px + env(safe-area-inset-bottom))!important;
+    width:auto;
+    max-width:none;
+  }
+  .buy-price-popover::before{
+    display:none;
+  }
+}

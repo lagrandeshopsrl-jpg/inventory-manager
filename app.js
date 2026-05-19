@@ -1255,8 +1255,9 @@ function setSalesBuyPriceHidden(hidden){
 
 function updateSaleBuyPriceToggle(){
   const button = document.getElementById('saleBuyPriceToggle');
-  if(!button) return;
   const hidden = hideSalesBuyPrice();
+  document.body.classList.toggle('sales-buy-hidden', hidden);
+  if(!button) return;
   button.innerText = hidden ? 'Mostra acquisto' : 'Nascondi acquisto';
   button.classList.toggle('active', hidden);
   button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
@@ -2308,7 +2309,7 @@ function renderProductSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Qta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card sales-products-table"><table><thead><tr><th></th><th>#</th><th>Prodotto</th><th>Barcode</th><th>Fornitore</th><th>Categoria</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Qta</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
     ${rows.map(([barcode, data], index) => {
       const p = productForBarcode(barcode);
       return `<tr>
@@ -2345,7 +2346,7 @@ function renderSupplierSalesStats(box, records){
     });
   });
   const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
-  box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Totale vendita</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
+  box.innerHTML = `<div class="table-card sales-suppliers-table"><table><thead><tr><th></th><th>#</th><th>Fornitore</th><th>Pezzi venduti</th><th>Totale vendita</th><th>Prodotti diversi</th><th>Prodotto migliore</th><th>Acquisto</th><th class="sell-price-header">Vendita</th><th>Ultima vendita</th><th>Azioni</th></tr></thead><tbody>
     ${rows.map(([supplier, data], index) => {
       const top = Object.entries(data.products).sort((a, b) => b[1] - a[1])[0];
       const p = top ? productForBarcode(top[0]) : null;
