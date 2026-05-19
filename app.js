@@ -131,6 +131,17 @@ function boolValue(value){
   return ['1','true','si','sì','yes','y','locked','bloccato','blocca'].includes(text);
 }
 function getPriceLocked(p){ return Array.isArray(p) ? boolValue(p[7]) : boolValue(valueOf(p, ['priceLocked','prezzoBloccato','Prezzo Bloccato','locked','Locked','lucchetto','Lucchetto'])); }
+function normalizeBuyPriceTrend(value){
+  const text = textValue(value).toLowerCase();
+  if(['up','su','aumentato','aumento','increase','increased','↑','▲'].includes(text)) return 'up';
+  if(['down','giu','giù','abbassato','diminuito','decrease','decreased','↓','▼'].includes(text)) return 'down';
+  return '';
+}
+function getBuyPriceTrend(p){
+  return Array.isArray(p)
+    ? normalizeBuyPriceTrend(p[8])
+    : normalizeBuyPriceTrend(valueOf(p, ['buyPriceTrend','buy_price_trend','trendAcquisto','andamentoAcquisto','variazioneAcquisto','prezzoAcquistoTrend']));
+}
 
 function canonicalProduct(p){
   const barcode = getBarcode(p);
@@ -141,6 +152,7 @@ function canonicalProduct(p){
   const sellPrice = getSell(p);
   const quantity = getQuantity(p);
   const priceLocked = getPriceLocked(p);
+  const buyPriceTrend = getBuyPriceTrend(p);
   return {
     barcode,
     name,
@@ -150,6 +162,7 @@ function canonicalProduct(p){
     sellPrice,
     quantity,
     priceLocked,
+    buyPriceTrend,
     prodotto: name,
     fornitore: supplier,
     categoria: category,
@@ -157,7 +170,8 @@ function canonicalProduct(p){
     vendita: sellPrice,
     quantita: quantity,
     quantità: quantity,
-    prezzoBloccato: priceLocked
+    prezzoBloccato: priceLocked,
+    andamentoAcquisto: buyPriceTrend
   };
 }
 
@@ -175,7 +189,8 @@ function compactProduct(p){
     product.buyPrice,
     product.sellPrice,
     product.quantity,
-    product.priceLocked ? 1 : 0
+    product.priceLocked ? 1 : 0,
+    product.buyPriceTrend
   ];
 }
 
@@ -193,7 +208,8 @@ function importSessionProduct(p){
     buyPrice: product.buyPrice,
     sellPrice: product.sellPrice,
     quantity: product.quantity,
-    priceLocked: product.priceLocked
+    priceLocked: product.priceLocked,
+    buyPriceTrend: product.buyPriceTrend
   };
 }
 
@@ -1236,7 +1252,7 @@ function renderSaleCurrentProduct(product, barcode){
   if(!box || !product) return;
   const code = textValue(barcode || getBarcode(product));
   const supplier = getSupplier(product) || '-';
-  const buyPrice = formatPriceDisplay(getBuy(product));
+  const buyPrice = buyPriceDisplayHTML(product);
   const cartQty = Number(saleCart[code] || 0);
   const showBuyPrice = !hideSalesBuyPrice();
   currentSaleBarcode = code;
@@ -1250,7 +1266,7 @@ function renderSaleCurrentProduct(product, barcode){
         <div class="sale-current-supplier">Fornitore: <strong>${escapeHTML(supplier)}</strong></div>
       </div>
       <div class="sale-current-prices">
-        ${showBuyPrice ? `<div><span>Acquisto</span><strong>${escapeHTML(buyPrice)}</strong></div>` : ''}
+        ${showBuyPrice ? `<div><span>Acquisto</span><strong>${buyPrice}</strong></div>` : ''}
         <div class="sale-current-sell-price"><span>Vendita</span><strong>${sellPriceDisplayHTML(product)}</strong></div>
         <div><span>Nel carrello</span><strong>${cartQty}</strong></div>
         <button class="edit-btn sale-current-edit" data-sale-edit-barcode="${escapeAttr(code)}">Modifica</button>
@@ -1361,6 +1377,34 @@ function sellPriceDisplayHTML(product, fallback = '-'){
   const price = formatPriceDisplay(getSell(product), fallback);
   const lock = getPriceLocked(product) ? ' <span class="price-lock-icon" title="Prezzo vendita bloccato">🔒</span>' : '';
   return `${escapeHTML(price)}${lock}`;
+}
+
+function buyPriceDisplayHTML(product, fallback = '-'){
+  if(!product) return escapeHTML(fallback);
+  const price = formatPriceDisplay(getBuy(product), fallback);
+  const trend = getBuyPriceTrend(product);
+  if(!trend) return escapeHTML(price);
+  const label = trend === 'up' ? 'Prezzo acquisto aumentato' : 'Prezzo acquisto abbassato';
+  const arrow = trend === 'up' ? '▲' : '▼';
+  return `<span class="buy-price-with-trend">${escapeHTML(price)}<span class="buy-price-trend ${trend}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${arrow}</span></span>`;
+}
+
+function compareBuyPriceTrend(oldProduct, newProduct){
+  const oldBuy = salePriceNumber(getBuy(oldProduct));
+  const newBuy = salePriceNumber(getBuy(newProduct));
+  if(!Number.isFinite(oldBuy) || !Number.isFinite(newBuy) || oldBuy <= 0 || newBuy <= 0) return '';
+  const diff = newBuy - oldBuy;
+  if(Math.abs(diff) < 0.0001) return '';
+  return diff > 0 ? 'up' : 'down';
+}
+
+function preserveBuyPriceTrendIfSame(oldProduct, newProduct){
+  const oldTrend = getBuyPriceTrend(oldProduct);
+  if(!oldTrend) return '';
+  const oldBuy = salePriceNumber(getBuy(oldProduct));
+  const newBuy = salePriceNumber(getBuy(newProduct));
+  if(!Number.isFinite(oldBuy) || !Number.isFinite(newBuy)) return '';
+  return Math.abs(newBuy - oldBuy) < 0.0001 ? oldTrend : '';
 }
 
 function saleMoney(value){
@@ -1646,7 +1690,7 @@ function renderSaleSearchResults(query = null){
         <td>${escapeHTML(barcode)}</td>
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
-        ${showBuyPrice ? `<td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>` : ''}
+        ${showBuyPrice ? `<td>${buyPriceDisplayHTML(p)}</td>` : ''}
         <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td><div class="action-buttons">
           <button class="edit-btn" data-sale-add-index="${item.index}">Aggiungi</button>
@@ -1698,14 +1742,13 @@ function renderSaleCart(){
   }
   box.innerHTML = `<div class="table-card"><table><thead><tr><th></th><th>Barcode</th><th>Prodotto</th><th>Fornitore</th>${showBuyPrice ? '<th>Acquisto</th>' : ''}<th>Vendita</th><th>Qta</th><th>Azioni</th></tr></thead><tbody>
     ${items.map(item => {
-      const buyPrice = item.product ? formatPriceDisplay(getBuy(item.product)) : '-';
       const supplier = item.product ? (getSupplier(item.product) || '-') : '-';
       return `<tr>
         <td><input type="checkbox" class="sale-cart-checkbox" data-barcode="${escapeAttr(item.barcode)}" ${saleCartAllSelected ? 'checked' : ''}></td>
         <td>${escapeHTML(item.barcode)}</td>
         <td>${escapeHTML(item.product ? getName(item.product) : 'Prodotto non trovato')}</td>
         <td>${escapeHTML(supplier)}</td>
-        ${showBuyPrice ? `<td>${escapeHTML(buyPrice)}</td>` : ''}
+        ${showBuyPrice ? `<td>${buyPriceDisplayHTML(item.product)}</td>` : ''}
         <td>${sellPriceDisplayHTML(item.product)}</td>
         <td>${item.qty}</td>
         <td><div class="action-buttons">
@@ -2132,7 +2175,7 @@ function renderProductSalesStats(box, records){
         <td>${escapeHTML(barcode)}</td>
         <td>${escapeHTML(p ? (getSupplier(p) || '-') : '-')}</td>
         <td>${escapeHTML(p ? (getCategory(p) || '-') : '-')}</td>
-        <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
+        <td>${buyPriceDisplayHTML(p)}</td>
         <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td><strong>${data.qty}</strong></td>
         <td>${escapeHTML(formatDate(data.last))}</td>
@@ -2173,7 +2216,7 @@ function renderSupplierSalesStats(box, records){
         <td class="sales-total-cell">${escapeHTML(saleMoney(data.totalSales))}</td>
         <td>${Object.keys(data.products).length}</td>
         <td>${escapeHTML(topName)}</td>
-        <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
+        <td>${buyPriceDisplayHTML(p)}</td>
         <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td>${escapeHTML(formatDate(data.last))}</td>
         <td><span class="supplier-sales-open-note">Apri fornitore</span></td>
@@ -2199,7 +2242,7 @@ function renderSupplierSalesProductDetail(supplier, data){
                   <td>${index + 1}</td>
                   <td>${escapeHTML(p ? getName(p) : 'Prodotto non trovato')}</td>
                   <td>${escapeHTML(barcode)}</td>
-                  <td>${escapeHTML(p ? formatPriceDisplay(getBuy(p)) : '-')}</td>
+                  <td>${buyPriceDisplayHTML(p)}</td>
                   <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
                   <td><strong>${qty}</strong></td>
                   <td class="sales-total-cell">${escapeHTML(saleMoney(salesItemSellTotal(barcode, qty)))}</td>
@@ -2312,7 +2355,7 @@ function renderProducts(){
         <td>${escapeHTML(getBarcode(p))}</td>
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
-        <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
+        <td>${buyPriceDisplayHTML(p)}</td>
         <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td>${escapeHTML(getCategory(p) || '-')}</td>
         <td>${escapeHTML(formatStockQuantity(stockQuantityNumber(getQuantity(p))))}</td>
@@ -2532,7 +2575,7 @@ function productRowsForDetail(items, mode){
       <td>${escapeHTML(getBarcode(p))}</td>
       <td>${escapeHTML(getName(p))}</td>
       <td>${escapeHTML(getSupplier(p) || '-')}</td>
-      <td>${escapeHTML(formatPriceDisplay(getBuy(p)))}</td>
+      <td>${buyPriceDisplayHTML(p)}</td>
       <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
       <td>${escapeHTML(getCategory(p) || '-')}</td>
       <td>${escapeHTML(formatStockQuantity(stockQuantityNumber(getQuantity(p))))}</td>
@@ -2708,7 +2751,7 @@ function renderImportSessionBody(id){
           <td>${escapeHTML(p.barcode || '')}</td>
           <td>${escapeHTML(p.name || '')}</td>
           <td>${escapeHTML(p.supplier || '')}</td>
-          <td>${escapeHTML(formatPriceDisplay(p.buyPrice, ''))}</td>
+          <td>${buyPriceDisplayHTML(p, '')}</td>
           <td class="sell-price-cell">${sellPriceDisplayHTML(p, '')}</td>
           <td>${escapeHTML(p.category || '')}</td>
           <td>${escapeHTML(p.quantity || '')}</td>
@@ -2951,8 +2994,14 @@ function validateProduct(product, ignoreIndex = -1){
 
 async function saveEditProduct(){
   if(editingIndex === null) return;
-  const oldBarcode = getBarcode(products[editingIndex]);
-  const product = productFromForm('edit');
+  const previousProduct = canonicalProduct(products[editingIndex]);
+  const oldBarcode = getBarcode(previousProduct);
+  const formProduct = productFromForm('edit');
+  const product = canonicalProduct({
+    ...formProduct,
+    buyPriceTrend: preserveBuyPriceTrendIfSame(previousProduct, formProduct),
+    andamentoAcquisto: preserveBuyPriceTrendIfSame(previousProduct, formProduct)
+  });
   if(!validateProduct(product, editingIndex)) return;
   products[editingIndex] = product;
   if(oldBarcode && oldBarcode !== product.barcode && saleCart[oldBarcode]){
@@ -3000,7 +3049,15 @@ async function saveNewProduct(){
   }
 
   const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
-  if(existing >= 0) products[existing] = product;
+  if(existing >= 0){
+    const previousProduct = canonicalProduct(products[existing]);
+    const preservedTrend = preserveBuyPriceTrendIfSame(previousProduct, product);
+    products[existing] = canonicalProduct({
+      ...product,
+      buyPriceTrend: preservedTrend,
+      andamentoAcquisto: preservedTrend
+    });
+  }
   else products.unshift(product);
 
   const wasSalesView = currentView === 'sales';
@@ -3111,6 +3168,8 @@ async function importExcel(event){
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
       let imported = 0;
       let updated = 0;
+      let buyIncreased = 0;
+      let buyDecreased = 0;
       const importProducts = [];
 
       for(const row of rows){
@@ -3142,18 +3201,30 @@ async function importExcel(event){
         const existing = products.findIndex(p => String(getBarcode(p)) === String(product.barcode));
         if(existing >= 0){
           const currentProduct = canonicalProduct(products[existing]);
+          const buyPriceTrend = compareBuyPriceTrend(currentProduct, product);
+          if(buyPriceTrend === 'up') buyIncreased++;
+          if(buyPriceTrend === 'down') buyDecreased++;
+          const importedProduct = canonicalProduct({
+            ...product,
+            buyPriceTrend,
+            andamentoAcquisto: buyPriceTrend
+          });
           products[existing] = getPriceLocked(currentProduct)
             ? canonicalProduct({
-                ...product,
+                ...importedProduct,
                 sellPrice: getSell(currentProduct),
                 vendita: getSell(currentProduct),
                 priceLocked: true,
                 prezzoBloccato: true
               })
-            : product;
+            : importedProduct;
           updated++;
         }else{
-          products.push(product);
+          products.push(canonicalProduct({
+            ...product,
+            buyPriceTrend: '',
+            andamentoAcquisto: ''
+          }));
           imported++;
         }
       }
@@ -3182,7 +3253,7 @@ async function importExcel(event){
       const syncMessage = cloudResult.synced
         ? 'Dropbox aggiornato.'
         : 'Salvato sul dispositivo. Dropbox non aggiornato: ' + (cloudResult.message || 'riprova Sincronizza dati.');
-      alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}\n${syncMessage}`);
+      alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}\nAcquisto aumentato: ${buyIncreased}\nAcquisto abbassato: ${buyDecreased}\n${syncMessage}`);
     }catch(err){
       console.error(err);
       if(isStorageQuotaError(err)){
