@@ -1473,10 +1473,15 @@ body.view-sales .sale-cart-tools button{
   }
   .sale-bottom-actions{
     grid-template-columns:1fr 1fr;
-    bottom:calc(72px + env(safe-area-inset-bottom));
+    position:static;
+    bottom:auto;
+    z-index:auto;
     gap:8px;
-    margin:12px -2px 0;
-    padding:8px 0;
+    margin:14px 0 0;
+    padding:12px 0 0;
+    background:white;
+    border-top:2px solid #e5eaf3;
+    box-shadow:none;
   }
   .sale-bottom-total{
     grid-column:1/-1;

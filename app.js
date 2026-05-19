@@ -3584,6 +3584,88 @@ async function barcodeDetectorFormats(){
   return preferred;
 }
 
+function barcodeCameraConstraints(deviceId = ''){
+  const video = {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    frameRate: { ideal: 30, max: 30 }
+  };
+  if(deviceId) video.deviceId = { exact: deviceId };
+  else video.facingMode = { ideal: 'environment' };
+  return { video, audio: false };
+}
+
+function stopMediaStream(stream){
+  if(stream && typeof stream.getTracks === 'function'){
+    stream.getTracks().forEach(track => track.stop());
+  }
+}
+
+function barcodeCameraDeviceScore(device){
+  const label = String(device?.label || '').toLowerCase();
+  if(!label) return 0;
+  let score = 0;
+  if(/back|rear|environment|posteriore|trasera|arriere|arrière|后|背面/.test(label)) score += 100;
+  if(/main|wide angle|wide-angle|wide|1x|principale/.test(label)) score += 35;
+  if(label === 'back camera' || label === 'rear camera') score += 45;
+  if(/front|user|face|selfie|facetime|desk|continuity/.test(label)) score -= 200;
+  if(/ultra|ultrawide|ultra-wide|0\\.5|0,5/.test(label)) score -= 90;
+  if(/tele|telephoto|zoom/.test(label)) score -= 60;
+  if(/triple|dual/.test(label)) score -= 15;
+  return score;
+}
+
+async function preferredBarcodeCameraDeviceId(){
+  if(!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') return '';
+  try{
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter(device => device.kind === 'videoinput' && device.deviceId);
+    if(!cameras.length || !cameras.some(device => device.label)) return '';
+    return cameras
+      .map((device, index) => ({ device, index, score: barcodeCameraDeviceScore(device) }))
+      .sort((a, b) => (b.score - a.score) || (a.index - b.index))[0]?.device?.deviceId || '';
+  }catch(error){
+    return '';
+  }
+}
+
+function streamVideoDeviceId(stream){
+  const track = stream?.getVideoTracks?.()[0];
+  if(!track || typeof track.getSettings !== 'function') return '';
+  return textValue(track.getSettings().deviceId);
+}
+
+async function openPreferredBarcodeCameraStream(){
+  const base = barcodeCameraConstraints();
+  let stream = await navigator.mediaDevices.getUserMedia(base);
+  const preferredDeviceId = await preferredBarcodeCameraDeviceId();
+  const currentDeviceId = streamVideoDeviceId(stream);
+  if(preferredDeviceId && currentDeviceId && preferredDeviceId !== currentDeviceId){
+    stopMediaStream(stream);
+    stream = await navigator.mediaDevices.getUserMedia(barcodeCameraConstraints(preferredDeviceId));
+  }
+  await stabilizeBarcodeCameraStream(stream);
+  return stream;
+}
+
+async function stabilizeBarcodeCameraStream(stream){
+  const track = stream?.getVideoTracks?.()[0];
+  if(!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') return;
+  try{
+    const capabilities = track.getCapabilities();
+    if(capabilities && capabilities.zoom){
+      const min = Number(capabilities.zoom.min);
+      const max = Number(capabilities.zoom.max);
+      const mainZoom = Number.isFinite(min) && Number.isFinite(max) && min <= 1 && max >= 1 ? 1 : min;
+      if(Number.isFinite(mainZoom)){
+        await track.applyConstraints({ advanced: [{ zoom: mainZoom }] });
+      }
+    }
+  }catch(error){
+    // Safari non espone sempre il controllo zoom: in quel caso usiamo solo la camera scelta.
+  }
+}
+
 function applyBarcodeFromCamera(code){
   const value = textValue(code).replace(/\s/g, '');
   if(!value){
@@ -3633,39 +3715,45 @@ async function startBarcodeCameraScanner(){
     return;
   }
 
-  const constraints = {
-    video: {
-      facingMode: { ideal: 'environment' },
-      width: { ideal: 1280 },
-      height: { ideal: 720 }
-    },
-    audio: false
-  };
-
   try{
+    barcodeCameraStream = await openPreferredBarcodeCameraStream();
+    video.srcObject = barcodeCameraStream;
+    await video.play();
+
     if(window.ZXingBrowser && ZXingBrowser.BrowserMultiFormatReader){
       barcodeCameraReader = new ZXingBrowser.BrowserMultiFormatReader();
-      barcodeCameraControls = await barcodeCameraReader.decodeFromConstraints(constraints, video, result => {
+      const onBarcodeRead = result => {
         if(result && !barcodeCameraFound){
           barcodeCameraFound = true;
           const code = typeof result.getText === 'function' ? result.getText() : String(result.text || result);
           applyBarcodeFromCamera(code);
         }
-      });
-      setBarcodeCameraStatus('Inquadra il barcode dentro il riquadro verde.');
+      };
+      if(typeof barcodeCameraReader.decodeFromStream === 'function'){
+        barcodeCameraControls = await barcodeCameraReader.decodeFromStream(barcodeCameraStream, video, onBarcodeRead);
+      }else if(typeof barcodeCameraReader.decodeFromVideoElement === 'function'){
+        barcodeCameraControls = await barcodeCameraReader.decodeFromVideoElement(video, onBarcodeRead);
+      }else{
+        const fallbackDeviceId = streamVideoDeviceId(barcodeCameraStream);
+        stopMediaStream(barcodeCameraStream);
+        barcodeCameraStream = null;
+        video.srcObject = null;
+        barcodeCameraControls = await barcodeCameraReader.decodeFromConstraints(barcodeCameraConstraints(fallbackDeviceId), video, onBarcodeRead);
+      }
+      setBarcodeCameraStatus('Fotocamera posteriore principale. Inquadra il barcode nel riquadro verde.');
       return;
     }
 
     if(!window.BarcodeDetector){
+      stopMediaStream(barcodeCameraStream);
+      barcodeCameraStream = null;
+      video.srcObject = null;
       setBarcodeCameraStatus('Lettore barcode non caricato. Controlla connessione internet e ricarica la pagina.', 'err');
       return;
     }
 
-    barcodeCameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = barcodeCameraStream;
-    await video.play();
     barcodeCameraDetector = new BarcodeDetector({ formats: await barcodeDetectorFormats() });
-    setBarcodeCameraStatus('Inquadra il barcode dentro il riquadro verde.');
+    setBarcodeCameraStatus('Fotocamera posteriore principale. Inquadra il barcode nel riquadro verde.');
     scanBarcodeCameraFrame();
   }catch(error){
     console.error('Errore fotocamera barcode:', error);
