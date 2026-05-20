@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260519-chatgpt-diagnosi-api" />
+  <link rel="stylesheet" href="style.css?v=20260520-memoria-prodotti-compatta" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -206,6 +206,7 @@
           <input id="categorySearch" placeholder="Cerca categoria..." oninput="renderCategoryFolders()" />
           <button tabindex="-1" onclick="autoCategorizeMissingProducts()">Categorizza automaticamente</button>
           <button tabindex="-1" onclick="categorizeWithChatGPT()">Chiedi a ChatGPT</button>
+          <button tabindex="-1" onclick="recategorizeAppCategoriesWithChatGPT()">Controlla categorie app</button>
           <button tabindex="-1" onclick="showProducts()">Torna ai prodotti</button>
         </div>
         <div id="categoryStats" class="supplier-stats"></div>
@@ -332,6 +333,6 @@
   <datalist id="supplierOptions"></datalist>
   <datalist id="categoryOptions"></datalist>
 
-  <script src="app.js?v=20260519-chatgpt-diagnosi-api"></script>
+  <script src="app.js?v=20260520-memoria-prodotti-compatta"></script>
 </body>
 </html>

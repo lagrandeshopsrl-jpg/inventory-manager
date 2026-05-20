@@ -1,4 +1,5 @@
 const STORAGE_PRODUCTS_KEY = 'products';
+const STORAGE_PRODUCTS_PACKED_KEY = 'productsPackedV2';
 const STORAGE_IMPORTS_KEY = 'importSessions';
 const STORAGE_SALES_KEY = 'salesRecords';
 const STORAGE_SALE_CART_KEY = 'saleCart';
@@ -25,7 +26,7 @@ const folderDetailPageSize = 100;
 const chatGPTCategoryBatchSize = 80;
 const chatGPTCategoryEndpoint = '/api/categorize-products';
 
-let products = normalizeProductList(readJson(STORAGE_PRODUCTS_KEY, []));
+let products = normalizeProductList(readProductsStorage());
 let importSessions = normalizeImportSessions(readJson(STORAGE_IMPORTS_KEY, []));
 let salesRecords = normalizeSalesRecords(readJson(STORAGE_SALES_KEY, []));
 let saleCart = normalizeSaleCart(readJson(STORAGE_SALE_CART_KEY, {}));
@@ -72,6 +73,97 @@ function readJson(key, fallback){
 function textValue(value){
   if(value === undefined || value === null) return '';
   return String(value).trim();
+}
+
+function packStorageField(value){
+  return textValue(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\t/g, '\\t')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r');
+}
+
+function unpackStorageLine(line){
+  const fields = [];
+  let value = '';
+  for(let i = 0; i < String(line).length; i++){
+    const ch = line[i];
+    if(ch === '\t'){
+      fields.push(value);
+      value = '';
+      continue;
+    }
+    if(ch === '\\' && i + 1 < line.length){
+      const next = line[++i];
+      if(next === 't') value += '\t';
+      else if(next === 'n') value += '\n';
+      else if(next === 'r') value += '\r';
+      else value += next;
+      continue;
+    }
+    value += ch;
+  }
+  fields.push(value);
+  return fields;
+}
+
+function shortCategorySource(source){
+  const normalized = normalizeCategorySource(source);
+  if(normalized === 'chatgpt') return 'g';
+  if(normalized === 'app') return 'a';
+  if(normalized === 'manual') return 'm';
+  return '';
+}
+
+function packProductsStorage(list){
+  return normalizeProductList(list).map(product => [
+    product.barcode,
+    product.name,
+    product.supplier,
+    product.category,
+    product.buyPrice,
+    product.sellPrice,
+    product.quantity,
+    product.priceLocked ? '1' : '',
+    product.buyPriceTrend,
+    product.buyPricePrevious,
+    product.buyPriceChange,
+    product.buyPriceChangedAt,
+    shortCategorySource(product.categorySource)
+  ].map(packStorageField).join('\t')).join('\n');
+}
+
+function unpackProductsStorage(raw){
+  const text = textValue(raw);
+  if(!text) return [];
+  return text.split('\n').filter(Boolean).map(line => {
+    const cells = unpackStorageLine(line);
+    return canonicalProduct({
+      barcode: cells[0],
+      name: cells[1],
+      supplier: cells[2],
+      category: cells[3],
+      buyPrice: cells[4],
+      sellPrice: cells[5],
+      quantity: cells[6],
+      priceLocked: cells[7] === '1',
+      buyPriceTrend: cells[8],
+      buyPricePrevious: cells[9],
+      buyPriceChange: cells[10],
+      buyPriceChangedAt: cells[11],
+      categorySource: normalizeCategorySource(cells[12])
+    });
+  });
+}
+
+function readProductsStorage(){
+  try{
+    const packed = localStorage.getItem(STORAGE_PRODUCTS_PACKED_KEY);
+    if(packed) return unpackProductsStorage(packed);
+  }catch(error){
+    console.error('Storage prodotti compatto non leggibile', error);
+  }
+  return readJson(STORAGE_PRODUCTS_KEY, []);
 }
 
 function randomOAuthString(length = 64){
@@ -130,6 +222,31 @@ function getBarcode(p){ return Array.isArray(p) ? textValue(p[0]) : textValue(va
 function getName(p){ return Array.isArray(p) ? textValue(p[1]) : textValue(valueOf(p, ['name','prodotto','Prodotto','Nome','Product','商品','n'])); }
 function getSupplier(p){ return Array.isArray(p) ? textValue(p[2]) : textValue(valueOf(p, ['supplier','fornitore','Fornitore','Supplier','Nome Fornitore','供应商','s'])); }
 function getCategory(p){ return Array.isArray(p) ? textValue(p[3]) : textValue(valueOf(p, ['category','categoria','Categoria','Category','类别','c'])); }
+function normalizeCategorySource(value){
+  const text = textValue(value).toLowerCase().replace(/^cs:/, '');
+  if(['g','chatgpt','openai','ai'].includes(text)) return 'chatgpt';
+  if(['a','app','auto','automatico'].includes(text)) return 'app';
+  if(['m','manual','manuale'].includes(text)) return 'manual';
+  return '';
+}
+function getCategorySource(p){
+  if(Array.isArray(p)){
+    for(let i = 8; i < p.length; i++){
+      const item = p[i];
+      if(typeof item === 'string' && item.toLowerCase().startsWith('cs:')) return normalizeCategorySource(item);
+      if(item && typeof item === 'object') return normalizeCategorySource(item.categorySource || item.categoriaFonte || item.sourceCategoria);
+    }
+    return '';
+  }
+  return normalizeCategorySource(valueOf(p, ['categorySource','categoriaFonte','sourceCategoria','origineCategoria','CategorySource']));
+}
+function categorySourceToken(source){
+  const normalized = normalizeCategorySource(source);
+  if(normalized === 'chatgpt') return 'cs:g';
+  if(normalized === 'app') return 'cs:a';
+  if(normalized === 'manual') return 'cs:m';
+  return '';
+}
 function getBuy(p){ return Array.isArray(p) ? textValue(p[4]) : textValue(valueOf(p, ['buyPrice','buy_price','acquisto','Acquisto','Prezzo Acquisto','BuyPrice','进价','a'])); }
 function getSell(p){ return Array.isArray(p) ? textValue(p[5]) : textValue(valueOf(p, ['sellPrice','sell_price','vendita','Vendita','Prezzo Vendita','SellPrice','售价','v'])); }
 function getQuantity(p){ return Array.isArray(p) ? textValue(p[6]) : textValue(valueOf(p, ['quantity','quantita','quantità','Quantita','Quantità','qta','Qta','qty','Qty','stock','Stock','Giacenza','giacenza','数量','库存','q'])); }
@@ -171,6 +288,7 @@ function canonicalProduct(p){
   const name = getName(p);
   const supplier = getSupplier(p);
   const category = getCategory(p);
+  const categorySource = getCategorySource(p);
   const buyPrice = getBuy(p);
   const sellPrice = getSell(p);
   const quantity = getQuantity(p);
@@ -184,6 +302,7 @@ function canonicalProduct(p){
     name,
     supplier,
     category,
+    categorySource,
     buyPrice,
     sellPrice,
     quantity,
@@ -195,6 +314,7 @@ function canonicalProduct(p){
     prodotto: name,
     fornitore: supplier,
     categoria: category,
+    categoriaFonte: categorySource,
     acquisto: buyPrice,
     vendita: sellPrice,
     quantita: quantity,
@@ -227,14 +347,14 @@ function compactProduct(p){
   const previous = textValue(product.buyPricePrevious);
   const change = textValue(product.buyPriceChange);
   const changedAt = textValue(product.buyPriceChangedAt);
+  const sourceToken = categorySourceToken(product.categorySource);
   if(trend){
     row.push(trend);
-    if(previous || change || changedAt){
-      row.push(previous);
-      if(change || changedAt) row.push(change);
-      if(changedAt) row.push(changedAt);
-    }
+    row.push(previous);
+    row.push(change);
+    row.push(changedAt);
   }
+  if(sourceToken) row.push(sourceToken);
   return row;
 }
 
@@ -249,6 +369,7 @@ function importSessionProduct(p){
     name: product.name,
     supplier: product.supplier,
     category: product.category,
+    categorySource: product.categorySource,
     buyPrice: product.buyPrice,
     sellPrice: product.sellPrice,
     quantity: product.quantity,
@@ -414,13 +535,16 @@ function safeSetStorage(key, value){
 function persistProducts(touch = true){
   products = normalizeProductList(products);
   invalidateProductBarcodeIndex();
+  const packedProducts = packProductsStorage(products);
   try{
-    safeSetStorage(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
+    localStorage.removeItem(STORAGE_PRODUCTS_KEY);
+    safeSetStorage(STORAGE_PRODUCTS_PACKED_KEY, packedProducts);
   }catch(error){
     if(!isStorageQuotaError(error)) throw error;
     localStorage.removeItem(STORAGE_IMPORTS_KEY);
     importSessions = [];
-    safeSetStorage(STORAGE_PRODUCTS_KEY, JSON.stringify(compactProductList(products)));
+    localStorage.removeItem(STORAGE_PRODUCTS_KEY);
+    safeSetStorage(STORAGE_PRODUCTS_PACKED_KEY, packedProducts);
     setCloudStatus('☁ Memoria liberata: cronologia importazioni svuotata', 'err');
   }
   if(touch) setLocalModified();
@@ -442,7 +566,14 @@ function persistImportSessions(touch = true){
 
 function persistSalesRecords(touch = true){
   salesRecords = normalizeSalesRecords(salesRecords);
-  safeSetStorage(STORAGE_SALES_KEY, JSON.stringify(compactSalesRecords(salesRecords)));
+  try{
+    safeSetStorage(STORAGE_SALES_KEY, JSON.stringify(compactSalesRecords(salesRecords)));
+  }catch(error){
+    if(!isStorageQuotaError(error)) throw error;
+    salesRecords = salesRecords.slice(-1000);
+    safeSetStorage(STORAGE_SALES_KEY, JSON.stringify(compactSalesRecords(salesRecords)));
+    setCloudStatus('☁ Cronologia vendite alleggerita', 'err');
+  }
   if(touch) setLocalModified();
 }
 
@@ -3298,6 +3429,44 @@ function productNeedsChatGPTCategory(product){
   return !category || category === 'SENZA CATEGORIA' || category === 'DA CONTROLLARE';
 }
 
+function priorityCategoryRules(){
+  return [
+    {
+      category: 'Bagno',
+      keywords: ['SOFFIONE','SOFFIONE DOCCIA','DOCCIA','DOCCETTA','DOCCETTA DOCCIA','TUBO DOCCIA','TENDA DOCCIA','RUBINETTO','FILTRO RUBINETTO','FILTRO PER RUBINETTO','COPRIWATER','COPRI WATER','SEDILE WC','SEDILE WATER']
+    }
+  ];
+}
+
+function priorityCategoryForProduct(product){
+  const haystack = normalizeCategoryText([
+    getName(product),
+    getSupplier(product),
+    getBarcode(product)
+  ].join(' '));
+  if(!haystack) return '';
+  const match = priorityCategoryRules().find(rule => rule.keywords.some(keyword => haystack.includes(keyword)));
+  return match ? match.category : '';
+}
+
+function productNeedsPriorityCategoryRepair(product){
+  const priorityCategory = priorityCategoryForProduct(product);
+  const currentCategory = normalizeCategoryText(getCategory(product));
+  if(!priorityCategory || !currentCategory) return false;
+  if(currentCategory === 'SENZA CATEGORIA' || currentCategory === 'DA CONTROLLARE') return false;
+  return currentCategory === 'BELLEZZA' && currentCategory !== normalizeCategoryText(priorityCategory);
+}
+
+function productNeedsAppCategoryReview(product){
+  const category = normalizeCategoryText(getCategory(product));
+  if(!category || category === 'SENZA CATEGORIA' || category === 'DA CONTROLLARE') return false;
+  const source = getCategorySource(product);
+  if(source === 'chatgpt' || source === 'manual') return false;
+  if(source === 'app') return true;
+  const guessed = guessProductCategory(product);
+  return guessed !== 'Da controllare' && category === normalizeCategoryText(guessed);
+}
+
 function autoCategoryRules(){
   return [
     {
@@ -3350,6 +3519,8 @@ function guessProductCategory(product){
     getBarcode(product)
   ].join(' '));
   if(!haystack) return 'Da controllare';
+  const priorityCategory = priorityCategoryForProduct(product);
+  if(priorityCategory) return priorityCategory;
   const rules = autoCategoryRules();
   const match = rules.find(rule => rule.keywords.some(keyword => haystack.includes(keyword)));
   return match ? match.category : 'Da controllare';
@@ -3383,7 +3554,9 @@ async function autoCategorizeMissingProducts(){
     products[index] = canonicalProduct({
       ...current,
       category,
-      categoria: category
+      categoria: category,
+      categorySource: 'app',
+      categoriaFonte: 'app'
     });
   });
 
@@ -3463,21 +3636,49 @@ async function categorizeWithChatGPT(){
     return;
   }
   const candidateIndexes = [];
+  const repairIndexes = [];
   products.forEach((product, index) => {
-    if(productNeedsChatGPTCategory(product)) candidateIndexes.push(index);
+    if(productNeedsChatGPTCategory(product)){
+      candidateIndexes.push(index);
+    }else if(productNeedsPriorityCategoryRepair(product)){
+      repairIndexes.push(index);
+    }
   });
-  if(!candidateIndexes.length){
-    alert('Nessun prodotto senza categoria o Da controllare da inviare a ChatGPT.');
+  if(!candidateIndexes.length && !repairIndexes.length){
+    alert('Nessun prodotto senza categoria, Da controllare o correzione sicura da aggiornare.');
     return;
   }
 
   const batches = Math.ceil(candidateIndexes.length / chatGPTCategoryBatchSize);
-  if(!confirm(`Chiedere a ChatGPT di categorizzare ${candidateIndexes.length} prodotti?\n\nL'app li invia in ${batches} blocchi da massimo ${chatGPTCategoryBatchSize} prodotti, così evita blocchi e memoria piena.\n\nVengono inviati solo barcode, nome prodotto e fornitore. I prezzi non vengono inviati.`)) return;
+  const chatGPTText = candidateIndexes.length
+    ? `ChatGPT categorizza ${candidateIndexes.length} prodotti in ${batches} blocchi da massimo ${chatGPTCategoryBatchSize}.`
+    : 'Non ci sono prodotti da inviare a ChatGPT.';
+  const repairText = repairIndexes.length
+    ? `\nCorrezioni sicure locali: ${repairIndexes.length} prodotti tipo doccetta/doccia/rubinetto da Bellezza a Bagno.`
+    : '';
+  if(!confirm(`${chatGPTText}${repairText}\n\nVengono inviati solo barcode, nome prodotto e fornitore. I prezzi non vengono inviati.`)) return;
 
   const categories = chatGPTCategoryList();
   let updated = 0;
+  let repaired = 0;
   let processed = 0;
   let failedBatches = 0;
+
+  repairIndexes.forEach(index => {
+    const category = priorityCategoryForProduct(products[index]);
+    if(!category) return;
+    const current = canonicalProduct(products[index]);
+    products[index] = canonicalProduct({
+      ...current,
+      category,
+      categoria: category,
+      categorySource: 'chatgpt',
+      categoriaFonte: 'chatgpt'
+    });
+    updated++;
+    repaired++;
+  });
+  if(repaired) persistProducts(false);
 
   for(let start = 0; start < candidateIndexes.length; start += chatGPTCategoryBatchSize){
     const indexes = candidateIndexes.slice(start, start + chatGPTCategoryBatchSize);
@@ -3490,12 +3691,14 @@ async function categorizeWithChatGPT(){
       const byBarcode = new Map(suggestions.map(item => [textValue(item.barcode), normalizeSuggestedCategory(item.category)]));
       indexes.forEach(index => {
         const barcode = getBarcode(products[index]);
-        const category = byBarcode.get(barcode) || 'Da controllare';
+        const category = priorityCategoryForProduct(products[index]) || byBarcode.get(barcode) || 'Da controllare';
         const current = canonicalProduct(products[index]);
         products[index] = canonicalProduct({
           ...current,
           category,
-          categoria: category
+          categoria: category,
+          categorySource: 'chatgpt',
+          categoriaFonte: 'chatgpt'
         });
         updated++;
       });
@@ -3521,7 +3724,79 @@ async function categorizeWithChatGPT(){
   const cloudResult = await saveCloudAfterChange('Categorie ChatGPT aggiornate', { silentDropboxError: true });
   const syncText = cloudResult.synced ? 'Dropbox aggiornato.' : 'Salvato sul dispositivo.';
   const failText = failedBatches ? `\nBlocchi con errore: ${failedBatches}. Quei prodotti sono in Da controllare.` : '';
-  alert(`Categorie ChatGPT aggiornate: ${updated}\n${syncText}${failText}`);
+  const repairResultText = repaired ? `\nCorrezioni bagno: ${repaired}` : '';
+  alert(`Categorie aggiornate: ${updated}${repairResultText}\n${syncText}${failText}`);
+}
+
+async function recategorizeAppCategoriesWithChatGPT(){
+  if(location.protocol === 'file:'){
+    alert('ChatGPT funziona dal sito pubblicato o da localhost con server API, non aprendo il file diretto.');
+    return;
+  }
+
+  const candidateIndexes = [];
+  products.forEach((product, index) => {
+    if(productNeedsAppCategoryReview(product)) candidateIndexes.push(index);
+  });
+
+  if(!candidateIndexes.length){
+    alert('Nessuna categoria fatta dall’app da ricontrollare. Quelle già fatte da ChatGPT o manuali vengono saltate.');
+    return;
+  }
+
+  const batches = Math.ceil(candidateIndexes.length / chatGPTCategoryBatchSize);
+  if(!confirm(`Far ricontrollare a ChatGPT ${candidateIndexes.length} prodotti categorizzati dall’app?\n\nLe categorie già fatte da ChatGPT o manuali vengono saltate.\nL'app lavora in ${batches} blocchi da massimo ${chatGPTCategoryBatchSize} prodotti per evitare memoria piena.`)) return;
+
+  const categories = chatGPTCategoryList();
+  let updated = 0;
+  let processed = 0;
+  let failedBatches = 0;
+
+  for(let start = 0; start < candidateIndexes.length; start += chatGPTCategoryBatchSize){
+    const indexes = candidateIndexes.slice(start, start + chatGPTCategoryBatchSize);
+    const batch = indexes.map(chatGPTProductPayload);
+    const batchNumber = Math.floor(start / chatGPTCategoryBatchSize) + 1;
+    setCloudStatus(`☁ ChatGPT controllo app ${processed}/${candidateIndexes.length}`, '');
+
+    try{
+      const suggestions = await requestChatGPTCategories(batch, categories);
+      const byBarcode = new Map(suggestions.map(item => [textValue(item.barcode), normalizeSuggestedCategory(item.category)]));
+      indexes.forEach(index => {
+        const barcode = getBarcode(products[index]);
+        const category = priorityCategoryForProduct(products[index]) || byBarcode.get(barcode) || getCategory(products[index]) || 'Da controllare';
+        const current = canonicalProduct(products[index]);
+        products[index] = canonicalProduct({
+          ...current,
+          category,
+          categoria: category,
+          categorySource: 'chatgpt',
+          categoriaFonte: 'chatgpt'
+        });
+        updated++;
+      });
+      processed += indexes.length;
+      persistProducts(false);
+    }catch(error){
+      console.error('Errore ricontrollo categorie app blocco', batchNumber, error);
+      if(updated === 0 && processed === 0){
+        setCloudStatus('☁ ChatGPT non configurato', 'err');
+        alert(chatGPTSetupErrorMessage(error));
+        return;
+      }
+      failedBatches++;
+      processed += indexes.length;
+    }
+
+    if(batchNumber % 5 === 0) renderCurrentView();
+    await new Promise(resolve => setTimeout(resolve, 60));
+  }
+
+  persistProducts(true);
+  renderCurrentView();
+  const cloudResult = await saveCloudAfterChange('Categorie app ricontrollate con ChatGPT', { silentDropboxError: true });
+  const syncText = cloudResult.synced ? 'Dropbox aggiornato.' : 'Salvato sul dispositivo.';
+  const failText = failedBatches ? `\nBlocchi con errore: ${failedBatches}.` : '';
+  alert(`Categorie app ricontrollate con ChatGPT: ${updated}\n${syncText}${failText}`);
 }
 
 function supplierOptions(){
@@ -3611,8 +3886,14 @@ async function saveEditProduct(){
   const oldBarcode = getBarcode(previousProduct);
   const formProduct = productFromForm('edit');
   const preservedBuyChange = preserveBuyPriceChangeDataIfSame(previousProduct, formProduct);
+  const categoryChanged = normalizeCategoryText(getCategory(previousProduct)) !== normalizeCategoryText(getCategory(formProduct));
+  const categorySource = categoryChanged
+    ? (getCategory(formProduct) ? 'manual' : '')
+    : getCategorySource(previousProduct);
   const product = canonicalProduct({
     ...formProduct,
+    categorySource,
+    categoriaFonte: categorySource,
     ...preservedBuyChange,
     andamentoAcquisto: preservedBuyChange.buyPriceTrend,
     acquistoPrecedente: preservedBuyChange.buyPricePrevious,
@@ -3659,7 +3940,13 @@ function closeNewProductModal(){
 }
 
 async function saveNewProduct(){
-  const product = productFromForm('new');
+  const formProduct = productFromForm('new');
+  const newCategorySource = getCategory(formProduct) ? 'manual' : '';
+  const product = canonicalProduct({
+    ...formProduct,
+    categorySource: newCategorySource,
+    categoriaFonte: newCategorySource
+  });
   if(!product.barcode || !product.name){
     alert('Inserisci barcode e nome prodotto');
     return;
@@ -3669,8 +3956,14 @@ async function saveNewProduct(){
   if(existing >= 0){
     const previousProduct = canonicalProduct(products[existing]);
     const preservedBuyChange = preserveBuyPriceChangeDataIfSame(previousProduct, product);
+    const categoryChanged = normalizeCategoryText(getCategory(previousProduct)) !== normalizeCategoryText(getCategory(product));
+    const categorySource = categoryChanged
+      ? (getCategory(product) ? 'manual' : '')
+      : getCategorySource(previousProduct);
     products[existing] = canonicalProduct({
       ...product,
+      categorySource,
+      categoriaFonte: categorySource,
       ...preservedBuyChange,
       andamentoAcquisto: preservedBuyChange.buyPriceTrend,
       acquistoPrecedente: preservedBuyChange.buyPricePrevious,
