@@ -1744,3 +1744,49 @@ body.view-sales .sale-cart-tools button{
     padding-bottom:0!important;
   }
 }
+
+@media(min-width:901px){
+  body.view-sales .sales-panel{
+    display:flex;
+    flex-direction:column;
+    height:clamp(500px, calc(100vh - 205px), 760px);
+    overflow:hidden;
+  }
+  body.view-sales .sale-cart-section{
+    flex:1 1 auto;
+    min-height:120px;
+    max-height:none!important;
+    overflow:auto;
+    padding-bottom:2px;
+  }
+  body.view-sales .sale-bottom-actions{
+    position:static;
+    flex:0 0 auto;
+    margin-top:10px;
+    padding:10px 0 0;
+    background:white;
+    box-shadow:none;
+  }
+}
+
+@media(min-width:901px) and (max-height:760px){
+  body.view-sales .sales-panel{
+    height:clamp(430px, calc(100vh - 172px), 620px);
+  }
+  body.view-sales .sale-current-product{
+    margin:6px 0 8px;
+    padding:10px;
+  }
+  body.view-sales .sale-cart-section{
+    margin-top:10px;
+    padding-top:10px;
+  }
+  body.view-sales .large-sale-action{
+    min-height:54px;
+    padding:13px 18px;
+    font-size:19px;
+  }
+  body.view-sales .sale-bottom-total{
+    min-height:54px;
+  }
+}
