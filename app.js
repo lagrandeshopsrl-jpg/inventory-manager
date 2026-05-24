@@ -1985,6 +1985,49 @@ function saleSearchMatches(query){
   return matches.slice(0, 25);
 }
 
+function saleBarcodePrefixMatches(code){
+  const cleanCode = textValue(code).toLowerCase();
+  if(cleanCode.length < 8) return [];
+  const matches = [];
+  products.forEach((product, index) => {
+    const barcode = getBarcode(product).toLowerCase();
+    if(barcode && barcode !== cleanCode && barcode.startsWith(cleanCode)){
+      matches.push({ product, index });
+    }
+  });
+  return matches.slice(0, 25);
+}
+
+function processSaleScannerLookup(code){
+  const value = textValue(code);
+  if(!value) return;
+
+  const exactIndex = productIndexByBarcode(value);
+  if(exactIndex >= 0){
+    addProductIndexToSaleCart(exactIndex);
+    clearSaleSearchResults(true);
+    clearMainScannerInput(value);
+    return;
+  }
+
+  const prefixMatches = saleBarcodePrefixMatches(value);
+  if(prefixMatches.length === 1){
+    addProductIndexToSaleCart(prefixMatches[0].index);
+    clearSaleSearchResults(true);
+    clearMainScannerInput(value);
+    return;
+  }
+
+  clearSaleCurrentProduct();
+  if(prefixMatches.length > 1){
+    setSaleStatus(`Trovati ${prefixMatches.length} prodotti con questo barcode. Scegli quale aggiungere.`, 'err');
+  }else{
+    setSaleStatus('Prodotto non registrato o barcode non completo.', 'err');
+  }
+  renderSaleSearchResults(value);
+  clearMainScannerInput(value);
+}
+
 function renderSaleSearchResults(query = null){
   const box = document.getElementById('saleSearchResults');
   if(!box) return;
@@ -2666,7 +2709,7 @@ function scheduleSaleScannerSearch(value){
     saleScannerSearchTimer = 0;
     const search = document.getElementById('search');
     if(currentView !== 'sales' || textValue(search?.value) !== snapshot) return;
-    renderSaleSearchResults(snapshot);
+    processSaleScannerLookup(snapshot);
   }, 180);
 }
 
@@ -2681,14 +2724,6 @@ function handleScannerInput(){
     if(!value){
       clearSaleScannerSearchTimer();
       renderSaleSearchResults();
-      return;
-    }
-    const exactIndex = productIndexByBarcode(value);
-    if(exactIndex >= 0){
-      clearSaleScannerSearchTimer();
-      addProductIndexToSaleCart(exactIndex);
-      clearSaleSearchResults(true);
-      if(search) search.value = '';
       return;
     }
     scheduleSaleScannerSearch(value);
