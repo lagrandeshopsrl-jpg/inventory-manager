@@ -1754,9 +1754,12 @@ body.view-sales .sale-cart-tools button{
   }
   body.view-sales .sale-cart-section{
     flex:1 1 auto;
-    min-height:120px;
+    min-height:0;
     max-height:none!important;
-    overflow:auto;
+    overflow:auto!important;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-gutter:stable;
     padding-bottom:2px;
   }
   body.view-sales .sale-bottom-actions{
