@@ -4,23 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260601-sidebar-pulita" />
+  <link rel="stylesheet" href="style.css?v=20260601-icona-impostazioni-slider" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
 <body>
   <div id="appRoot" class="app-root">
     <aside class="sidebar">
-      <div class="logo">Inventory Manager</div>
-      <button tabindex="-1" class="menu active" id="menuSales" onclick="showSales()">€ Vendite</button>
-      <button tabindex="-1" class="menu" id="menuQuickScan" onclick="showQuickScan()">▥ Scanner</button>
-      <button tabindex="-1" class="menu" id="menuProducts" onclick="showProducts()">▣ Prodotti</button>
-      <button tabindex="-1" class="menu" id="menuSuppliers" onclick="showSuppliers()">📁 Fornitori</button>
-      <button tabindex="-1" class="menu" id="menuTopSales" onclick="showTopSales()">★ Più venduti</button>
-      <button tabindex="-1" class="menu" id="menuHistory" onclick="showHistory()">🕘 Cronologia</button>
-      <button tabindex="-1" class="menu" id="menuCategories" onclick="showCategories()">▤ Categorie</button>
-      <button tabindex="-1" class="menu" id="menuSettings" onclick="showSettings()">⚙ Impostazioni</button>
-      <button tabindex="-1" class="menu" onclick="logoutUser()">↪ Esci</button>
+      <div class="logo"><span class="logo-mark">IM</span><span class="logo-text">Inventory<br>Manager</span></div>
+      <button tabindex="-1" class="menu active" id="menuSales" onclick="showSales()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 7.4a6.1 6.1 0 0 0-10.7 2.1M6 10h8M6 14h7M17.5 16.8a6.1 6.1 0 0 1-10.2-2.5"/></svg></span><span class="menu-label">Vendite</span></button>
+      <button tabindex="-1" class="menu" id="menuQuickScan" onclick="showQuickScan()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5v14M8 5v14M12 5v14M16 5v14M19 5v14M4 20h16"/></svg></span><span class="menu-label">Scanner</span></button>
+      <button tabindex="-1" class="menu" id="menuProducts" onclick="showProducts()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5-8 4.5L4 7.5Z"/><path d="M4 7.5v9L12 21l8-4.5v-9M12 12v9"/></svg></span><span class="menu-label">Prodotti</span></button>
+      <button tabindex="-1" class="menu" id="menuSuppliers" onclick="showSuppliers()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 7.2c0-1 .8-1.8 1.8-1.8h4.4l2 2.2h7c1 0 1.8.8 1.8 1.8v7.4c0 1-.8 1.8-1.8 1.8H5.3c-1 0-1.8-.8-1.8-1.8V7.2Z"/><path d="M3.7 10h16.6"/></svg></span><span class="menu-label">Fornitori</span></button>
+      <button tabindex="-1" class="menu" id="menuTopSales" onclick="showTopSales()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/></svg></span><span class="menu-label">Più venduti</span></button>
+      <button tabindex="-1" class="menu" id="menuHistory" onclick="showHistory()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 5.2v4h4"/><path d="M12 7.5V12l3 1.8"/></svg></span><span class="menu-label">Cronologia</span></button>
+      <button tabindex="-1" class="menu" id="menuCategories" onclick="showCategories()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="6" height="6" rx="1.2"/><rect x="14" y="5" width="6" height="6" rx="1.2"/><rect x="4" y="14" width="6" height="5" rx="1.2"/><rect x="14" y="14" width="6" height="5" rx="1.2"/></svg></span><span class="menu-label">Categorie</span></button>
+      <button tabindex="-1" class="menu" id="menuSettings" onclick="showSettings()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h6M14 6h6"/><circle cx="12" cy="6" r="2"/><path d="M4 12h12M20 12h0"/><circle cx="18" cy="12" r="2"/><path d="M4 18h3M11 18h9"/><circle cx="9" cy="18" r="2"/></svg></span><span class="menu-label">Impostazioni</span></button>
+      <button tabindex="-1" class="menu" onclick="logoutUser()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 20H5.8c-1 0-1.8-.8-1.8-1.8V5.8C4 4.8 4.8 4 5.8 4H9"/><path d="M14 7l5 5-5 5M19 12H8"/></svg></span><span class="menu-label">Esci</span></button>
       <div class="copyright">© 2026 Inventory Manager</div>
     </aside>
 
@@ -333,6 +333,6 @@
   <datalist id="supplierOptions"></datalist>
   <datalist id="categoryOptions"></datalist>
 
-  <script src="app.js?v=20260601-sidebar-pulita"></script>
+  <script src="app.js?v=20260601-icona-impostazioni-slider"></script>
 </body>
 </html>
