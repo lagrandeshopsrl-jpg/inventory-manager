@@ -19,6 +19,7 @@ const DROPBOX_OAUTH_VERIFIER_KEY = 'inventory_dropbox_oauth_verifier';
 const DROPBOX_OAUTH_REDIRECT_KEY = 'inventory_dropbox_oauth_redirect';
 const DEFAULT_DROPBOX_PATH = '/inventory_manager_snapshot.json';
 const DEFAULT_DROPBOX_BACKUP_FOLDER = '/inventory_manager_backups';
+const DROPBOX_AUTO_SYNC_INTERVAL_MS = 60 * 60 * 1000;
 const IMPORT_HISTORY_RETENTION_DAYS = 30;
 const itemsPerPage = 100;
 const importSessionPageSize = 200;
@@ -38,6 +39,8 @@ let currentView = 'products';
 let openSupplierFolderName = '';
 let openCategoryFolderName = '';
 let cloudLoading = false;
+let dropboxAutoSyncTimer = 0;
+let dropboxLastAutoSyncAt = 0;
 let __barcodeLastValue = '';
 let dropboxFolderPickerPath = '';
 let importSessionPages = {};
@@ -1146,6 +1149,24 @@ async function syncNow(options = {}){
     cloudLoading = false;
   }
 }
+
+async function syncDropboxAutomatically(){
+  if(!hasDropboxCredentials() || cloudLoading) return;
+  dropboxLastAutoSyncAt = Date.now();
+  await syncNow({ silentMissingToken: true, autoSync: true });
+}
+
+function startDropboxAutoSync(){
+  if(dropboxAutoSyncTimer) clearInterval(dropboxAutoSyncTimer);
+  dropboxAutoSyncTimer = setInterval(syncDropboxAutomatically, DROPBOX_AUTO_SYNC_INTERVAL_MS);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) return;
+  if(Date.now() - dropboxLastAutoSyncAt >= DROPBOX_AUTO_SYNC_INTERVAL_MS){
+    syncDropboxAutomatically();
+  }
+});
 
 function setActive(view){
   document.getElementById('menuProducts')?.classList.toggle('active', view === 'products');
@@ -4900,6 +4921,10 @@ window.onload = async function(){
   __installBarcodeInputLogic();
   installClearSearchOnScan();
   setInterval(__focusBarcodeIfAllowed, 1200);
+  startDropboxAutoSync();
   await handleDropboxOAuthRedirect();
-  setTimeout(() => syncNow({ silentMissingToken: true }), 200);
+  setTimeout(() => {
+    dropboxLastAutoSyncAt = Date.now();
+    syncNow({ silentMissingToken: true });
+  }, 200);
 };
