@@ -20,6 +20,8 @@ const DROPBOX_OAUTH_REDIRECT_KEY = 'inventory_dropbox_oauth_redirect';
 const DEFAULT_DROPBOX_PATH = '/inventory_manager_snapshot.json';
 const DEFAULT_DROPBOX_BACKUP_FOLDER = '/inventory_manager_backups';
 const DROPBOX_AUTO_SYNC_INTERVAL_MS = 60 * 60 * 1000;
+const DROPBOX_NETWORK_RETRY_DELAYS = [800, 2200, 5000];
+const DROPBOX_RECOVERY_SYNC_DELAY_MS = 45000;
 const IMPORT_HISTORY_RETENTION_DAYS = 30;
 const itemsPerPage = 100;
 const importSessionPageSize = 200;
@@ -41,6 +43,7 @@ let openCategoryFolderName = '';
 let cloudLoading = false;
 let dropboxAutoSyncTimer = 0;
 let dropboxLastAutoSyncAt = 0;
+let dropboxNetworkRetryTimer = 0;
 let __barcodeLastValue = '';
 let dropboxFolderPickerPath = '';
 let importSessionPages = {};
@@ -76,6 +79,10 @@ function readJson(key, fallback){
 function textValue(value){
   if(value === undefined || value === null) return '';
   return String(value).trim();
+}
+
+function wait(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function packStorageField(value){
@@ -782,37 +789,59 @@ async function getValidDropboxToken(forceRefresh = false){
   throw new Error('NO_DROPBOX_TOKEN');
 }
 
-async function dropboxFetch(url, options, retry = true){
-  const token = await getValidDropboxToken(false);
-  let response;
-  try{
-    response = await fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: 'Bearer ' + token
-      }
-    });
-  }catch(error){
-    throw new Error('DROPBOX_NETWORK');
-  }
+function isRetryableDropboxStatus(status){
+  return [408, 429, 500, 502, 503, 504].includes(Number(status));
+}
 
-  if(response.status === 401 && retry && canRefreshDropboxToken()){
-    const refreshedToken = await getValidDropboxToken(true);
+async function fetchDropboxWithToken(url, options, token){
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: 'Bearer ' + token
+    }
+  });
+}
+
+async function dropboxFetch(url, options, retry = true){
+  let token = await getValidDropboxToken(false);
+  let canRetryAuth = retry;
+  let lastResponse = null;
+
+  for(let attempt = 0; attempt <= DROPBOX_NETWORK_RETRY_DELAYS.length; attempt++){
+    if(attempt > 0){
+      setCloudStatus('☁ Dropbox non raggiungibile, riprovo...', '');
+      await wait(DROPBOX_NETWORK_RETRY_DELAYS[attempt - 1]);
+    }
+
+    let response;
     try{
-      return await fetch(url, {
-        ...options,
-        headers: {
-          ...(options.headers || {}),
-          Authorization: 'Bearer ' + refreshedToken
-        }
-      });
+      response = await fetchDropboxWithToken(url, options, token);
     }catch(error){
+      if(attempt < DROPBOX_NETWORK_RETRY_DELAYS.length) continue;
       throw new Error('DROPBOX_NETWORK');
     }
+
+    if(response.status === 401 && canRetryAuth && canRefreshDropboxToken()){
+      token = await getValidDropboxToken(true);
+      canRetryAuth = false;
+      try{
+        response = await fetchDropboxWithToken(url, options, token);
+      }catch(error){
+        if(attempt < DROPBOX_NETWORK_RETRY_DELAYS.length) continue;
+        throw new Error('DROPBOX_NETWORK');
+      }
+    }
+
+    if(isRetryableDropboxStatus(response.status) && attempt < DROPBOX_NETWORK_RETRY_DELAYS.length){
+      lastResponse = response;
+      continue;
+    }
+
+    return response;
   }
 
-  return response;
+  return lastResponse;
 }
 
 function getDropboxPath(){
@@ -1053,7 +1082,7 @@ function dropboxErrorAdvice(error){
   if(code === 'NO_DROPBOX_TOKEN') return 'Collega Dropbox dalle Impostazioni.';
   if(code === 'DROPBOX_AUTH') return 'Ricollega Dropbox: il token non e piu valido.';
   if(code === 'DROPBOX_REFRESH_AUTH') return 'Ricollega Dropbox: il rinnovo automatico non e piu valido.';
-  if(code === 'DROPBOX_NETWORK') return 'Controlla internet e riprova Sincronizza dati.';
+  if(code === 'DROPBOX_NETWORK') return 'Riprovo automaticamente tra poco. Se internet e attivo, non serve chiudere e riaprire.';
   if(code.startsWith('DROPBOX_UPLOAD_')) return 'I dati sono salvati sul dispositivo. Riprova Sincronizza dati tra poco.';
   if(error?.name === 'QuotaExceededError') return 'Riduci la cronologia importazioni o svuota dati vecchi.';
   return 'I dati restano salvati sul dispositivo; riprova Sincronizza dati.';
@@ -1063,10 +1092,35 @@ function dropboxAlertMessage(error){
   return dropboxErrorMessage(error) + '. ' + dropboxErrorAdvice(error);
 }
 
+function isDropboxNetworkError(error){
+  const code = String(error?.message || '');
+  return code === 'DROPBOX_NETWORK'
+    || code.includes('Failed to fetch')
+    || code.includes('NetworkError');
+}
+
+function scheduleDropboxRecoverySync(){
+  if(dropboxNetworkRetryTimer || !hasDropboxCredentials()) return;
+  dropboxNetworkRetryTimer = setTimeout(async () => {
+    dropboxNetworkRetryTimer = 0;
+    if(typeof navigator !== 'undefined' && navigator.onLine === false){
+      scheduleDropboxRecoverySync();
+      return;
+    }
+    setCloudStatus('☁ Riprovo Dropbox automaticamente...', '');
+    await syncNow({ silentMissingToken: true, autoRecovery: true });
+  }, DROPBOX_RECOVERY_SYNC_DELAY_MS);
+}
+
 function handleDropboxError(error, showAlert = true){
   const message = dropboxErrorMessage(error);
   console.error(error);
-  setCloudStatus('☁ ' + message, 'err');
+  if(isDropboxNetworkError(error)){
+    scheduleDropboxRecoverySync();
+    setCloudStatus('☁ ' + message + ': riprovo automaticamente', 'err');
+  }else{
+    setCloudStatus('☁ ' + message, 'err');
+  }
   if(showAlert) alert(dropboxAlertMessage(error));
 }
 
@@ -1166,6 +1220,14 @@ document.addEventListener('visibilitychange', () => {
   if(Date.now() - dropboxLastAutoSyncAt >= DROPBOX_AUTO_SYNC_INTERVAL_MS){
     syncDropboxAutomatically();
   }
+});
+
+window.addEventListener('online', () => {
+  if(dropboxNetworkRetryTimer){
+    clearTimeout(dropboxNetworkRetryTimer);
+    dropboxNetworkRetryTimer = 0;
+  }
+  syncDropboxAutomatically();
 });
 
 function setActive(view){
