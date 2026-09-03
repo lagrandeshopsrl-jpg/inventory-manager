@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20260903-dropbox-ultimo-file" />
+  <link rel="stylesheet" href="style.css?v=20260903-versione-app-visibile" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -22,6 +22,7 @@
       <button tabindex="-1" class="menu" id="menuSettings" onclick="showSettings()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h6M14 6h6"/><circle cx="12" cy="6" r="2"/><path d="M4 12h12M20 12h0"/><circle cx="18" cy="12" r="2"/><path d="M4 18h3M11 18h9"/><circle cx="9" cy="18" r="2"/></svg></span><span class="menu-label">Impostazioni</span></button>
       <button tabindex="-1" class="menu" onclick="logoutUser()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 20H5.8c-1 0-1.8-.8-1.8-1.8V5.8C4 4.8 4.8 4 5.8 4H9"/><path d="M14 7l5 5-5 5M19 12H8"/></svg></span><span class="menu-label">Esci</span></button>
       <div class="copyright">© 2026 Inventory Manager</div>
+      <div class="app-version">Versione 89<span>03/09/2026</span></div>
     </aside>
 
     <main class="main">
@@ -216,6 +217,10 @@
 
       <section id="settingsPage" class="hidden">
         <div class="settings-panel">
+          <div class="app-version-card">
+            <strong>Versione app</strong>
+            <span>89 - 03/09/2026</span>
+          </div>
           <div class="settings-row">
             <label for="dropboxAppKey">Codice app Dropbox</label>
             <input id="dropboxAppKey" type="password" autocomplete="off" placeholder="Codice app Dropbox" />
@@ -333,6 +338,6 @@
   <datalist id="supplierOptions"></datalist>
   <datalist id="categoryOptions"></datalist>
 
-  <script src="app.js?v=20260903-dropbox-ultimo-file"></script>
+  <script src="app.js?v=20260903-versione-app-visibile"></script>
 </body>
 </html>
