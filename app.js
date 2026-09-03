@@ -12,6 +12,9 @@ const DROPBOX_APP_KEY_KEY = 'inventory_dropbox_app_key';
 const DROPBOX_REFRESH_TOKEN_KEY = 'inventory_dropbox_refresh_token';
 const DROPBOX_PATH_KEY = 'inventory_dropbox_path';
 const DROPBOX_BACKUP_FOLDER_KEY = 'inventory_dropbox_backup_folder';
+const DROPBOX_LAST_SYNCED_SERVER_KEY = 'inventory_dropbox_last_synced_server_modified';
+const DROPBOX_LAST_SYNCED_LOCAL_KEY = 'inventory_dropbox_last_synced_local_modified';
+const DROPBOX_LOCAL_DIRTY_KEY = 'inventory_dropbox_local_dirty';
 const BARCODE_CAMERA_DEVICE_KEY = 'inventory_barcode_camera_device_id';
 const SYNC_FIX_VERSION_KEY = 'inventory_sync_fix_version';
 const DROPBOX_OAUTH_STATE_KEY = 'inventory_dropbox_oauth_state';
@@ -513,12 +516,38 @@ function escapeAttr(value){
   return escapeHTML(value).replace(/`/g, '&#96;');
 }
 
-function setLocalModified(value = Date.now()){
+function setLocalModified(value = Date.now(), markDirty = true){
   localStorage.setItem(LAST_MODIFIED_KEY, String(Number(value) || Date.now()));
+  if(markDirty) localStorage.setItem(DROPBOX_LOCAL_DIRTY_KEY, '1');
 }
 
 function getLocalModified(){
   return Number(localStorage.getItem(LAST_MODIFIED_KEY) || '0') || 0;
+}
+
+function hasLocalUnsyncedChanges(){
+  if(localStorage.getItem(DROPBOX_LOCAL_DIRTY_KEY) === '1') return true;
+  const lastLocalTime = getLastDropboxSyncedLocalModified();
+  return lastLocalTime > 0 && getLocalModified() > lastLocalTime + 1500;
+}
+
+function clearLocalUnsyncedChanges(){
+  localStorage.removeItem(DROPBOX_LOCAL_DIRTY_KEY);
+}
+
+function getLastDropboxSyncedServerModified(){
+  return Number(localStorage.getItem(DROPBOX_LAST_SYNCED_SERVER_KEY) || '0') || 0;
+}
+
+function getLastDropboxSyncedLocalModified(){
+  return Number(localStorage.getItem(DROPBOX_LAST_SYNCED_LOCAL_KEY) || '0') || 0;
+}
+
+function markDropboxSynced(remoteTime){
+  const cleanRemoteTime = Number(remoteTime || 0) || Date.now();
+  localStorage.setItem(DROPBOX_LAST_SYNCED_SERVER_KEY, String(cleanRemoteTime));
+  localStorage.setItem(DROPBOX_LAST_SYNCED_LOCAL_KEY, String(getLocalModified()));
+  clearLocalUnsyncedChanges();
 }
 
 function parseDropboxTime(value){
@@ -931,6 +960,112 @@ function buildSnapshot(timestamp = Date.now(), meta = {}){
   };
 }
 
+function snapshotCounts(snapshot){
+  return {
+    products: Array.isArray(snapshot?.products) ? snapshot.products.length : 0,
+    importSessions: Array.isArray(snapshot?.importSessions) ? snapshot.importSessions.length : 0,
+    salesRecords: Array.isArray(snapshot?.salesRecords) ? snapshot.salesRecords.length : 0
+  };
+}
+
+function currentSnapshotCounts(){
+  return {
+    products: products.length,
+    importSessions: importSessions.length,
+    salesRecords: salesRecords.length
+  };
+}
+
+function remoteHasMoreUsefulData(remote){
+  const remoteCounts = snapshotCounts(remote);
+  const localCounts = currentSnapshotCounts();
+  return remoteCounts.products > localCounts.products
+    || remoteCounts.importSessions > localCounts.importSessions
+    || remoteCounts.salesRecords > localCounts.salesRecords;
+}
+
+function applyRemoteSnapshot(remote){
+  const remoteTime = Number(remote?.dropboxServerModified || remote?.lastModified || 0) || Date.now();
+  products = normalizeProductList(remote.products);
+  importSessions = normalizeImportSessions(remote.importSessions);
+  salesRecords = normalizeSalesRecords(remote.salesRecords || []);
+  persistAll(false);
+  setLocalModified(remoteTime, false);
+  markDropboxSynced(remoteTime);
+}
+
+function remoteChangedAfterLastSync(remote, remoteTime){
+  if(!remote) return false;
+  const lastRemoteTime = getLastDropboxSyncedServerModified();
+  const remoteServerTime = Number(remote.dropboxServerModified || remoteTime || 0) || 0;
+  if(lastRemoteTime === 0) return remoteServerTime > 0;
+  return remoteServerTime > lastRemoteTime + 1500;
+}
+
+function mergeById(localList, remoteList){
+  const byId = new Map();
+  normalizeImportSessions(remoteList).forEach(item => byId.set(item.id, item));
+  normalizeImportSessions(localList).forEach(item => {
+    if(!byId.has(item.id)) byId.set(item.id, item);
+  });
+  return Array.from(byId.values());
+}
+
+function mergeSalesById(localList, remoteList){
+  const byId = new Map();
+  normalizeSalesRecords(remoteList).forEach(item => byId.set(item.id, item));
+  normalizeSalesRecords(localList).forEach(item => {
+    if(!byId.has(item.id)) byId.set(item.id, item);
+  });
+  return Array.from(byId.values());
+}
+
+function mergeRemoteAndLocalSnapshots(remote){
+  const remoteProducts = normalizeProductList(remote.products);
+  const localProducts = normalizeProductList(products);
+  const localProductsByBarcode = new Map(localProducts.map(product => [product.barcode, product]));
+  const remoteProductBarcodes = new Set(remoteProducts.map(product => product.barcode));
+  const remoteSaleIds = new Set(normalizeSalesRecords(remote.salesRecords || []).map(record => record.id));
+  const hasLocalSalesNotInRemote = normalizeSalesRecords(salesRecords).some(record => !remoteSaleIds.has(record.id));
+
+  products = remoteProducts.map(remoteProduct => {
+    const localProduct = localProductsByBarcode.get(remoteProduct.barcode);
+    if(!localProduct) return remoteProduct;
+    const mergedProduct = { ...remoteProduct };
+    const localQty = Number(localProduct.quantity);
+    const remoteQty = Number(remoteProduct.quantity);
+    if(hasLocalSalesNotInRemote && Number.isFinite(localQty) && Number.isFinite(remoteQty) && localQty < remoteQty){
+      mergedProduct.quantity = localProduct.quantity;
+    }
+    return canonicalProduct(mergedProduct);
+  });
+
+  localProducts.forEach(localProduct => {
+    if(localProduct.barcode && !remoteProductBarcodes.has(localProduct.barcode)){
+      products.push(localProduct);
+    }
+  });
+
+  importSessions = mergeById(importSessions, remote.importSessions);
+  salesRecords = mergeSalesById(salesRecords, remote.salesRecords || []);
+  persistAll(true);
+}
+
+function shouldDownloadRemoteSnapshot(remote, localTime, remoteTime){
+  if(!remote) return false;
+  const lastRemoteTime = getLastDropboxSyncedServerModified();
+  const lastLocalTime = getLastDropboxSyncedLocalModified();
+  const remoteIsNewerThanLastSync = lastRemoteTime > 0 && remoteChangedAfterLastSync(remote, remoteTime);
+  const localChangedAfterLastSync = hasLocalUnsyncedChanges()
+    || (lastLocalTime > 0 && localTime > lastLocalTime + 1500);
+
+  if(!localChangedAfterLastSync && remoteTime > 0) return true;
+  if(remoteIsNewerThanLastSync && !localChangedAfterLastSync) return true;
+  if(remoteHasMoreUsefulData(remote) && !localChangedAfterLastSync) return true;
+  if(lastRemoteTime === 0 && remoteTime > localTime) return true;
+  return remoteTime > localTime;
+}
+
 async function dropboxDownloadSnapshot(){
   const response = await dropboxFetch('https://content.dropboxapi.com/2/files/download', {
     method: 'POST',
@@ -1053,6 +1188,7 @@ async function dropboxUploadSnapshot(){
   salesRecords = snapshot.salesRecords;
   persistAll(false);
   setLocalModified(savedTime);
+  markDropboxSynced(savedTime);
   return snapshot;
 }
 
@@ -1160,7 +1296,7 @@ async function syncNow(options = {}){
   try{
     const remote = await dropboxDownloadSnapshot();
     const localTime = getLocalModified();
-    const remoteTime = remote ? Number(remote.lastModified || 0) : 0;
+    const remoteTime = remote ? (Number(remote.dropboxServerModified || remote.lastModified || 0) || 0) : 0;
     const localProducts = products.length;
     const remoteProducts = remote ? remote.products.length : 0;
 
@@ -1168,29 +1304,21 @@ async function syncNow(options = {}){
       await dropboxUploadSnapshot();
       setCloudStatus('☁ Dropbox creato + backup: ' + products.length + ' prodotti', 'ok');
     }else if(localProducts === 0 && remoteProducts > 0){
-      products = remote.products;
-      importSessions = remote.importSessions;
-      salesRecords = remote.salesRecords || [];
-      persistAll(false);
-      setLocalModified(remoteTime || Date.now());
+      applyRemoteSnapshot(remote);
       setCloudStatus('☁ Database scaricato da Dropbox', 'ok');
     }else if(localTime === 0 && remoteProducts > 0){
-      products = remote.products;
-      importSessions = remote.importSessions;
-      salesRecords = remote.salesRecords || [];
-      persistAll(false);
-      setLocalModified(remoteTime || Date.now());
+      applyRemoteSnapshot(remote);
       setCloudStatus('☁ Ultimo file Dropbox scaricato: ' + products.length + ' prodotti', 'ok');
     }else if(localTime === 0 && localProducts > 0 && remoteProducts === 0){
       await dropboxUploadSnapshot();
       setCloudStatus('☁ Locale caricato + backup: ' + products.length + ' prodotti', 'ok');
-    }else if(remoteTime > localTime){
-      products = remote.products;
-      importSessions = remote.importSessions;
-      salesRecords = remote.salesRecords || [];
-      persistAll(false);
-      setLocalModified(remoteTime);
-      setCloudStatus('☁ Scaricato da Dropbox: ' + products.length + ' prodotti', 'ok');
+    }else if(hasLocalUnsyncedChanges() && remoteChangedAfterLastSync(remote, remoteTime) && remoteHasMoreUsefulData(remote)){
+      mergeRemoteAndLocalSnapshots(remote);
+      await dropboxUploadSnapshot();
+      setCloudStatus('☁ Dropbox unito e aggiornato: ' + products.length + ' prodotti', 'ok');
+    }else if(shouldDownloadRemoteSnapshot(remote, localTime, remoteTime)){
+      applyRemoteSnapshot(remote);
+      setCloudStatus('☁ Ultimo Dropbox scaricato: ' + products.length + ' prodotti', 'ok');
     }else{
       await dropboxUploadSnapshot();
       setCloudStatus('☁ Caricato su Dropbox + backup: ' + products.length + ' prodotti', 'ok');
