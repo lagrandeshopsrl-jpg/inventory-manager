@@ -5,6 +5,10 @@ body{margin:0;font-family:Arial,"Noto Sans SC","Microsoft YaHei",sans-serif;back
 .storage-failure span{flex:1 1 240px}
 .storage-failure button{min-height:44px;padding:10px 12px;border:1px solid #fca5a5;border-radius:6px;background:white;color:#991b1b;cursor:pointer;font-weight:700}
 .history-retention-note{margin:0 0 16px;color:#475569;font-size:14px;line-height:1.5}
+.settings-disconnect{margin-top:24px;padding-top:16px;border-top:1px solid #e5eaf3}
+.settings-disconnect button{max-width:100%;min-height:44px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;background:transparent;color:#475569;font-size:14px;font-weight:700;line-height:1.4;text-align:left;white-space:normal;overflow-wrap:anywhere;cursor:pointer}
+.settings-disconnect button:hover{background:#f8fafc;color:#0f172a}
+.settings-disconnect button:focus-visible{outline:2px solid #0b63e5;outline-offset:3px}
 .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#061d3a,#0b63e5);padding:20px}
 .login-card{background:white;width:100%;max-width:430px;border-radius:24px;padding:32px;box-shadow:0 25px 80px rgba(0,0,0,.32)}
 .login-card h1{margin:0;color:#0b63e5;font-size:34px}.login-card p{margin:10px 0 22px;color:#64748b;font-size:18px}

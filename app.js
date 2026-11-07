@@ -739,7 +739,7 @@ function setDropboxOAuthTokens(data){
 }
 
 async function startDropboxOAuth(){
-  saveDropboxSettings({ silent: true });
+  if(!saveDropboxSettings({ silent: true })) return;
   const appKey = getDropboxAppKey();
   if(!appKey){
     setCloudStatus('☁ App Key Dropbox mancante', 'err');
@@ -4477,6 +4477,12 @@ function saveDropboxSettings(options = {}){
   const token = textValue(document.getElementById('dropboxToken')?.value);
   const path = textValue(document.getElementById('dropboxPath')?.value);
   const backupFolder = textValue(document.getElementById('dropboxBackupFolder')?.value);
+  const removesCredentials = [
+    [DROPBOX_APP_KEY_KEY, appKey],
+    [DROPBOX_REFRESH_TOKEN_KEY, refreshToken],
+    [DROPBOX_TOKEN_KEY, token]
+  ].some(([key, value]) => inventoryStorage.getItem(key) && !value);
+  if(removesCredentials && !confirm('Salvare queste impostazioni rimuove una o piu credenziali Dropbox da questo dispositivo. La sincronizzazione potrebbe interrompersi e richiedere un nuovo collegamento.\n\nProdotti, quantita, vendite, carrello e cronologia restano salvati. Continuare?')) return false;
   if(appKey) inventoryStorage.setItem(DROPBOX_APP_KEY_KEY, appKey);
   else inventoryStorage.removeItem(DROPBOX_APP_KEY_KEY);
   if(refreshToken) inventoryStorage.setItem(DROPBOX_REFRESH_TOKEN_KEY, refreshToken);
@@ -4501,10 +4507,11 @@ function saveDropboxSettings(options = {}){
     accountStatus.innerText = connected ? 'Dropbox collegato' : 'Dropbox non collegato';
     accountStatus.classList.toggle('ok', connected);
   }
+  return true;
 }
 
 async function loadDropboxFolderPicker(path = dropboxFolderPickerPath){
-  saveDropboxSettings({ silent: true });
+  if(!saveDropboxSettings({ silent: true })) return;
   if(!hasDropboxCredentials()){
     setFolderPickerStatus('Dropbox non collegato: collega account Dropbox prima di scegliere la cartella.', 'err');
     setCloudStatus('☁ Token Dropbox mancante', 'err');
@@ -4565,6 +4572,7 @@ async function goUpDropboxFolder(){
 }
 
 function clearDropboxToken(){
+  if(!confirm('Scollegare Dropbox da questo dispositivo?\n\nLa sincronizzazione si interrompe finche non ricolleghi l\'account. Prodotti, quantita, vendite, carrello e cronologia restano salvati.')) return false;
   inventoryStorage.removeItem(DROPBOX_TOKEN_KEY);
   inventoryStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
   inventoryStorage.removeItem(DROPBOX_APP_KEY_KEY);
@@ -4582,10 +4590,11 @@ function clearDropboxToken(){
   }
   setFolderPickerStatus('Dropbox scollegato. Collega account Dropbox per scegliere le cartelle.', 'err');
   setCloudStatus('☁ Token Dropbox rimosso', 'err');
+  return true;
 }
 
 function logoutUser(){
-  clearDropboxToken();
+  if(!clearDropboxToken()) return;
   showSettings();
 }
 
