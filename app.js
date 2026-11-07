@@ -26,6 +26,8 @@ const DROPBOX_AUTO_SYNC_INTERVAL_MS = 60 * 60 * 1000;
 const DROPBOX_NETWORK_RETRY_DELAYS = [800, 2200, 5000];
 const DROPBOX_RECOVERY_SYNC_DELAY_MS = 45000;
 const IMPORT_HISTORY_RETENTION_DAYS = 30;
+const IMPORT_HISTORY_MAX_SESSIONS = 100;
+const IMPORT_HISTORY_MAX_BYTES = 1024 * 1024;
 const itemsPerPage = 100;
 const importSessionPageSize = 200;
 const folderDetailPageSize = 100;
@@ -70,7 +72,7 @@ let folderDetailPages = {};
 
 function readJson(key, fallback){
   try{
-    const raw = localStorage.getItem(key);
+    const raw = inventoryStorage.getItem(key);
     if(!raw) return fallback;
     return JSON.parse(raw);
   }catch(e){
@@ -171,7 +173,7 @@ function unpackProductsStorage(raw){
 
 function readProductsStorage(){
   try{
-    const packed = localStorage.getItem(STORAGE_PRODUCTS_PACKED_KEY);
+    const packed = inventoryStorage.getItem(STORAGE_PRODUCTS_PACKED_KEY);
     if(packed) return unpackProductsStorage(packed);
   }catch(error){
     console.error('Storage prodotti compatto non leggibile', error);
@@ -438,6 +440,36 @@ function compactImportSessions(list){
   }));
 }
 
+function limitImportHistory(list, now = Date.now()){
+  const cutoff = now - IMPORT_HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const recent = normalizeImportSessions(list)
+    .filter(session => Number.isFinite(Date.parse(session.time)) && Date.parse(session.time) >= cutoff)
+    .sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
+  const retained = [];
+  let bytes = 4;
+  for(const session of recent){
+    if(retained.length >= IMPORT_HISTORY_MAX_SESSIONS) break;
+    const entry = { i: session.id, f: session.fileName, t: session.time, c: session.count, b: session.barcodes };
+    const entryBytes = (JSON.stringify(entry).length + (retained.length ? 1 : 0)) * 2;
+    // Retain complete barcode lists so history actions cannot operate on partial imports.
+    if(bytes + entryBytes > IMPORT_HISTORY_MAX_BYTES) continue;
+    bytes += entryBytes;
+    session.products = [];
+    retained.push(session);
+  }
+  return retained;
+}
+
+function trimImportHistory(){
+  const before = importSessions;
+  importSessions = limitImportHistory(importSessions);
+  const remainingIds = new Set(importSessions.map(session => String(session.id)));
+  before.forEach(session => {
+    if(!remainingIds.has(String(session.id))) cleanupImportSessionState(session.id);
+  });
+  return before.length - importSessions.length;
+}
+
 function normalizeSaleItems(items){
   if(!Array.isArray(items)) return [];
   const totals = {};
@@ -517,36 +549,36 @@ function escapeAttr(value){
 }
 
 function setLocalModified(value = Date.now(), markDirty = true){
-  localStorage.setItem(LAST_MODIFIED_KEY, String(Number(value) || Date.now()));
-  if(markDirty) localStorage.setItem(DROPBOX_LOCAL_DIRTY_KEY, '1');
+  inventoryStorage.setItem(LAST_MODIFIED_KEY, String(Number(value) || Date.now()));
+  if(markDirty) inventoryStorage.setItem(DROPBOX_LOCAL_DIRTY_KEY, '1');
 }
 
 function getLocalModified(){
-  return Number(localStorage.getItem(LAST_MODIFIED_KEY) || '0') || 0;
+  return Number(inventoryStorage.getItem(LAST_MODIFIED_KEY) || '0') || 0;
 }
 
 function hasLocalUnsyncedChanges(){
-  if(localStorage.getItem(DROPBOX_LOCAL_DIRTY_KEY) === '1') return true;
+  if(inventoryStorage.getItem(DROPBOX_LOCAL_DIRTY_KEY) === '1') return true;
   const lastLocalTime = getLastDropboxSyncedLocalModified();
   return lastLocalTime > 0 && getLocalModified() > lastLocalTime + 1500;
 }
 
 function clearLocalUnsyncedChanges(){
-  localStorage.removeItem(DROPBOX_LOCAL_DIRTY_KEY);
+  inventoryStorage.removeItem(DROPBOX_LOCAL_DIRTY_KEY);
 }
 
 function getLastDropboxSyncedServerModified(){
-  return Number(localStorage.getItem(DROPBOX_LAST_SYNCED_SERVER_KEY) || '0') || 0;
+  return Number(inventoryStorage.getItem(DROPBOX_LAST_SYNCED_SERVER_KEY) || '0') || 0;
 }
 
 function getLastDropboxSyncedLocalModified(){
-  return Number(localStorage.getItem(DROPBOX_LAST_SYNCED_LOCAL_KEY) || '0') || 0;
+  return Number(inventoryStorage.getItem(DROPBOX_LAST_SYNCED_LOCAL_KEY) || '0') || 0;
 }
 
 function markDropboxSynced(remoteTime){
   const cleanRemoteTime = Number(remoteTime || 0) || Date.now();
-  localStorage.setItem(DROPBOX_LAST_SYNCED_SERVER_KEY, String(cleanRemoteTime));
-  localStorage.setItem(DROPBOX_LAST_SYNCED_LOCAL_KEY, String(getLocalModified()));
+  inventoryStorage.setItem(DROPBOX_LAST_SYNCED_SERVER_KEY, String(cleanRemoteTime));
+  inventoryStorage.setItem(DROPBOX_LAST_SYNCED_LOCAL_KEY, String(getLocalModified()));
   clearLocalUnsyncedChanges();
 }
 
@@ -562,57 +594,47 @@ function isStorageQuotaError(error){
 }
 
 function safeSetStorage(key, value){
-  try{
-    localStorage.setItem(key, value);
-  }catch(error){
-    if(!isStorageQuotaError(error)) throw error;
-    localStorage.removeItem(key);
-    localStorage.setItem(key, value);
-  }
+  inventoryStorage.setItem(key, value);
+}
+
+function showStorageFailure(){
+  const notice = document.getElementById('storageFailure');
+  if(notice) notice.classList.remove('hidden');
+}
+
+async function retryLocalSave(){
+  persistAll(false);
+  persistSaleCart();
+  try{ await inventoryStorage.flush(); }catch(error){ showStorageFailure(); }
+}
+
+function exportRecoveryBackup(){
+  const snapshot = { ...buildSnapshot(), saleCart: compactSaleCart(saleCart), saleCartOrder: [...saleCartOrder] };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot)], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'inventory_backup_recupero_' + backupTimestamp(new Date()) + '.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function persistProducts(touch = true){
   products = normalizeProductList(products);
   invalidateProductBarcodeIndex();
   const packedProducts = packProductsStorage(products);
-  try{
-    localStorage.removeItem(STORAGE_PRODUCTS_KEY);
-    safeSetStorage(STORAGE_PRODUCTS_PACKED_KEY, packedProducts);
-  }catch(error){
-    if(!isStorageQuotaError(error)) throw error;
-    localStorage.removeItem(STORAGE_IMPORTS_KEY);
-    importSessions = [];
-    localStorage.removeItem(STORAGE_PRODUCTS_KEY);
-    safeSetStorage(STORAGE_PRODUCTS_PACKED_KEY, packedProducts);
-    setCloudStatus('☁ Memoria liberata: cronologia importazioni svuotata', 'err');
-  }
+  safeSetStorage(STORAGE_PRODUCTS_PACKED_KEY, packedProducts);
   if(touch) setLocalModified();
 }
 
 function persistImportSessions(touch = true){
-  importSessions = normalizeImportSessions(importSessions);
-  try{
-    safeSetStorage(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
-  }catch(error){
-    if(!isStorageQuotaError(error)) throw error;
-    localStorage.removeItem(STORAGE_IMPORTS_KEY);
-    importSessions = importSessions.slice(0, 10);
-    safeSetStorage(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
-    setCloudStatus('☁ Cronologia importazioni alleggerita', 'err');
-  }
+  trimImportHistory();
+  safeSetStorage(STORAGE_IMPORTS_KEY, JSON.stringify(compactImportSessions(importSessions)));
   if(touch) setLocalModified();
 }
 
 function persistSalesRecords(touch = true){
   salesRecords = normalizeSalesRecords(salesRecords);
-  try{
-    safeSetStorage(STORAGE_SALES_KEY, JSON.stringify(compactSalesRecords(salesRecords)));
-  }catch(error){
-    if(!isStorageQuotaError(error)) throw error;
-    salesRecords = salesRecords.slice(-1000);
-    safeSetStorage(STORAGE_SALES_KEY, JSON.stringify(compactSalesRecords(salesRecords)));
-    setCloudStatus('☁ Cronologia vendite alleggerita', 'err');
-  }
+  safeSetStorage(STORAGE_SALES_KEY, JSON.stringify(compactSalesRecords(salesRecords)));
   if(touch) setLocalModified();
 }
 
@@ -631,15 +653,15 @@ function persistAll(touch = true){
 }
 
 function ensureLocalModified(){
-  if(!localStorage.getItem(LAST_MODIFIED_KEY)) {
-    localStorage.setItem(LAST_MODIFIED_KEY, '0');
+  if(!inventoryStorage.getItem(LAST_MODIFIED_KEY)) {
+    inventoryStorage.setItem(LAST_MODIFIED_KEY, '0');
   }
 }
 
 function applySyncTimestampMigration(){
-  if(localStorage.getItem(SYNC_FIX_VERSION_KEY) === 'remote_time_v2') return;
-  localStorage.setItem(LAST_MODIFIED_KEY, '0');
-  localStorage.setItem(SYNC_FIX_VERSION_KEY, 'remote_time_v2');
+  if(inventoryStorage.getItem(SYNC_FIX_VERSION_KEY) === 'remote_time_v2') return;
+  inventoryStorage.setItem(LAST_MODIFIED_KEY, '0');
+  inventoryStorage.setItem(SYNC_FIX_VERSION_KEY, 'remote_time_v2');
 }
 
 function setCloudStatus(text, type = ''){
@@ -650,15 +672,15 @@ function setCloudStatus(text, type = ''){
 }
 
 function getDropboxToken(){
-  return textValue(localStorage.getItem(DROPBOX_TOKEN_KEY));
+  return textValue(inventoryStorage.getItem(DROPBOX_TOKEN_KEY));
 }
 
 function getDropboxAppKey(){
-  return textValue(localStorage.getItem(DROPBOX_APP_KEY_KEY));
+  return textValue(inventoryStorage.getItem(DROPBOX_APP_KEY_KEY));
 }
 
 function getDropboxRefreshToken(){
-  return textValue(localStorage.getItem(DROPBOX_REFRESH_TOKEN_KEY));
+  return textValue(inventoryStorage.getItem(DROPBOX_REFRESH_TOKEN_KEY));
 }
 
 function canRefreshDropboxToken(){
@@ -670,7 +692,7 @@ function hasDropboxCredentials(){
 }
 
 function tokenNeedsRefresh(){
-  const expiresAt = Number(localStorage.getItem(DROPBOX_TOKEN_EXPIRES_KEY) || '0') || 0;
+  const expiresAt = Number(inventoryStorage.getItem(DROPBOX_TOKEN_EXPIRES_KEY) || '0') || 0;
   return !getDropboxToken() || (expiresAt > 0 && Date.now() > expiresAt - 120000);
 }
 
@@ -696,23 +718,23 @@ async function refreshDropboxAccessToken(){
   const data = await response.json();
   if(!data.access_token) throw new Error('DROPBOX_REFRESH_BAD_RESPONSE');
 
-  localStorage.setItem(DROPBOX_TOKEN_KEY, data.access_token);
+  inventoryStorage.setItem(DROPBOX_TOKEN_KEY, data.access_token);
   if(data.expires_in){
-    localStorage.setItem(DROPBOX_TOKEN_EXPIRES_KEY, String(Date.now() + Number(data.expires_in) * 1000));
+    inventoryStorage.setItem(DROPBOX_TOKEN_EXPIRES_KEY, String(Date.now() + Number(data.expires_in) * 1000));
   }else{
-    localStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
+    inventoryStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
   }
   return data.access_token;
 }
 
 function setDropboxOAuthTokens(data){
   if(!data || !data.access_token) throw new Error('DROPBOX_REFRESH_BAD_RESPONSE');
-  localStorage.setItem(DROPBOX_TOKEN_KEY, data.access_token);
-  if(data.refresh_token) localStorage.setItem(DROPBOX_REFRESH_TOKEN_KEY, data.refresh_token);
+  inventoryStorage.setItem(DROPBOX_TOKEN_KEY, data.access_token);
+  if(data.refresh_token) inventoryStorage.setItem(DROPBOX_REFRESH_TOKEN_KEY, data.refresh_token);
   if(data.expires_in){
-    localStorage.setItem(DROPBOX_TOKEN_EXPIRES_KEY, String(Date.now() + Number(data.expires_in) * 1000));
+    inventoryStorage.setItem(DROPBOX_TOKEN_EXPIRES_KEY, String(Date.now() + Number(data.expires_in) * 1000));
   }else{
-    localStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
+    inventoryStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
   }
 }
 
@@ -733,9 +755,9 @@ async function startDropboxOAuth(){
   const state = randomOAuthString(32);
   const verifier = randomOAuthString(96);
   const challenge = await sha256Base64Url(verifier);
-  localStorage.setItem(DROPBOX_OAUTH_STATE_KEY, state);
-  localStorage.setItem(DROPBOX_OAUTH_VERIFIER_KEY, verifier);
-  localStorage.setItem(DROPBOX_OAUTH_REDIRECT_KEY, redirectUri);
+  inventoryStorage.setItem(DROPBOX_OAUTH_STATE_KEY, state);
+  inventoryStorage.setItem(DROPBOX_OAUTH_VERIFIER_KEY, verifier);
+  inventoryStorage.setItem(DROPBOX_OAUTH_REDIRECT_KEY, redirectUri);
 
   const params = new URLSearchParams({
     client_id: appKey,
@@ -747,13 +769,14 @@ async function startDropboxOAuth(){
     state,
     scope: 'files.metadata.read files.content.read files.content.write'
   });
+  try{ await inventoryStorage.flush(); }catch(error){ showStorageFailure(); return; }
   window.location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
 }
 
 async function finishDropboxOAuth(code){
   const appKey = getDropboxAppKey();
-  const verifier = localStorage.getItem(DROPBOX_OAUTH_VERIFIER_KEY) || '';
-  const redirectUri = localStorage.getItem(DROPBOX_OAUTH_REDIRECT_KEY) || getOAuthRedirectUri();
+  const verifier = inventoryStorage.getItem(DROPBOX_OAUTH_VERIFIER_KEY) || '';
+  const redirectUri = inventoryStorage.getItem(DROPBOX_OAUTH_REDIRECT_KEY) || getOAuthRedirectUri();
   if(!appKey || !verifier) throw new Error('DROPBOX_OAUTH_MISSING');
 
   const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
@@ -787,7 +810,7 @@ async function handleDropboxOAuthRedirect(){
     return;
   }
 
-  const expectedState = localStorage.getItem(DROPBOX_OAUTH_STATE_KEY) || '';
+  const expectedState = inventoryStorage.getItem(DROPBOX_OAUTH_STATE_KEY) || '';
   const state = params.get('state') || '';
   if(!expectedState || state !== expectedState){
     setCloudStatus('☁ Collegamento Dropbox non valido', 'err');
@@ -798,9 +821,9 @@ async function handleDropboxOAuthRedirect(){
   try{
     setCloudStatus('☁ Collegamento Dropbox...', '');
     await finishDropboxOAuth(code);
-    localStorage.removeItem(DROPBOX_OAUTH_STATE_KEY);
-    localStorage.removeItem(DROPBOX_OAUTH_VERIFIER_KEY);
-    localStorage.removeItem(DROPBOX_OAUTH_REDIRECT_KEY);
+    inventoryStorage.removeItem(DROPBOX_OAUTH_STATE_KEY);
+    inventoryStorage.removeItem(DROPBOX_OAUTH_VERIFIER_KEY);
+    inventoryStorage.removeItem(DROPBOX_OAUTH_REDIRECT_KEY);
     history.replaceState({}, document.title, getOAuthRedirectUri());
     showSettings();
     setCloudStatus('☁ Dropbox collegato', 'ok');
@@ -874,24 +897,24 @@ async function dropboxFetch(url, options, retry = true){
 }
 
 function getDropboxPath(){
-  const path = textValue(localStorage.getItem(DROPBOX_PATH_KEY)) || DEFAULT_DROPBOX_PATH;
+  const path = textValue(inventoryStorage.getItem(DROPBOX_PATH_KEY)) || DEFAULT_DROPBOX_PATH;
   return path.startsWith('/') ? path : '/' + path;
 }
 
 function setDropboxPath(path){
   const cleanPath = textValue(path) || DEFAULT_DROPBOX_PATH;
-  localStorage.setItem(DROPBOX_PATH_KEY, cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath);
+  inventoryStorage.setItem(DROPBOX_PATH_KEY, cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath);
 }
 
 function getDropboxBackupFolder(){
-  const folder = textValue(localStorage.getItem(DROPBOX_BACKUP_FOLDER_KEY)) || DEFAULT_DROPBOX_BACKUP_FOLDER;
+  const folder = textValue(inventoryStorage.getItem(DROPBOX_BACKUP_FOLDER_KEY)) || DEFAULT_DROPBOX_BACKUP_FOLDER;
   const cleanFolder = folder.startsWith('/') ? folder : '/' + folder;
   return cleanFolder.replace(/\/+$/g, '') || DEFAULT_DROPBOX_BACKUP_FOLDER;
 }
 
 function setDropboxBackupFolder(folder){
   const cleanFolder = textValue(folder) || DEFAULT_DROPBOX_BACKUP_FOLDER;
-  localStorage.setItem(DROPBOX_BACKUP_FOLDER_KEY, cleanFolder.startsWith('/') ? cleanFolder : '/' + cleanFolder);
+  inventoryStorage.setItem(DROPBOX_BACKUP_FOLDER_KEY, cleanFolder.startsWith('/') ? cleanFolder : '/' + cleanFolder);
 }
 
 function normalizeDropboxFolderPath(path){
@@ -948,6 +971,7 @@ function buildBackupPath(timestamp){
 }
 
 function buildSnapshot(timestamp = Date.now(), meta = {}){
+  pruneOldImportSessions(false);
   return {
     version: 60,
     lastModified: timestamp,
@@ -1189,6 +1213,7 @@ async function dropboxUploadSnapshot(){
   persistAll(false);
   setLocalModified(savedTime);
   markDropboxSynced(savedTime);
+  await inventoryStorage.flush();
   return snapshot;
 }
 
@@ -1261,20 +1286,22 @@ function handleDropboxError(error, showAlert = true){
 }
 
 async function saveCloudAfterChange(label, options = {}){
+  let localSaved = true;
+  try{ await inventoryStorage.flush(); }catch(error){ localSaved = false; }
   if(!hasDropboxCredentials()){
-    setCloudStatus('☁ ' + label + ' locale', 'ok');
-    return { synced: false, skipped: true, message: 'Dropbox non collegato' };
+    setCloudStatus(localSaved ? '☁ ' + label + ' locale' : 'Salvataggio locale da riprovare', localSaved ? 'ok' : 'err');
+    return { synced: false, skipped: true, localSaved, message: localSaved ? 'Dropbox non collegato' : 'Salvataggio sul dispositivo non riuscito' };
   }
   try{
     await dropboxUploadSnapshot();
     setCloudStatus('☁ ' + label + ' su Dropbox + backup', 'ok');
-    return { synced: true };
+    return { synced: true, localSaved };
   }catch(error){
     handleDropboxError(error, false);
     if(!options.silentDropboxError){
-      alert(label + ' salvato sul dispositivo.\nDropbox non aggiornato: ' + dropboxAlertMessage(error));
+      alert((localSaved ? label + ' salvato sul dispositivo.' : 'Salvataggio sul dispositivo da riprovare. Esporta un backup prima di chiudere.') + '\nDropbox non aggiornato: ' + dropboxAlertMessage(error));
     }
-    return { synced: false, error, message: dropboxAlertMessage(error) };
+    return { synced: false, localSaved, error, message: dropboxAlertMessage(error) };
   }
 }
 
@@ -1324,6 +1351,7 @@ async function syncNow(options = {}){
       setCloudStatus('☁ Caricato su Dropbox + backup: ' + products.length + ' prodotti', 'ok');
     }
 
+    await inventoryStorage.flush();
     renderCurrentView();
   }catch(error){
     handleDropboxError(error, !options.silentMissingToken);
@@ -1345,6 +1373,9 @@ function startDropboxAutoSync(){
 
 document.addEventListener('visibilitychange', () => {
   if(document.hidden) return;
+  if(!storageReady) return;
+  pruneOldImportSessions(false);
+  if(inventoryStorage.hasPending()) inventoryStorage.flush().catch(showStorageFailure);
   if(Date.now() - dropboxLastAutoSyncAt >= DROPBOX_AUTO_SYNC_INTERVAL_MS){
     syncDropboxAutomatically();
   }
@@ -1610,11 +1641,11 @@ function prepareScannerForSalesEntry(){
 }
 
 function hideSalesBuyPrice(){
-  return localStorage.getItem(SALES_HIDE_BUY_PRICE_KEY) === '1';
+  return inventoryStorage.getItem(SALES_HIDE_BUY_PRICE_KEY) === '1';
 }
 
 function setSalesBuyPriceHidden(hidden){
-  localStorage.setItem(SALES_HIDE_BUY_PRICE_KEY, hidden ? '1' : '0');
+  inventoryStorage.setItem(SALES_HIDE_BUY_PRICE_KEY, hidden ? '1' : '0');
 }
 
 function updateSaleBuyPriceToggle(){
@@ -2182,7 +2213,10 @@ async function confirmSaleCart(){
   prepareScannerForNextSaleScan();
   renderSalesStats();
   const cloudResult = await saveCloudAfterChange('Vendita salvata', { silentDropboxError: true });
-  setSaleStatus(cloudResult.synced ? 'Vendita confermata e sincronizzata.' : 'Vendita confermata sul dispositivo.', cloudResult.synced ? 'ok' : '');
+  const saleMessage = cloudResult.synced ? 'Vendita confermata e sincronizzata.'
+    : cloudResult.localSaved ? 'Vendita confermata sul dispositivo.'
+    : 'Vendita in attesa di salvataggio. Esporta un backup prima di chiudere.';
+  setSaleStatus(saleMessage, cloudResult.synced ? 'ok' : cloudResult.localSaved ? '' : 'err');
   prepareScannerForNextSaleScan();
 }
 
@@ -3551,19 +3585,9 @@ function cleanupImportSessionState(id){
 }
 
 function pruneOldImportSessions(touch = true){
-  const cutoff = Date.now() - (IMPORT_HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  const before = importSessions.length;
-  importSessions = importSessions.filter(session => {
-    const time = new Date(session.time).getTime();
-    return !Number.isFinite(time) || time >= cutoff;
-  });
-  if(importSessions.length === before) return 0;
-  const remainingIds = new Set(importSessions.map(session => String(session.id)));
-  openImportSessionIds.forEach(id => {
-    if(!remainingIds.has(String(id))) cleanupImportSessionState(id);
-  });
-  persistImportSessions(touch);
-  return before - importSessions.length;
+  const removed = trimImportHistory();
+  if(removed) persistImportSessions(touch);
+  return removed;
 }
 
 async function deleteImportSessionFromHistory(id){
@@ -3616,7 +3640,7 @@ function freeBrowserMemory(){
   importSessions = [];
   importSessionPages = {};
   openImportSessionIds.clear();
-  localStorage.removeItem(STORAGE_IMPORTS_KEY);
+  inventoryStorage.removeItem(STORAGE_IMPORTS_KEY);
   persistProducts(true);
   setCloudStatus('☁ Memoria liberata', 'ok');
   if(currentView === 'history') renderImportSessions();
@@ -4329,6 +4353,7 @@ async function importExcel(event){
       let updated = 0;
       let buyIncreased = 0;
       let buyDecreased = 0;
+      let historyNote = '';
       const importProducts = [];
 
       for(const row of rows){
@@ -4405,14 +4430,18 @@ async function importExcel(event){
       });
 
       if(importedNow.length){
+        const importSessionId = 'imp_' + Date.now();
         importSessions.unshift({
-          id: 'imp_' + Date.now(),
+          id: importSessionId,
           fileName: file.name,
           time: new Date().toISOString(),
           count: importedNow.length,
           barcodes: importedNow.map(p => p.barcode)
         });
         persistImportSessions(true);
+        if(!importSessions.some(session => session.id === importSessionId)){
+          historyNote = '\nLa lista di questa importazione supera lo spazio riservato alla cronologia. Tutti i prodotti sono stati aggiunti al catalogo.';
+        }
       }
 
       currentPage = 1;
@@ -4421,13 +4450,16 @@ async function importExcel(event){
       const cloudResult = await saveCloudAfterChange('Import salvato', { silentDropboxError: true });
       const syncMessage = cloudResult.synced
         ? 'Dropbox aggiornato.'
-        : 'Salvato sul dispositivo. Dropbox non aggiornato: ' + (cloudResult.message || 'riprova Sincronizza dati.');
-      alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}\nAcquisto aumentato: ${buyIncreased}\nAcquisto abbassato: ${buyDecreased}\n${syncMessage}`);
+        : cloudResult.localSaved
+          ? 'Salvato sul dispositivo. Dropbox non aggiornato: ' + (cloudResult.message || 'riprova Sincronizza dati.')
+          : 'Salvataggio non riuscito: esporta un backup prima di chiudere.';
+      alert(`Import completato!\nNuovi: ${imported}\nAggiornati: ${updated}\nAcquisto aumentato: ${buyIncreased}\nAcquisto abbassato: ${buyDecreased}\n${syncMessage}${historyNote}`);
     }catch(err){
       console.error(err);
       if(isStorageQuotaError(err)){
         setCloudStatus('☁ Memoria del browser piena', 'err');
-        alert('Memoria del browser piena. Ho alleggerito il salvataggio, ma questo import e troppo grande per questa memoria locale. Usa il sito online, oppure svuota la cronologia importazioni e riprova.');
+        showStorageFailure();
+        alert('Salvataggio non riuscito. I dati aperti possono essere esportati dal pulsante Esporta backup prima di chiudere.');
       }else{
         setCloudStatus('☁ Errore import', 'err');
         alert('Errore importazione');
@@ -4445,13 +4477,13 @@ function saveDropboxSettings(options = {}){
   const token = textValue(document.getElementById('dropboxToken')?.value);
   const path = textValue(document.getElementById('dropboxPath')?.value);
   const backupFolder = textValue(document.getElementById('dropboxBackupFolder')?.value);
-  if(appKey) localStorage.setItem(DROPBOX_APP_KEY_KEY, appKey);
-  else localStorage.removeItem(DROPBOX_APP_KEY_KEY);
-  if(refreshToken) localStorage.setItem(DROPBOX_REFRESH_TOKEN_KEY, refreshToken);
-  else localStorage.removeItem(DROPBOX_REFRESH_TOKEN_KEY);
-  if(token) localStorage.setItem(DROPBOX_TOKEN_KEY, token);
-  else localStorage.removeItem(DROPBOX_TOKEN_KEY);
-  localStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
+  if(appKey) inventoryStorage.setItem(DROPBOX_APP_KEY_KEY, appKey);
+  else inventoryStorage.removeItem(DROPBOX_APP_KEY_KEY);
+  if(refreshToken) inventoryStorage.setItem(DROPBOX_REFRESH_TOKEN_KEY, refreshToken);
+  else inventoryStorage.removeItem(DROPBOX_REFRESH_TOKEN_KEY);
+  if(token) inventoryStorage.setItem(DROPBOX_TOKEN_KEY, token);
+  else inventoryStorage.removeItem(DROPBOX_TOKEN_KEY);
+  inventoryStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
   setDropboxPath(path);
   setDropboxBackupFolder(backupFolder);
   if(!options.silent){
@@ -4533,10 +4565,10 @@ async function goUpDropboxFolder(){
 }
 
 function clearDropboxToken(){
-  localStorage.removeItem(DROPBOX_TOKEN_KEY);
-  localStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
-  localStorage.removeItem(DROPBOX_APP_KEY_KEY);
-  localStorage.removeItem(DROPBOX_REFRESH_TOKEN_KEY);
+  inventoryStorage.removeItem(DROPBOX_TOKEN_KEY);
+  inventoryStorage.removeItem(DROPBOX_TOKEN_EXPIRES_KEY);
+  inventoryStorage.removeItem(DROPBOX_APP_KEY_KEY);
+  inventoryStorage.removeItem(DROPBOX_REFRESH_TOKEN_KEY);
   const appKeyInput = document.getElementById('dropboxAppKey');
   const refreshInput = document.getElementById('dropboxRefreshToken');
   const tokenInput = document.getElementById('dropboxToken');
@@ -4631,7 +4663,7 @@ async function preferredBarcodeCameraDeviceId(){
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cameras = devices.filter(device => device.kind === 'videoinput' && device.deviceId);
     if(!cameras.length || !cameras.some(device => device.label)) return '';
-    const saved = textValue(localStorage.getItem(BARCODE_CAMERA_DEVICE_KEY));
+    const saved = textValue(inventoryStorage.getItem(BARCODE_CAMERA_DEVICE_KEY));
     if(saved && cameras.some(device => device.deviceId === saved)) return saved;
     return cameras
       .map((device, index) => ({ device, index, score: barcodeCameraDeviceScore(device) }))
@@ -4649,14 +4681,14 @@ function streamVideoDeviceId(stream){
 
 async function openPreferredBarcodeCameraStream(){
   const base = barcodeCameraConstraints();
-  const savedDeviceId = textValue(localStorage.getItem(BARCODE_CAMERA_DEVICE_KEY));
+  const savedDeviceId = textValue(inventoryStorage.getItem(BARCODE_CAMERA_DEVICE_KEY));
   if(savedDeviceId){
     try{
       const savedStream = await navigator.mediaDevices.getUserMedia(barcodeCameraConstraints(savedDeviceId));
       await stabilizeBarcodeCameraStream(savedStream);
       return savedStream;
     }catch(error){
-      localStorage.removeItem(BARCODE_CAMERA_DEVICE_KEY);
+      inventoryStorage.removeItem(BARCODE_CAMERA_DEVICE_KEY);
     }
   }
   let stream = await navigator.mediaDevices.getUserMedia(base);
@@ -4665,9 +4697,9 @@ async function openPreferredBarcodeCameraStream(){
   if(preferredDeviceId && preferredDeviceId !== currentDeviceId){
     stopMediaStream(stream);
     stream = await navigator.mediaDevices.getUserMedia(barcodeCameraConstraints(preferredDeviceId));
-    localStorage.setItem(BARCODE_CAMERA_DEVICE_KEY, preferredDeviceId);
+    inventoryStorage.setItem(BARCODE_CAMERA_DEVICE_KEY, preferredDeviceId);
   }else if(preferredDeviceId){
-    localStorage.setItem(BARCODE_CAMERA_DEVICE_KEY, preferredDeviceId);
+    inventoryStorage.setItem(BARCODE_CAMERA_DEVICE_KEY, preferredDeviceId);
   }
   await stabilizeBarcodeCameraStream(stream);
   return stream;
@@ -5089,29 +5121,54 @@ document.addEventListener('click', function(event){
   }
 });
 
+let storageReady = false;
+
+inventoryStorage.configure({
+  onError: showStorageFailure,
+  onSaved: () => document.getElementById('storageFailure')?.classList.add('hidden'),
+  onQuota: () => {
+    importSessions = [];
+    importSessionPages = {};
+    openImportSessionIds.clear();
+    if(currentView === 'history') renderImportSessions();
+  }
+});
+
+window.addEventListener('beforeunload', event => {
+  if(!inventoryStorage.hasPending()) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+
 window.onload = async function(){
+  try{
+    await inventoryStorage.initialize();
+  }catch(error){
+    document.getElementById('storageFailureText').textContent = 'Archivio locale non leggibile. Riapri questa pagina prima di lavorare.';
+    document.querySelectorAll('#storageFailure button').forEach(button => button.disabled = true);
+    showStorageFailure();
+    return;
+  }
+  products = normalizeProductList(readProductsStorage());
+  importSessions = limitImportHistory(readJson(STORAGE_IMPORTS_KEY, []));
+  salesRecords = normalizeSalesRecords(readJson(STORAGE_SALES_KEY, []));
+  saleCart = normalizeSaleCart(readJson(STORAGE_SALE_CART_KEY, {}));
+  saleCartOrder = normalizeSaleCartOrder(readJson(STORAGE_SALE_CART_ORDER_KEY, []), saleCart);
   ensureLocalModified();
   applySyncTimestampMigration();
-  try{
-    persistAll(false);
-  }catch(error){
-    if(isStorageQuotaError(error)){
-      importSessions = [];
-      localStorage.removeItem(STORAGE_IMPORTS_KEY);
-      persistProducts(false);
-      setCloudStatus('☁ Memoria liberata: cronologia svuotata', 'err');
-    }else{
-      throw error;
-    }
-  }
-  pruneOldImportSessions(false);
-  if(!localStorage.getItem(DROPBOX_PATH_KEY)) setDropboxPath(DEFAULT_DROPBOX_PATH);
+  persistAll(false);
+  persistSaleCart();
+  try{ await inventoryStorage.flush(); }catch(error){ showStorageFailure(); }
+  storageReady = true;
+  document.getElementById('appRoot').inert = false;
+  if(!inventoryStorage.getItem(DROPBOX_PATH_KEY)) setDropboxPath(DEFAULT_DROPBOX_PATH);
   showSales();
   installAutoSellPriceFromBuy();
   __installBarcodeInputLogic();
   installClearSearchOnScan();
   setInterval(__focusBarcodeIfAllowed, 1200);
   startDropboxAutoSync();
+  setInterval(() => pruneOldImportSessions(false), 60 * 60 * 1000);
   await handleDropboxOAuthRedirect();
   setTimeout(() => {
     dropboxLastAutoSyncAt = Date.now();
