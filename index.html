@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inventory Manager</title>
-  <link rel="stylesheet" href="style.css?v=20261107-v91-uscita-protetta" />
+  <link rel="stylesheet" href="style.css?v=20261107-v92-impostazioni" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 </head>
@@ -21,7 +21,7 @@
       <button tabindex="-1" class="menu" id="menuCategories" onclick="showCategories()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="6" height="6" rx="1.2"/><rect x="14" y="5" width="6" height="6" rx="1.2"/><rect x="4" y="14" width="6" height="5" rx="1.2"/><rect x="14" y="14" width="6" height="5" rx="1.2"/></svg></span><span class="menu-label">Categorie</span></button>
       <button tabindex="-1" class="menu" id="menuSettings" onclick="showSettings()"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h6M14 6h6"/><circle cx="12" cy="6" r="2"/><path d="M4 12h12M20 12h0"/><circle cx="18" cy="12" r="2"/><path d="M4 18h3M11 18h9"/><circle cx="9" cy="18" r="2"/></svg></span><span class="menu-label">Impostazioni</span></button>
       <div class="copyright">© 2026 Inventory Manager</div>
-      <div class="app-version">Versione 91<span>07/11/2026</span></div>
+      <div class="app-version">Versione 92<span>07/11/2026</span></div>
     </aside>
 
     <main class="main">
@@ -224,21 +224,23 @@
         <div class="settings-panel">
           <div class="app-version-card">
             <strong>Versione app</strong>
-            <span>91 - 07/11/2026</span>
+            <span>92 - 07/11/2026</span>
           </div>
-          <div class="settings-row">
-            <label for="dropboxAppKey">Codice app Dropbox</label>
-            <input id="dropboxAppKey" type="password" autocomplete="off" placeholder="Codice app Dropbox" />
-          </div>
-          <div class="settings-row">
-            <label>Account Dropbox</label>
-            <div class="oauth-box">
-              <button type="button" onclick="startDropboxOAuth()">Collega account</button>
-              <div id="dropboxAccountStatus" class="oauth-status">Non collegato</div>
+          <div class="settings-overview">
+            <div>
+              <h2>Dropbox</h2>
+              <div id="dropboxAccountStatus" class="oauth-status" role="status">Da configurare</div>
+              <p class="settings-last-sync"><span>Ultima sincronizzazione riuscita</span><time id="dropboxLastSyncTime">Nessuna sincronizzazione riuscita registrata su questo dispositivo.</time></p>
             </div>
+            <button id="settingsSyncButton" type="button" onclick="syncNow()">Sincronizza ora</button>
           </div>
-          <details class="advanced-settings">
+          <details id="dropboxAdvanced" class="advanced-settings settings-advanced" ontoggle="if(this.open) loadDropboxFolderPicker()">
             <summary>Impostazioni avanzate Dropbox</summary>
+            <div class="settings-row">
+              <label for="dropboxAppKey">Codice app Dropbox</label>
+              <input id="dropboxAppKey" type="password" autocomplete="off" placeholder="Codice app Dropbox" />
+            </div>
+            <div class="settings-actions"><button type="button" onclick="startDropboxOAuth()">Collega account</button></div>
             <div class="oauth-help">
               <span>URI Dropbox da registrare</span>
               <code id="dropboxRedirectUriText">Apri l'app dal sito</code>
@@ -253,37 +255,30 @@
               <input id="dropboxToken" type="password" autocomplete="off" placeholder="Token temporaneo opzionale" />
             </div>
             <div class="settings-row">
-              <label for="dropboxPath">File Dropbox</label>
+              <label for="dropboxPath">File dati Dropbox</label>
               <input id="dropboxPath" type="text" autocomplete="off" />
             </div>
-          </details>
-          <div class="settings-row">
-            <label for="dropboxBackupFolder">Cartella backup</label>
-            <input id="dropboxBackupFolder" type="text" autocomplete="off" />
-          </div>
-          <div class="settings-row">
-            <label for="dropboxFolderSelect">Cartelle Dropbox</label>
-            <div class="folder-picker">
-              <select id="dropboxFolderSelect">
-                <option value="">Mostra cartelle Dropbox</option>
-              </select>
-              <div id="dropboxFolderCurrent" class="folder-current">/</div>
-              <div class="folder-picker-actions">
-                <button type="button" onclick="loadDropboxFolderPicker()">Mostra cartelle</button>
-                <button type="button" onclick="openSelectedDropboxFolder()">Entra</button>
-                <button id="dropboxFolderBackButton" type="button" onclick="goUpDropboxFolder()">Torna indietro</button>
-                <button type="button" onclick="useSelectedDropboxFolder()">Salva questa cartella</button>
-              </div>
-              <div id="dropboxFolderPickerStatus" class="folder-picker-status">Collega Dropbox e mostra le cartelle.</div>
+            <div class="settings-row">
+              <label for="dropboxBackupFolder">Cartella backup</label>
+              <input id="dropboxBackupFolder" type="text" autocomplete="off" />
             </div>
-          </div>
-          <div class="settings-actions">
-            <button type="button" onclick="saveDropboxSettings()">Salva</button>
-            <button type="button" onclick="syncNow()">Sincronizza dati</button>
-          </div>
-          <div class="settings-disconnect">
-            <button type="button" onclick="logoutUser()">Scollega Dropbox da questo dispositivo</button>
-          </div>
+            <div class="settings-actions"><button type="button" onclick="saveDropboxSettings()">Salva impostazioni</button></div>
+            <div class="folder-picker settings-folder-browser">
+              <h3>Scegli cartella backup</h3>
+              <p class="settings-folder-note">Sono elencate solo le sottocartelle. I file di backup non compaiono qui.</p>
+              <div class="settings-folder-toolbar">
+                <button id="dropboxFolderBackButton" class="settings-folder-back" type="button" onclick="goUpDropboxFolder()" aria-label="Cartella superiore" title="Cartella superiore" disabled><span aria-hidden="true">&#8592;</span></button>
+                <div id="dropboxFolderCurrent" class="folder-current">/</div>
+                <button id="dropboxFolderLoadButton" type="button" onclick="loadDropboxFolderPicker()">Aggiorna cartelle</button>
+              </div>
+              <div id="dropboxFolderPickerStatus" class="folder-picker-status" role="status" aria-live="polite">Apri le impostazioni avanzate per caricare le sottocartelle.</div>
+              <ul id="dropboxFolderList" class="settings-folder-list" aria-label="Sottocartelle Dropbox" aria-busy="false"></ul>
+              <div class="folder-picker-actions"><button id="dropboxFolderUseButton" type="button" onclick="useSelectedDropboxFolder()" disabled>Usa questa cartella per i backup</button></div>
+            </div>
+            <div class="settings-disconnect">
+              <button type="button" onclick="logoutUser()">Scollega Dropbox da questo dispositivo</button>
+            </div>
+          </details>
         </div>
       </section>
     </main>
@@ -344,7 +339,7 @@
   <datalist id="supplierOptions"></datalist>
   <datalist id="categoryOptions"></datalist>
 
-  <script src="storage.js?v=20261107-v91-uscita-protetta"></script>
-  <script src="app.js?v=20261107-v91-uscita-protetta"></script>
+  <script src="storage.js?v=20261107-v92-impostazioni"></script>
+  <script src="app.js?v=20261107-v92-impostazioni"></script>
 </body>
 </html>
