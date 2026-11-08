@@ -47,6 +47,7 @@ let currentView = 'products';
 let openSupplierFolderName = '';
 let openCategoryFolderName = '';
 let cloudLoading = false;
+let cloudStatusMessageText = '';
 let dropboxAutoSyncTimer = 0;
 let dropboxLastAutoSyncAt = 0;
 let dropboxNetworkRetryTimer = 0;
@@ -670,10 +671,12 @@ function applySyncTimestampMigration(){
 }
 
 function setCloudStatus(text, type = ''){
+  cloudStatusMessageText = text;
   const el = document.getElementById('cloudStatus');
-  if(!el) return;
-  el.className = 'cloud-status ' + type;
-  el.innerText = text;
+  const message = document.getElementById('cloudStatusMessage');
+  if(el) el.className = 'cloud-status ' + type;
+  if(message) message.textContent = text;
+  updateLastDropboxSyncDisplay();
 }
 
 function getDropboxToken(){
@@ -718,15 +721,26 @@ function updateDropboxAccountStatus(){
 
 function updateLastDropboxSyncDisplay(){
   const element = document.getElementById('dropboxLastSyncTime');
-  if(!element) return;
+  const badgeTime = document.getElementById('cloudLastSyncTime');
   const timestamp = Number(inventoryStorage.getItem(DROPBOX_LAST_SUCCESSFUL_SYNC_AT_KEY));
   const date = new Date(timestamp);
   const known = timestamp > 0 && Number.isFinite(date.getTime());
-  element.textContent = known ? new Intl.DateTimeFormat('it-IT', {
+  const formatted = known ? new Intl.DateTimeFormat('it-IT', {
     weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
-  }).format(date) : 'Nessuna sincronizzazione riuscita registrata su questo dispositivo.';
-  element.dateTime = known ? date.toISOString() : '';
+  }).format(date) : '';
+  if(element){
+    element.textContent = formatted || 'Nessuna sincronizzazione riuscita registrata su questo dispositivo.';
+    element.dateTime = known ? date.toISOString() : '';
+  }
+  if(badgeTime){
+    badgeTime.textContent = formatted || 'non ancora registrata su questo dispositivo';
+    badgeTime.dateTime = known ? date.toISOString() : '';
+  }
+  if(!cloudStatusMessageText){
+    const message = document.getElementById('cloudStatusMessage');
+    if(message) message.textContent = (hasDropboxCredentials() ? '☁ Dropbox: ' : '☁ Locale: ') + products.length + ' prodotti sul dispositivo';
+  }
 }
 
 async function recordDropboxSyncSuccess(){
@@ -1411,34 +1425,36 @@ async function syncNow(options = {}){
     const remoteTime = remote ? (Number(remote.dropboxServerModified || remote.lastModified || 0) || 0) : 0;
     const localProducts = products.length;
     const remoteProducts = remote ? remote.products.length : 0;
+    let syncMessage;
 
     if(!remote){
       await dropboxUploadSnapshot();
-      setCloudStatus('☁ Dropbox creato + backup: ' + products.length + ' prodotti', 'ok');
+      syncMessage = '☁ Dropbox creato + backup: ' + products.length + ' prodotti';
     }else if(localProducts === 0 && remoteProducts > 0){
       applyRemoteSnapshot(remote);
-      setCloudStatus('☁ Database scaricato da Dropbox', 'ok');
+      syncMessage = '☁ Database scaricato da Dropbox: ' + products.length + ' prodotti';
     }else if(localTime === 0 && remoteProducts > 0){
       applyRemoteSnapshot(remote);
-      setCloudStatus('☁ Ultimo file Dropbox scaricato: ' + products.length + ' prodotti', 'ok');
+      syncMessage = '☁ Ultimo file Dropbox scaricato: ' + products.length + ' prodotti';
     }else if(localTime === 0 && localProducts > 0 && remoteProducts === 0){
       await dropboxUploadSnapshot();
-      setCloudStatus('☁ Locale caricato + backup: ' + products.length + ' prodotti', 'ok');
+      syncMessage = '☁ Locale caricato + backup: ' + products.length + ' prodotti';
     }else if(hasLocalUnsyncedChanges() && remoteChangedAfterLastSync(remote, remoteTime) && remoteHasMoreUsefulData(remote)){
       mergeRemoteAndLocalSnapshots(remote);
       await dropboxUploadSnapshot();
-      setCloudStatus('☁ Dropbox unito e aggiornato: ' + products.length + ' prodotti', 'ok');
+      syncMessage = '☁ Dropbox unito e aggiornato: ' + products.length + ' prodotti';
     }else if(shouldDownloadRemoteSnapshot(remote, localTime, remoteTime)){
       applyRemoteSnapshot(remote);
-      setCloudStatus('☁ Ultimo Dropbox scaricato: ' + products.length + ' prodotti', 'ok');
+      syncMessage = '☁ Ultimo Dropbox scaricato: ' + products.length + ' prodotti';
     }else{
       await dropboxUploadSnapshot();
-      setCloudStatus('☁ Caricato su Dropbox + backup: ' + products.length + ' prodotti', 'ok');
+      syncMessage = '☁ Caricato su Dropbox + backup: ' + products.length + ' prodotti';
     }
 
     await inventoryStorage.flush();
     await recordDropboxSyncSuccess();
     setDropboxConnectionState('verified');
+    setCloudStatus(syncMessage, 'ok');
     renderCurrentView();
   }catch(error){
     handleDropboxError(error, !options.silentMissingToken);
@@ -1504,6 +1520,7 @@ function setPageVisibility(view){
   Object.entries(pages).forEach(([key, id]) => {
     document.getElementById(id)?.classList.toggle('hidden', key !== view);
   });
+  updateLastDropboxSyncDisplay();
 }
 
 function setTitle(title, subtitle){
