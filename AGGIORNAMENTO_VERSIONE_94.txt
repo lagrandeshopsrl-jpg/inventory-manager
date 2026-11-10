@@ -1,0 +1,65 @@
+INVENTORY MANAGER - VERSIONE 94 - 10/11/2026
+
+FILE DA AGGIORNARE DALLA 93
+index.html, app.js, style.css e storage.js (piccola aggiunta).
+api/categorize-products.js è aggiornato (protezione): caricalo nella cartella api.
+Il formato dei dati resta compatibile: non serve reimportare nulla.
+Aggiorna TUTTI i dispositivi alla 94: una 93 rimasta accesa può ancora
+sovrascrivere il file Dropbox con i suoi vecchi dati.
+
+SINCRONIZZAZIONE DROPBOX (correzioni importanti)
+- Una sola operazione Dropbox alla volta. Più vendite confermate di seguito
+  diventano un solo caricamento e nessuna va persa.
+- Il caricamento non rimette più in memoria i dati "vecchi": vendite e modifiche
+  fatte mentre si carica restano e partono al caricamento successivo.
+- Dropbox rifiuta il caricamento se un altro dispositivo ha cambiato il file
+  nel frattempo. In quel caso l'app scarica, unisce e ricarica da sola.
+- Unione tra dispositivi: le vendite di entrambi vengono sommate
+  (esempio: giacenza 10, A vende 2, B vende 3 -> 5). Le vendite fatte senza
+  internet non vengono più cancellate. I prodotti eliminati su un dispositivo
+  spariscono anche sugli altri. Se lo stesso campo viene cambiato su due
+  dispositivi, vince quello che sincronizza dopo con la modifica locale.
+- La sincronizzazione automatica controlla prima se Dropbox è cambiato:
+  se non lo è, non riscarica il file.
+- File Dropbox in JSON compatto: circa il 40% più leggero.
+
+BACKUP DROPBOX
+- Non più un backup a ogni vendita: al massimo uno ogni ora per dispositivo.
+- Pulizia automatica una volta al giorno nella cartella backup:
+  si tengono tutti i backup degli ultimi 2 giorni, uno al giorno per 60 giorni
+  e uno al mese oltre; gli ultimi 10 non vengono mai cancellati.
+  Vengono toccati solo i file inventory_backup_*.json, nessun altro file.
+  I vecchi backup della 93 (uno per vendita) verranno ridotti allo stesso modo.
+  I valori si cambiano in cima ad app.js (DROPBOX_BACKUP_...).
+
+ALTRE CORREZIONI
+- Ogni vendita memorizza il prezzo di vendita del momento: cambiare un prezzo
+  non modifica più gli incassi passati. Le vendite già registrate prima
+  della 94 continuano a usare il prezzo attuale.
+- Modifica ed eliminazione prodotti lavorano per barcode: una sincronizzazione
+  mentre la finestra Modifica è aperta non può più toccare un altro prodotto.
+- Collegamento Dropbox annullato/fallito: l'avviso non ricompare a ogni ricarica.
+- Ricerca scritta a mano in Prodotti: una pausa non cancella più il testo
+  (si svuota solo dopo un barcode completo dello scanner).
+- Codici vendita e importazione unici anche se creati nello stesso istante.
+
+PROTEZIONE API CHATGPT
+- Le richieste da pagine di altri siti vengono rifiutate.
+- Consigliato: su Vercel > Settings > Environment Variables aggiungi
+  INVENTORY_API_KEY con un valore a scelta (es. una frase lunga), fai Redeploy,
+  poi in Impostazioni > ChatGPT categorie inserisci lo stesso valore su ogni
+  dispositivo. Senza questa variabile l'API funziona come prima.
+
+NUOVO ASPETTO "BOTTEGA"
+Menu verde scuro con voce attiva in giallo limone, campo scanner in evidenza,
+totale vendita in stile scontrino, superfici più pulite e caratteri più leggibili
+(Avenir Next su iPhone/Mac). Su mobile corretto il titolo spostato a destra.
+Struttura, pulsanti e funzioni restano dove erano.
+
+VERIFICHE
+18 test simulati con due dispositivi e un Dropbox finto: vendite contemporanee,
+vendita offline, vendite rapide con rete lenta, eliminazioni, prezzi, backup,
+pulizia backup. Gli stessi test sulla 93 falliscono in 11 casi su 16.
+Screenshot controllati su desktop e mobile. Sintassi JavaScript verificata.
+Non sono prove con il tuo account Dropbox reale né su Safari iOS reale.
+Questa consegna non pubblica automaticamente la versione sul sito.

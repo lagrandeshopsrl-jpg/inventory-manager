@@ -16,6 +16,11 @@ const DROPBOX_LAST_SYNCED_SERVER_KEY = 'inventory_dropbox_last_synced_server_mod
 const DROPBOX_LAST_SYNCED_LOCAL_KEY = 'inventory_dropbox_last_synced_local_modified';
 const DROPBOX_LAST_SUCCESSFUL_SYNC_AT_KEY = 'inventory_dropbox_last_successful_sync_at';
 const DROPBOX_LOCAL_DIRTY_KEY = 'inventory_dropbox_local_dirty';
+const DROPBOX_LAST_SYNCED_REV_KEY = 'inventory_dropbox_last_synced_rev';
+const DROPBOX_BASE_SNAPSHOT_KEY = 'inventory_dropbox_base_snapshot';
+const DROPBOX_LAST_BACKUP_AT_KEY = 'inventory_dropbox_last_backup_at';
+const DROPBOX_LAST_BACKUP_PRUNE_AT_KEY = 'inventory_dropbox_last_backup_prune_at';
+const CATEGORIZER_API_KEY_KEY = 'inventory_categorizer_api_key';
 const BARCODE_CAMERA_DEVICE_KEY = 'inventory_barcode_camera_device_id';
 const SYNC_FIX_VERSION_KEY = 'inventory_sync_fix_version';
 const DROPBOX_OAUTH_STATE_KEY = 'inventory_dropbox_oauth_state';
@@ -26,6 +31,12 @@ const DEFAULT_DROPBOX_BACKUP_FOLDER = '/inventory_manager_backups';
 const DROPBOX_AUTO_SYNC_INTERVAL_MS = 60 * 60 * 1000;
 const DROPBOX_NETWORK_RETRY_DELAYS = [800, 2200, 5000];
 const DROPBOX_RECOVERY_SYNC_DELAY_MS = 45000;
+// Backup: uno ogni ora al massimo; si tengono tutti quelli degli ultimi 2 giorni,
+// uno al giorno per 60 giorni e uno al mese oltre. Gli ultimi 10 non vengono mai cancellati.
+const DROPBOX_BACKUP_INTERVAL_MS = 60 * 60 * 1000;
+const DROPBOX_BACKUP_KEEP_ALL_DAYS = 2;
+const DROPBOX_BACKUP_KEEP_DAILY_DAYS = 60;
+const DROPBOX_BACKUP_ALWAYS_KEEP = 10;
 const IMPORT_HISTORY_RETENTION_DAYS = 30;
 const IMPORT_HISTORY_MAX_SESSIONS = 100;
 const IMPORT_HISTORY_MAX_BYTES = 1024 * 1024;
@@ -43,6 +54,8 @@ let saleCartOrder = normalizeSaleCartOrder(readJson(STORAGE_SALE_CART_ORDER_KEY,
 let currentPage = 1;
 let allSelected = false;
 let editingIndex = null;
+let editingBarcode = '';
+let localChangeSeq = 0;
 let currentView = 'products';
 let openSupplierFolderName = '';
 let openCategoryFolderName = '';
@@ -90,6 +103,10 @@ function readJson(key, fallback){
 function textValue(value){
   if(value === undefined || value === null) return '';
   return String(value).trim();
+}
+
+function uniqueRecordId(prefix){
+  return prefix + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 }
 
 function wait(ms){
@@ -478,13 +495,42 @@ function trimImportHistory(){
 
 function normalizeSaleItems(items){
   if(!Array.isArray(items)) return [];
-  const totals = {};
+  const totals = new Map();
   items.forEach(item => {
     const barcode = Array.isArray(item) ? textValue(item[0]) : textValue(item?.barcode || item?.b);
     const qty = Math.max(0, Number(Array.isArray(item) ? item[1] : (item?.qty || item?.q || 0)) || 0);
-    if(barcode && qty > 0) totals[barcode] = (totals[barcode] || 0) + qty;
+    const rawPrice = Array.isArray(item) ? item[2] : (item?.price ?? item?.p);
+    const price = rawPrice === undefined || rawPrice === null || rawPrice === '' ? NaN : Number(rawPrice);
+    if(!barcode || qty <= 0) return;
+    const existing = totals.get(barcode);
+    if(existing){
+      existing.qty += qty;
+      if(!Number.isFinite(existing.price) && Number.isFinite(price)) existing.price = price;
+    }else{
+      totals.set(barcode, { barcode, qty, price });
+    }
   });
-  return Object.entries(totals).map(([barcode, qty]) => ({ barcode, qty }));
+  // Il prezzo di vendita resta quello del momento della vendita.
+  return Array.from(totals.values()).map(item => Number.isFinite(item.price) && item.price >= 0
+    ? { barcode: item.barcode, qty: item.qty, price: Math.round(item.price * 100) / 100 }
+    : { barcode: item.barcode, qty: item.qty });
+}
+
+function currentSellPriceForSale(barcode){
+  const product = productForBarcode(barcode);
+  const price = product ? salePriceNumber(getSell(product)) : 0;
+  return price > 0 ? Math.round(price * 100) / 100 : undefined;
+}
+
+function saleItemWithPrice(item){
+  const price = currentSellPriceForSale(item.barcode);
+  return price === undefined ? { barcode: item.barcode, qty: item.qty } : { barcode: item.barcode, qty: item.qty, price };
+}
+
+function saleItemUnitPrice(item){
+  if(Number.isFinite(item?.price)) return item.price;
+  const product = productForBarcode(item?.barcode);
+  return product ? salePriceNumber(getSell(product)) : 0;
 }
 
 function normalizeSalesRecords(list){
@@ -503,7 +549,7 @@ function compactSalesRecords(list){
   return normalizeSalesRecords(list).map(record => ({
     i: record.id,
     t: record.time,
-    m: record.items.map(item => [item.barcode, item.qty])
+    m: record.items.map(item => Number.isFinite(item.price) ? [item.barcode, item.qty, item.price] : [item.barcode, item.qty])
   }));
 }
 
@@ -556,7 +602,10 @@ function escapeAttr(value){
 
 function setLocalModified(value = Date.now(), markDirty = true){
   inventoryStorage.setItem(LAST_MODIFIED_KEY, String(Number(value) || Date.now()));
-  if(markDirty) inventoryStorage.setItem(DROPBOX_LOCAL_DIRTY_KEY, '1');
+  if(markDirty){
+    localChangeSeq++;
+    inventoryStorage.setItem(DROPBOX_LOCAL_DIRTY_KEY, '1');
+  }
 }
 
 function getLocalModified(){
@@ -579,13 +628,6 @@ function getLastDropboxSyncedServerModified(){
 
 function getLastDropboxSyncedLocalModified(){
   return Number(inventoryStorage.getItem(DROPBOX_LAST_SYNCED_LOCAL_KEY) || '0') || 0;
-}
-
-function markDropboxSynced(remoteTime){
-  const cleanRemoteTime = Number(remoteTime || 0) || Date.now();
-  inventoryStorage.setItem(DROPBOX_LAST_SYNCED_SERVER_KEY, String(cleanRemoteTime));
-  inventoryStorage.setItem(DROPBOX_LAST_SYNCED_LOCAL_KEY, String(getLocalModified()));
-  clearLocalUnsyncedChanges();
 }
 
 function parseDropboxTime(value){
@@ -870,11 +912,17 @@ async function finishDropboxOAuth(code){
   setDropboxOAuthTokens(data);
 }
 
+function clearOAuthParamsFromUrl(){
+  try{ history.replaceState({}, document.title, getOAuthRedirectUri()); }catch(error){ /* ignorato */ }
+}
+
 async function handleDropboxOAuthRedirect(){
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const error = params.get('error');
   if(!code && !error) return;
+  // Il codice vale una sola volta: si toglie subito dall'indirizzo.
+  clearOAuthParamsFromUrl();
 
   showSettings();
   if(error){
@@ -897,7 +945,6 @@ async function handleDropboxOAuthRedirect(){
     inventoryStorage.removeItem(DROPBOX_OAUTH_STATE_KEY);
     inventoryStorage.removeItem(DROPBOX_OAUTH_VERIFIER_KEY);
     inventoryStorage.removeItem(DROPBOX_OAUTH_REDIRECT_KEY);
-    history.replaceState({}, document.title, getOAuthRedirectUri());
     showSettings();
     setCloudStatus('☁ Dropbox collegato', 'ok');
   }catch(error){
@@ -1065,9 +1112,9 @@ function buildBackupPath(timestamp){
 function buildSnapshot(timestamp = Date.now(), meta = {}){
   pruneOldImportSessions(false);
   return {
-    version: 60,
+    version: 94,
     lastModified: timestamp,
-    backupCreatedAt: meta.backupCreatedAt || new Date(timestamp).toISOString(),
+    backupCreatedAt: meta.backupCreatedAt || '',
     backupLabel: meta.backupLabel || '',
     backupPath: meta.backupPath || '',
     products: compactProductList(products),
@@ -1076,110 +1123,229 @@ function buildSnapshot(timestamp = Date.now(), meta = {}){
   };
 }
 
-function snapshotCounts(snapshot){
+function hasLocalInventoryData(){
+  return products.length > 0 || salesRecords.length > 0;
+}
+
+function getLastDropboxRev(){
+  return textValue(inventoryStorage.getItem(DROPBOX_LAST_SYNCED_REV_KEY));
+}
+
+/* ---------- Base comune per l'unione a 3 vie ---------- */
+
+function canStoreDropboxBase(){
+  return typeof inventoryStorage.usesIndexedDB === 'function' && inventoryStorage.usesIndexedDB();
+}
+
+function saveDropboxBase(snapshot){
+  if(!canStoreDropboxBase()){
+    inventoryStorage.removeItem(DROPBOX_BASE_SNAPSHOT_KEY);
+    return;
+  }
+  inventoryStorage.setItem(DROPBOX_BASE_SNAPSHOT_KEY, JSON.stringify({
+    rev: snapshot.rev || '',
+    products: compactProductList(snapshot.products || []),
+    importSessions: compactImportSessions(snapshot.importSessions || []),
+    salesRecords: compactSalesRecords(snapshot.salesRecords || [])
+  }));
+}
+
+function readDropboxBase(expectedRev){
+  if(!expectedRev) return null;
+  const base = readJson(DROPBOX_BASE_SNAPSHOT_KEY, null);
+  if(!base || typeof base !== 'object' || base.rev !== expectedRev) return null;
   return {
-    products: Array.isArray(snapshot?.products) ? snapshot.products.length : 0,
-    importSessions: Array.isArray(snapshot?.importSessions) ? snapshot.importSessions.length : 0,
-    salesRecords: Array.isArray(snapshot?.salesRecords) ? snapshot.salesRecords.length : 0
+    products: normalizeProductList(base.products),
+    importSessions: normalizeImportSessions(base.importSessions),
+    salesRecords: normalizeSalesRecords(base.salesRecords)
   };
 }
 
-function currentSnapshotCounts(){
-  return {
-    products: products.length,
-    importSessions: importSessions.length,
-    salesRecords: salesRecords.length
-  };
-}
-
-function remoteHasMoreUsefulData(remote){
-  const remoteCounts = snapshotCounts(remote);
-  const localCounts = currentSnapshotCounts();
-  return remoteCounts.products > localCounts.products
-    || remoteCounts.importSessions > localCounts.importSessions
-    || remoteCounts.salesRecords > localCounts.salesRecords;
+/* Registra lo stato appena allineato con Dropbox.
+   Le modifiche fatte durante l'upload restano "da sincronizzare". */
+function recordDropboxSyncedState(snapshot, rev, serverTime, seqAtSnapshot){
+  inventoryStorage.setItem(DROPBOX_LAST_SYNCED_REV_KEY, textValue(rev));
+  inventoryStorage.setItem(DROPBOX_LAST_SYNCED_SERVER_KEY, String(Number(serverTime) || Date.now()));
+  saveDropboxBase({ ...snapshot, rev: textValue(rev) });
+  if(localChangeSeq === seqAtSnapshot){
+    inventoryStorage.setItem(DROPBOX_LAST_SYNCED_LOCAL_KEY, String(getLocalModified()));
+    clearLocalUnsyncedChanges();
+  }
 }
 
 function applyRemoteSnapshot(remote){
   const remoteTime = Number(remote?.dropboxServerModified || remote?.lastModified || 0) || Date.now();
   products = normalizeProductList(remote.products);
   importSessions = normalizeImportSessions(remote.importSessions);
-  salesRecords = normalizeSalesRecords(remote.salesRecords || []);
+  salesRecords = sortSalesRecords(normalizeSalesRecords(remote.salesRecords || []));
   persistAll(false);
   setLocalModified(remoteTime, false);
-  markDropboxSynced(remoteTime);
+  recordDropboxSyncedState(remote, remote.dropboxRev, remoteTime, localChangeSeq);
 }
 
-function remoteChangedAfterLastSync(remote, remoteTime){
-  if(!remote) return false;
-  const lastRemoteTime = getLastDropboxSyncedServerModified();
-  const remoteServerTime = Number(remote.dropboxServerModified || remoteTime || 0) || 0;
-  if(lastRemoteTime === 0) return remoteServerTime > 0;
-  return remoteServerTime > lastRemoteTime + 1500;
+/* ---------- Unione dati locali + Dropbox ---------- */
+
+const PRODUCT_MERGE_GROUPS = [
+  ['name'],
+  ['supplier'],
+  ['category', 'categorySource'],
+  ['buyPrice', 'buyPriceTrend', 'buyPricePrevious', 'buyPriceChange', 'buyPriceChangedAt'],
+  ['sellPrice', 'priceLocked']
+];
+
+function productMergeKey(product){
+  const barcode = getBarcode(product);
+  return barcode ? 'b:' + barcode : 'n:' + getName(product).toLowerCase();
 }
 
-function mergeById(localList, remoteList){
-  const byId = new Map();
-  normalizeImportSessions(remoteList).forEach(item => byId.set(item.id, item));
-  normalizeImportSessions(localList).forEach(item => {
-    if(!byId.has(item.id)) byId.set(item.id, item);
+function productGroupValue(product, group){
+  return JSON.stringify(group.map(field => product[field]));
+}
+
+function sameProductData(a, b){
+  if(!a || !b) return false;
+  return PRODUCT_MERGE_GROUPS.every(group => productGroupValue(a, group) === productGroupValue(b, group))
+    && textValue(a.quantity) === textValue(b.quantity);
+}
+
+function mergeQuantity(base, local, remote){
+  const b = textValue(base?.quantity);
+  const l = textValue(local.quantity);
+  const r = textValue(remote.quantity);
+  if(l === b) return r;
+  if(r === b) return l;
+  // Entrambi i dispositivi hanno cambiato la giacenza: si sommano le due variazioni.
+  const merged = stockQuantityNumber(l) + stockQuantityNumber(r) - stockQuantityNumber(b);
+  return formatStockQuantity(merged);
+}
+
+function mergeProductFields(base, local, remote){
+  const merged = { ...remote };
+  PRODUCT_MERGE_GROUPS.forEach(group => {
+    const localChanged = !base || productGroupValue(local, group) !== productGroupValue(base, group);
+    const remoteChanged = base && productGroupValue(remote, group) !== productGroupValue(base, group);
+    // In caso di modifica su entrambi i lati vince quella di questo dispositivo.
+    const source = localChanged || !remoteChanged ? local : remote;
+    group.forEach(field => { merged[field] = source[field]; });
   });
-  return Array.from(byId.values());
+  merged.quantity = base ? mergeQuantity(base, local, remote) : local.quantity;
+  return canonicalProduct(merged);
 }
 
-function mergeSalesById(localList, remoteList){
-  const byId = new Map();
-  normalizeSalesRecords(remoteList).forEach(item => byId.set(item.id, item));
-  normalizeSalesRecords(localList).forEach(item => {
-    if(!byId.has(item.id)) byId.set(item.id, item);
+function localOnlySaleQuantities(localSales, remoteSales){
+  const remoteIds = new Set(remoteSales.map(record => record.id));
+  const totals = new Map();
+  localSales.forEach(record => {
+    if(remoteIds.has(record.id)) return;
+    record.items.forEach(item => totals.set(item.barcode, (totals.get(item.barcode) || 0) + (Number(item.qty) || 0)));
   });
-  return Array.from(byId.values());
+  return totals;
 }
 
-function mergeRemoteAndLocalSnapshots(remote){
-  const remoteProducts = normalizeProductList(remote.products);
+function mergeProductLists(baseList, localList, remoteList, localSales, remoteSales){
+  const baseMap = baseList ? new Map(baseList.map(p => [productMergeKey(p), p])) : null;
+  const localMap = new Map(localList.map(p => [productMergeKey(p), p]));
+  const remoteMap = new Map(remoteList.map(p => [productMergeKey(p), p]));
+  const keys = [];
+  const seen = new Set();
+  [...localList, ...remoteList].forEach(p => {
+    const key = productMergeKey(p);
+    if(!seen.has(key)){ seen.add(key); keys.push(key); }
+  });
+  const pendingSales = baseMap ? null : localOnlySaleQuantities(localSales, remoteSales);
+  const result = [];
+
+  keys.forEach(key => {
+    const local = localMap.get(key);
+    const remote = remoteMap.get(key);
+    if(!baseMap){
+      // Nessuna base comune (primo allineamento): nessuna cancellazione,
+      // i dati Dropbox restano, e le vendite solo locali vengono scalate.
+      if(local && remote){
+        const merged = canonicalProduct({ ...remote });
+        const sold = pendingSales.get(getBarcode(remote)) || 0;
+        if(sold){
+          const quantity = formatStockQuantity(stockQuantityNumber(remote.quantity) - sold);
+          result.push(canonicalProduct({ ...merged, quantity, quantita: quantity, 'quantità': quantity }));
+        }else{
+          result.push(merged);
+        }
+      }else{
+        result.push(local || remote);
+      }
+      return;
+    }
+    const base = baseMap.get(key);
+    if(local && remote){
+      result.push(mergeProductFields(base, local, remote));
+    }else if(local){
+      // Esiste solo qui: nuovo, oppure eliminato su Dropbox.
+      if(!base || !sameProductData(local, base)) result.push(local);
+    }else if(remote){
+      // Esiste solo su Dropbox: nuovo, oppure eliminato qui.
+      if(!base || !sameProductData(remote, base)) result.push(remote);
+    }
+  });
+  return result;
+}
+
+function mergeRecordsById(baseList, localList, remoteList, normalize){
+  const baseMap = baseList ? new Map(baseList.map(item => [item.id, JSON.stringify(item)])) : null;
+  const localMap = new Map(localList.map(item => [item.id, item]));
+  const remoteMap = new Map(remoteList.map(item => [item.id, item]));
+  const ids = Array.from(new Set([...localMap.keys(), ...remoteMap.keys()]));
+  const result = [];
+  ids.forEach(id => {
+    const local = localMap.get(id);
+    const remote = remoteMap.get(id);
+    const base = baseMap ? baseMap.get(id) : undefined;
+    if(local && remote){
+      const localChanged = base !== undefined && JSON.stringify(local) !== base;
+      result.push(localChanged ? local : remote);
+    }else if(local){
+      if(!baseMap || base === undefined || JSON.stringify(local) !== base) result.push(local);
+    }else if(remote){
+      if(!baseMap || base === undefined || JSON.stringify(remote) !== base) result.push(remote);
+    }
+  });
+  return normalize(result);
+}
+
+function sortSalesRecords(list){
+  return list.slice().sort((a, b) => String(b.time).localeCompare(String(a.time)));
+}
+
+function mergeWithRemoteSnapshot(remote){
+  const base = readDropboxBase(getLastDropboxRev());
   const localProducts = normalizeProductList(products);
-  const localProductsByBarcode = new Map(localProducts.map(product => [product.barcode, product]));
-  const remoteProductBarcodes = new Set(remoteProducts.map(product => product.barcode));
-  const remoteSaleIds = new Set(normalizeSalesRecords(remote.salesRecords || []).map(record => record.id));
-  const hasLocalSalesNotInRemote = normalizeSalesRecords(salesRecords).some(record => !remoteSaleIds.has(record.id));
+  const remoteProducts = normalizeProductList(remote.products);
+  const localSales = normalizeSalesRecords(salesRecords);
+  const remoteSales = normalizeSalesRecords(remote.salesRecords || []);
 
-  products = remoteProducts.map(remoteProduct => {
-    const localProduct = localProductsByBarcode.get(remoteProduct.barcode);
-    if(!localProduct) return remoteProduct;
-    const mergedProduct = { ...remoteProduct };
-    const localQty = Number(localProduct.quantity);
-    const remoteQty = Number(remoteProduct.quantity);
-    if(hasLocalSalesNotInRemote && Number.isFinite(localQty) && Number.isFinite(remoteQty) && localQty < remoteQty){
-      mergedProduct.quantity = localProduct.quantity;
-    }
-    return canonicalProduct(mergedProduct);
-  });
-
-  localProducts.forEach(localProduct => {
-    if(localProduct.barcode && !remoteProductBarcodes.has(localProduct.barcode)){
-      products.push(localProduct);
-    }
-  });
-
-  importSessions = mergeById(importSessions, remote.importSessions);
-  salesRecords = mergeSalesById(salesRecords, remote.salesRecords || []);
+  products = mergeProductLists(base?.products || null, localProducts, remoteProducts, localSales, remoteSales);
+  salesRecords = sortSalesRecords(mergeRecordsById(base?.salesRecords || null, localSales, remoteSales, normalizeSalesRecords));
+  importSessions = mergeRecordsById(
+    base?.importSessions || null,
+    normalizeImportSessions(importSessions),
+    normalizeImportSessions(remote.importSessions),
+    normalizeImportSessions
+  ).sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
   persistAll(true);
+  return Boolean(base);
 }
 
-function shouldDownloadRemoteSnapshot(remote, localTime, remoteTime){
-  if(!remote) return false;
-  const lastRemoteTime = getLastDropboxSyncedServerModified();
-  const lastLocalTime = getLastDropboxSyncedLocalModified();
-  const remoteIsNewerThanLastSync = lastRemoteTime > 0 && remoteChangedAfterLastSync(remote, remoteTime);
-  const localChangedAfterLastSync = hasLocalUnsyncedChanges()
-    || (lastLocalTime > 0 && localTime > lastLocalTime + 1500);
+/* ---------- Chiamate Dropbox ---------- */
 
-  if(!localChangedAfterLastSync && remoteTime > 0) return true;
-  if(remoteIsNewerThanLastSync && !localChangedAfterLastSync) return true;
-  if(remoteHasMoreUsefulData(remote) && !localChangedAfterLastSync) return true;
-  if(lastRemoteTime === 0 && remoteTime > localTime) return true;
-  return remoteTime > localTime;
+async function dropboxGetMetadata(path){
+  const response = await dropboxFetch('https://api.dropboxapi.com/2/files/get_metadata', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  });
+  if(response.status === 409) return null;
+  if(response.status === 401) throw new Error('DROPBOX_AUTH');
+  if(!response.ok) throw new Error('DROPBOX_DOWNLOAD_' + response.status);
+  return response.json();
 }
 
 async function dropboxDownloadSnapshot(){
@@ -1195,7 +1361,13 @@ async function dropboxDownloadSnapshot(){
   if(!response.ok) throw new Error('DROPBOX_DOWNLOAD_' + response.status);
 
   const text = await response.text();
-  if(!text.trim()) return null;
+  let meta = {};
+  try{
+    meta = JSON.parse(response.headers.get('dropbox-api-result') || '{}');
+  }catch(e){
+    meta = {};
+  }
+  if(!text.trim()) return { products: [], importSessions: [], salesRecords: [], dropboxRev: textValue(meta.rev), dropboxServerModified: parseDropboxTime(meta.server_modified), emptyFile: true };
 
   let data;
   try{
@@ -1204,17 +1376,11 @@ async function dropboxDownloadSnapshot(){
     throw new Error('DROPBOX_BAD_JSON');
   }
 
-  let meta = {};
-  try{
-    meta = JSON.parse(response.headers.get('dropbox-api-result') || '{}');
-  }catch(e){
-    meta = {};
-  }
-
   const snapshotModified = Number(data.lastModified || 0) || 0;
   const serverModified = parseDropboxTime(meta.server_modified);
   data.lastModified = Math.max(snapshotModified, serverModified);
   data.dropboxServerModified = serverModified;
+  data.dropboxRev = textValue(meta.rev);
   data.snapshotModified = snapshotModified;
   data.products = normalizeProductList(data.products);
   data.importSessions = normalizeImportSessions(data.importSessions);
@@ -1222,8 +1388,8 @@ async function dropboxDownloadSnapshot(){
   return data;
 }
 
-async function dropboxListFolders(path = '', signal){
-  const folders = [];
+async function dropboxListEntries(path = '', signal){
+  const entries = [];
   let response = await dropboxFetch('https://api.dropboxapi.com/2/files/list_folder', {
     method: 'POST',
     signal,
@@ -1240,7 +1406,7 @@ async function dropboxListFolders(path = '', signal){
   if(!response.ok) throw new Error('DROPBOX_LIST_' + response.status);
 
   let data = await response.json();
-  folders.push(...data.entries.filter(entry => entry['.tag'] === 'folder'));
+  entries.push(...data.entries);
 
   while(data.has_more){
     response = await dropboxFetch('https://api.dropboxapi.com/2/files/list_folder/continue', {
@@ -1252,13 +1418,20 @@ async function dropboxListFolders(path = '', signal){
     if(response.status === 401) throw new Error('DROPBOX_AUTH');
     if(!response.ok) throw new Error('DROPBOX_LIST_' + response.status);
     data = await response.json();
-    folders.push(...data.entries.filter(entry => entry['.tag'] === 'folder'));
+    entries.push(...data.entries);
   }
-
-  return folders.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  return entries;
 }
 
-async function dropboxUploadJson(path, data, mode = 'overwrite'){
+async function dropboxListFolders(path = '', signal){
+  const entries = await dropboxListEntries(path, signal);
+  return entries
+    .filter(entry => entry['.tag'] === 'folder')
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+/* mode: { '.tag': 'update', update: rev } | { '.tag': 'add' } */
+async function dropboxUploadJson(path, data, mode, autorename = false){
   const response = await dropboxFetch('https://content.dropboxapi.com/2/files/upload', {
     method: 'POST',
     headers: {
@@ -1266,49 +1439,239 @@ async function dropboxUploadJson(path, data, mode = 'overwrite'){
       'Dropbox-API-Arg': JSON.stringify({
         path,
         mode,
-        autorename: mode !== 'overwrite',
+        autorename,
         mute: true,
-        strict_conflict: false
+        strict_conflict: true
       })
     },
-    body: JSON.stringify(data, null, 2)
+    // JSON compatto: circa il 40% piu leggero del formato indentato.
+    body: JSON.stringify(data)
   });
 
   if(response.status === 401) throw new Error('DROPBOX_AUTH');
+  if(response.status === 409){
+    const text = await response.text().catch(() => '');
+    if(text.includes('conflict')) throw new Error('DROPBOX_CONFLICT');
+    throw new Error('DROPBOX_UPLOAD_409');
+  }
   if(!response.ok) throw new Error('DROPBOX_UPLOAD_' + response.status);
 
-  let meta = {};
   try{
-    meta = await response.json();
+    return await response.json();
   }catch(e){
-    meta = {};
+    return {};
   }
-  return meta;
 }
 
-async function dropboxUploadSnapshot(){
+/* Carica lo stato attuale senza mai sovrascrivere modifiche di altri dispositivi:
+   Dropbox rifiuta l'upload se il file non e piu quello letto (rev). */
+async function uploadCurrentState({ rev = '', create = false } = {}){
+  const seq = localChangeSeq;
   const timestamp = Date.now();
-  const backupNameTime = backupTimestamp(new Date(timestamp));
-  const backupPath = buildBackupPath(backupNameTime);
-  const snapshot = buildSnapshot(timestamp, {
-    backupCreatedAt: new Date(timestamp).toISOString(),
-    backupLabel: backupNameTime,
-    backupPath
-  });
-
-  const mainMeta = await dropboxUploadJson(getDropboxPath(), snapshot, 'overwrite');
-  await dropboxUploadJson(backupPath, snapshot, 'add');
-
-  const serverModified = parseDropboxTime(mainMeta.server_modified);
-  const savedTime = Math.max(timestamp, serverModified);
-  products = snapshot.products;
-  importSessions = snapshot.importSessions;
-  salesRecords = snapshot.salesRecords;
-  persistAll(false);
-  setLocalModified(savedTime);
-  markDropboxSynced(savedTime);
+  const snapshot = buildSnapshot(timestamp);
+  const mode = create ? { '.tag': 'add' } : { '.tag': 'update', update: rev };
+  const meta = await dropboxUploadJson(getDropboxPath(), snapshot, mode, false);
+  const serverModified = parseDropboxTime(meta.server_modified) || timestamp;
+  recordDropboxSyncedState(snapshot, meta.rev, serverModified, seq);
   await inventoryStorage.flush();
+  await maybeCreateDropboxBackup(snapshot);
   return snapshot;
+}
+
+/* ---------- Backup: al massimo uno ogni ora, con pulizia automatica ---------- */
+
+async function maybeCreateDropboxBackup(snapshot, force = false){
+  const last = Number(inventoryStorage.getItem(DROPBOX_LAST_BACKUP_AT_KEY) || 0) || 0;
+  if(!force && Date.now() - last < DROPBOX_BACKUP_INTERVAL_MS) return false;
+  try{
+    const now = new Date();
+    const label = backupTimestamp(now);
+    const backupPath = buildBackupPath(label);
+    await dropboxUploadJson(backupPath, {
+      ...snapshot,
+      backupCreatedAt: now.toISOString(),
+      backupLabel: label,
+      backupPath
+    }, { '.tag': 'add' }, true);
+    inventoryStorage.setItem(DROPBOX_LAST_BACKUP_AT_KEY, String(Date.now()));
+    await pruneOldDropboxBackups();
+    return true;
+  }catch(error){
+    console.error('Backup Dropbox non riuscito', error);
+    return false;
+  }
+}
+
+function backupDateFromName(name){
+  const match = /^inventory_backup_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})(?:-(\d{3}))?(?: \(\d+\))?\.json$/.exec(String(name || ''));
+  if(!match) return null;
+  const [, y, mo, d, h, mi, s, ms] = match;
+  const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s), Number(ms || 0));
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function backupsToDelete(files, now = Date.now()){
+  const dated = files
+    .map(file => ({ file, date: backupDateFromName(file.name) }))
+    .filter(item => item.date)
+    .sort((a, b) => b.date - a.date);
+  const keepDays = new Set();
+  const keepMonths = new Set();
+  const remove = [];
+  dated.forEach((item, index) => {
+    const age = now - item.date.getTime();
+    const dayKey = dateInputValue(item.date);
+    const monthKey = dayKey.slice(0, 7);
+    let keep = index < DROPBOX_BACKUP_ALWAYS_KEEP || age <= DROPBOX_BACKUP_KEEP_ALL_DAYS * 86400000;
+    if(!keep && age <= DROPBOX_BACKUP_KEEP_DAILY_DAYS * 86400000 && !keepDays.has(dayKey)) keep = true;
+    if(!keep && !keepMonths.has(monthKey)) keep = true;
+    if(keep){
+      keepDays.add(dayKey);
+      keepMonths.add(monthKey);
+    }else{
+      remove.push(item.file);
+    }
+  });
+  return remove;
+}
+
+async function pruneOldDropboxBackups(force = false){
+  const last = Number(inventoryStorage.getItem(DROPBOX_LAST_BACKUP_PRUNE_AT_KEY) || 0) || 0;
+  if(!force && Date.now() - last < 24 * 60 * 60 * 1000) return 0;
+  const entries = await dropboxListEntries(getDropboxBackupFolder());
+  const files = entries.filter(entry => entry['.tag'] === 'file');
+  const remove = backupsToDelete(files).slice(0, 900);
+  if(remove.length){
+    const response = await dropboxFetch('https://api.dropboxapi.com/2/files/delete_batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: remove.map(file => ({ path: file.path_lower || file.path_display })) })
+    });
+    if(!response.ok) throw new Error('DROPBOX_DELETE_' + response.status);
+  }
+  inventoryStorage.setItem(DROPBOX_LAST_BACKUP_PRUNE_AT_KEY, String(Date.now()));
+  return remove.length;
+}
+
+/* ---------- Coda unica delle operazioni Dropbox ---------- */
+
+let cloudTaskChain = Promise.resolve();
+let cloudBusyCount = 0;
+let queuedCloudPush = null;
+let queuedCloudSync = null;
+
+function runCloudTask(task){
+  const wrapped = async () => {
+    cloudBusyCount++;
+    cloudLoading = true;
+    updateDropboxAccountStatus();
+    try{
+      return await task();
+    }finally{
+      cloudBusyCount--;
+      cloudLoading = cloudBusyCount > 0;
+      updateDropboxAccountStatus();
+    }
+  };
+  const run = cloudTaskChain.then(wrapped, wrapped);
+  cloudTaskChain = run.catch(() => {});
+  return run;
+}
+
+async function fullSyncTask(attempt = 0){
+  const seqAtStart = localChangeSeq;
+  const knownRev = getLastDropboxRev();
+
+  // Controllo leggero: se Dropbox non e cambiato e qui non ci sono modifiche, niente download.
+  if(knownRev && !hasLocalUnsyncedChanges()){
+    const meta = await dropboxGetMetadata(getDropboxPath());
+    if(meta && meta.rev === knownRev && localChangeSeq === seqAtStart){
+      return { action: 'none' };
+    }
+  }
+
+  const remote = await dropboxDownloadSnapshot();
+  try{
+    if(!remote){
+      await uploadCurrentState({ create: true });
+      return { action: 'created' };
+    }
+    const localDirty = hasLocalUnsyncedChanges() || localChangeSeq !== seqAtStart;
+    const remoteChanged = !knownRev || remote.dropboxRev !== knownRev;
+
+    if(!hasLocalInventoryData() && remote.products.length){
+      applyRemoteSnapshot(remote);
+      return { action: 'download', changed: true };
+    }
+    if(!localDirty){
+      if(remoteChanged){
+        applyRemoteSnapshot(remote);
+        return { action: 'download', changed: true };
+      }
+      return { action: 'none' };
+    }
+    if(!remoteChanged){
+      await uploadCurrentState({ rev: remote.dropboxRev });
+      return { action: 'upload' };
+    }
+    if(remote.emptyFile){
+      await uploadCurrentState({ rev: remote.dropboxRev });
+      return { action: 'upload' };
+    }
+    const withBase = mergeWithRemoteSnapshot(remote);
+    await uploadCurrentState({ rev: remote.dropboxRev });
+    return { action: 'merge', changed: true, withBase };
+  }catch(error){
+    if(error?.message === 'DROPBOX_CONFLICT' && attempt < 2) return fullSyncTask(attempt + 1);
+    throw error;
+  }
+}
+
+async function pushLocalChangesTask(){
+  const rev = getLastDropboxRev();
+  if(!rev) return fullSyncTask();
+  if(!hasLocalUnsyncedChanges()) return { action: 'none' };
+  try{
+    await uploadCurrentState({ rev });
+    return { action: 'upload' };
+  }catch(error){
+    // Un altro dispositivo ha aggiornato Dropbox: si scarica, si unisce e si ricarica.
+    if(error?.message === 'DROPBOX_CONFLICT') return fullSyncTask();
+    throw error;
+  }
+}
+
+/* Piu richieste ravvicinate (es. vendite in sequenza) diventano un solo upload. */
+function requestCloudPush(){
+  if(queuedCloudPush) return queuedCloudPush;
+  const promise = runCloudTask(async () => {
+    if(queuedCloudPush === promise) queuedCloudPush = null;
+    return pushLocalChangesTask();
+  });
+  queuedCloudPush = promise;
+  return promise;
+}
+
+function requestCloudSync(){
+  if(queuedCloudSync) return queuedCloudSync;
+  const promise = runCloudTask(async () => {
+    if(queuedCloudSync === promise) queuedCloudSync = null;
+    return fullSyncTask();
+  });
+  queuedCloudSync = promise;
+  return promise;
+}
+
+function refreshViewAfterRemoteChange(){
+  invalidateProductBarcodeIndex();
+  if(currentView === 'sales'){
+    renderSaleCart();
+    const product = productForBarcode(currentSaleBarcode);
+    if(product) renderSaleCurrentProduct(product, currentSaleBarcode);
+    return;
+  }
+  if(currentView === 'quickScan') return;
+  renderCurrentView();
 }
 
 function dropboxErrorMessage(error){
@@ -1324,6 +1687,7 @@ function dropboxErrorMessage(error){
   if(code === 'DROPBOX_OAUTH_MISSING') return 'Dati collegamento Dropbox mancanti';
   if(code.startsWith('DROPBOX_OAUTH_')) return 'Errore collegamento Dropbox';
   if(code === 'DROPBOX_BAD_JSON') return 'File Dropbox non leggibile';
+  if(code === 'DROPBOX_CONFLICT') return 'Dropbox modificato da un altro dispositivo';
   if(code.startsWith('DROPBOX_UPLOAD_')) return 'Errore upload Dropbox';
   if(code.startsWith('DROPBOX_DOWNLOAD_')) return 'Errore download Dropbox';
   if(code.startsWith('DROPBOX_LIST_')) return 'Errore lettura cartelle Dropbox';
@@ -1381,6 +1745,13 @@ function handleDropboxError(error, showAlert = true){
   if(showAlert) alert(dropboxAlertMessage(error));
 }
 
+function cloudResultMessage(result, fallback){
+  if(result?.action === 'merge') return '☁ Dati uniti con l\'altro dispositivo: ' + products.length + ' prodotti';
+  if(result?.action === 'download') return '☁ Aggiornato da Dropbox: ' + products.length + ' prodotti';
+  if(result?.action === 'created') return '☁ File Dropbox creato: ' + products.length + ' prodotti';
+  return fallback;
+}
+
 async function saveCloudAfterChange(label, options = {}){
   let localSaved = true;
   try{ await inventoryStorage.flush(); }catch(error){ localSaved = false; }
@@ -1389,10 +1760,12 @@ async function saveCloudAfterChange(label, options = {}){
     return { synced: false, skipped: true, localSaved, message: localSaved ? 'Dropbox non collegato' : 'Salvataggio sul dispositivo non riuscito' };
   }
   try{
-    await dropboxUploadSnapshot();
+    setCloudStatus('☁ Salvo su Dropbox...', '');
+    const result = await requestCloudPush();
     await recordDropboxSyncSuccess();
     setDropboxConnectionState('verified');
-    setCloudStatus('☁ ' + label + ' su Dropbox + backup', 'ok');
+    setCloudStatus(cloudResultMessage(result, '☁ ' + label + ' su Dropbox'), 'ok');
+    if(result?.changed) refreshViewAfterRemoteChange();
     return { synced: true, localSaved };
   }catch(error){
     handleDropboxError(error, false);
@@ -1404,63 +1777,28 @@ async function saveCloudAfterChange(label, options = {}){
 }
 
 async function syncNow(options = {}){
-  if(cloudLoading) return;
-
   if(!hasDropboxCredentials()){
     setCloudStatus('☁ Token Dropbox mancante', 'err');
     if(!options.silentMissingToken){
       showSettings();
-      alert('Inserisci in Impostazioni un access token Dropbox oppure App Key + Refresh Token.');
+      alert('Collega Dropbox dalle Impostazioni avanzate.');
     }
     return;
   }
 
-  cloudLoading = true;
-  updateDropboxAccountStatus();
   setCloudStatus('☁ Sincronizzo Dropbox...', '');
-
   try{
-    const remote = await dropboxDownloadSnapshot();
-    const localTime = getLocalModified();
-    const remoteTime = remote ? (Number(remote.dropboxServerModified || remote.lastModified || 0) || 0) : 0;
-    const localProducts = products.length;
-    const remoteProducts = remote ? remote.products.length : 0;
-    let syncMessage;
-
-    if(!remote){
-      await dropboxUploadSnapshot();
-      syncMessage = '☁ Dropbox creato + backup: ' + products.length + ' prodotti';
-    }else if(localProducts === 0 && remoteProducts > 0){
-      applyRemoteSnapshot(remote);
-      syncMessage = '☁ Database scaricato da Dropbox: ' + products.length + ' prodotti';
-    }else if(localTime === 0 && remoteProducts > 0){
-      applyRemoteSnapshot(remote);
-      syncMessage = '☁ Ultimo file Dropbox scaricato: ' + products.length + ' prodotti';
-    }else if(localTime === 0 && localProducts > 0 && remoteProducts === 0){
-      await dropboxUploadSnapshot();
-      syncMessage = '☁ Locale caricato + backup: ' + products.length + ' prodotti';
-    }else if(hasLocalUnsyncedChanges() && remoteChangedAfterLastSync(remote, remoteTime) && remoteHasMoreUsefulData(remote)){
-      mergeRemoteAndLocalSnapshots(remote);
-      await dropboxUploadSnapshot();
-      syncMessage = '☁ Dropbox unito e aggiornato: ' + products.length + ' prodotti';
-    }else if(shouldDownloadRemoteSnapshot(remote, localTime, remoteTime)){
-      applyRemoteSnapshot(remote);
-      syncMessage = '☁ Ultimo Dropbox scaricato: ' + products.length + ' prodotti';
-    }else{
-      await dropboxUploadSnapshot();
-      syncMessage = '☁ Caricato su Dropbox + backup: ' + products.length + ' prodotti';
-    }
-
+    try{ await inventoryStorage.flush(); }catch(error){ showStorageFailure(); }
+    const result = await requestCloudSync();
     await inventoryStorage.flush();
     await recordDropboxSyncSuccess();
     setDropboxConnectionState('verified');
-    setCloudStatus(syncMessage, 'ok');
-    renderCurrentView();
+    setCloudStatus(cloudResultMessage(result, result?.action === 'upload'
+      ? '☁ Caricato su Dropbox: ' + products.length + ' prodotti'
+      : '☁ Dropbox gia aggiornato: ' + products.length + ' prodotti'), 'ok');
+    if(result?.changed) refreshViewAfterRemoteChange();
   }catch(error){
     handleDropboxError(error, !options.silentMissingToken);
-  }finally{
-    cloudLoading = false;
-    updateDropboxAccountStatus();
   }
 }
 
@@ -1621,6 +1959,8 @@ function showSettings(){
   if(tokenInput) tokenInput.value = getDropboxToken();
   if(pathInput) pathInput.value = getDropboxPath();
   if(backupFolderInput) backupFolderInput.value = getDropboxBackupFolder();
+  const categorizerInput = document.getElementById('categorizerApiKey');
+  if(categorizerInput) categorizerInput.value = textValue(inventoryStorage.getItem(CATEGORIZER_API_KEY_KEY));
   updateDropboxAccountStatus();
   updateDropboxRedirectHint();
   resetFolderPicker(getDropboxBackupFolder());
@@ -2289,7 +2629,8 @@ function clearSaleCart(){
 async function confirmSaleCart(){
   const items = Object.entries(saleCart)
     .map(([barcode, qty]) => ({ barcode, qty: Number(qty) || 0 }))
-    .filter(item => item.barcode && item.qty > 0);
+    .filter(item => item.barcode && item.qty > 0)
+    .map(saleItemWithPrice);
   if(!items.length){
     setSaleStatus('Aggiungi almeno un prodotto prima di confermare.', 'err');
     prepareScannerForNextSaleScan();
@@ -2299,7 +2640,7 @@ async function confirmSaleCart(){
   const total = items.reduce((sum, item) => sum + item.qty, 0);
 
   salesRecords.unshift({
-    id: 'sale_' + Date.now(),
+    id: uniqueRecordId('sale_'),
     time: new Date().toISOString(),
     items
   });
@@ -2401,7 +2742,7 @@ function renderSaleSearchResults(query = null){
         ${showBuyPrice ? `<td>${buyPriceDisplayHTML(p)}</td>` : ''}
         <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td><div class="action-buttons">
-          <button class="edit-btn" data-sale-add-index="${item.index}">Aggiungi</button>
+          <button class="edit-btn" data-sale-add-index="${item.index}" data-barcode="${escapeAttr(barcode)}">Aggiungi</button>
           <button class="edit-btn" data-sale-edit-barcode="${escapeAttr(barcode)}">Modifica</button>
         </div></td>
       </tr>`;
@@ -2655,9 +2996,9 @@ async function addManualSalesStat(barcodeValue = '', qtyValue = null){
   }
 
   const selectedBarcode = getBarcode(selected.product);
-  const item = { barcode: selectedBarcode, qty };
+  const item = saleItemWithPrice({ barcode: selectedBarcode, qty });
   salesRecords.unshift({
-    id: 'sale_manual_' + Date.now(),
+    id: uniqueRecordId('sale_manual_'),
     time: salesAdjustmentTime(salesDateRange()),
     items: [item]
   });
@@ -2813,9 +3154,9 @@ async function editSalesStatsQuantity(type, key, addBarcode = ''){
       setSalesStatsStatus('Non trovo un prodotto su cui aggiungere quantità.', 'err');
       return;
     }
-    const addedItems = [{ barcode, qty: newQty - currentQty }];
+    const addedItems = [saleItemWithPrice({ barcode, qty: newQty - currentQty })];
     salesRecords.unshift({
-      id: 'sale_adjust_' + Date.now(),
+      id: uniqueRecordId('sale_adjust_'),
       time: salesAdjustmentTime(range),
       items: addedItems
     });
@@ -2849,18 +3190,12 @@ function saleRecordInRange(record, range){
 
 function salesRecordsSellTotal(records){
   return (records || []).reduce((sum, record) => {
-    return sum + (record.items || []).reduce((itemSum, item) => {
-      const product = productForBarcode(item.barcode);
-      const sellPrice = product ? salePriceNumber(getSell(product)) : 0;
-      return itemSum + (sellPrice * (Number(item.qty) || 0));
-    }, 0);
+    return sum + (record.items || []).reduce((itemSum, item) => itemSum + saleItemSellTotal(item), 0);
   }, 0);
 }
 
-function salesItemSellTotal(barcode, qty){
-  const product = productForBarcode(barcode);
-  const sellPrice = product ? salePriceNumber(getSell(product)) : 0;
-  return sellPrice * (Number(qty) || 0);
+function saleItemSellTotal(item){
+  return saleItemUnitPrice(item) * (Number(item?.qty) || 0);
 }
 
 function renderSalesStats(){
@@ -2925,9 +3260,10 @@ function renderSupplierSalesStats(box, records){
     record.items.forEach(item => {
       const p = productForBarcode(item.barcode);
       const supplier = p ? supplierNameOf(p) : 'Senza fornitore';
-      if(!totals[supplier]) totals[supplier] = { qty: 0, totalSales: 0, products: {}, productLast: {}, last: '' };
+      if(!totals[supplier]) totals[supplier] = { qty: 0, totalSales: 0, products: {}, productTotals: {}, productLast: {}, last: '' };
       totals[supplier].qty += item.qty;
-      totals[supplier].totalSales += salesItemSellTotal(item.barcode, item.qty);
+      totals[supplier].totalSales += saleItemSellTotal(item);
+      totals[supplier].productTotals[item.barcode] = (totals[supplier].productTotals[item.barcode] || 0) + saleItemSellTotal(item);
       totals[supplier].products[item.barcode] = (totals[supplier].products[item.barcode] || 0) + item.qty;
       if(!totals[supplier].productLast[item.barcode] || record.time > totals[supplier].productLast[item.barcode]){
         totals[supplier].productLast[item.barcode] = record.time;
@@ -2979,7 +3315,7 @@ function renderSupplierSalesProductDetail(supplier, data){
                   <td>${buyPriceDisplayHTML(p)}</td>
                   <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
                   <td><strong>${qty}</strong></td>
-                  <td class="sales-total-cell">${escapeHTML(saleMoney(salesItemSellTotal(barcode, qty)))}</td>
+                  <td class="sales-total-cell">${escapeHTML(saleMoney(data.productTotals[barcode] || 0))}</td>
                   <td>${escapeHTML(formatDate(data.productLast[barcode] || data.last))}</td>
                   <td><button class="edit-btn" data-sales-qty-type="product" data-sales-qty-key="${escapeAttr(barcode)}" data-sales-qty-add-barcode="${escapeAttr(barcode)}">Modifica</button></td>
                 </tr>`;
@@ -3131,7 +3467,7 @@ function renderProducts(){
     table.innerHTML = visibleIndexes.map(realIndex => {
       const p = products[realIndex];
       return `<tr>
-        <td><input type="checkbox" class="product-checkbox" data-index="${realIndex}" ${allSelected ? 'checked' : ''}></td>
+        <td><input type="checkbox" class="product-checkbox" data-index="${realIndex}" data-barcode="${escapeAttr(getBarcode(p))}" ${allSelected ? 'checked' : ''}></td>
         <td>${escapeHTML(getBarcode(p))}</td>
         <td>${escapeHTML(getName(p))}</td>
         <td>${escapeHTML(getSupplier(p) || '-')}</td>
@@ -3139,7 +3475,7 @@ function renderProducts(){
         <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
         <td>${escapeHTML(getCategory(p) || '-')}</td>
         <td>${escapeHTML(formatStockQuantity(stockQuantityNumber(getQuantity(p))))}</td>
-        <td><div class="action-buttons"><button class="edit-btn" onclick="openEditModal(${realIndex})">✎</button><button class="delete-btn" onclick="deleteProduct(${realIndex})">🗑</button></div></td>
+        <td><div class="action-buttons"><button class="edit-btn" data-product-edit="${realIndex}" data-barcode="${escapeAttr(getBarcode(p))}" aria-label="Modifica">✎</button><button class="delete-btn" data-product-delete="${realIndex}" data-barcode="${escapeAttr(getBarcode(p))}" aria-label="Elimina">🗑</button></div></td>
       </tr>`;
     }).join('');
   }
@@ -3403,7 +3739,7 @@ function productRowsForDetail(items, mode){
   return items.map(item => {
     const p = item.product;
     return `<tr>
-      <td><input type="checkbox" class="${checkboxClass}" data-index="${item.index}"></td>
+      <td><input type="checkbox" class="${checkboxClass}" data-index="${item.index}" data-barcode="${escapeAttr(getBarcode(p))}"></td>
       <td>${escapeHTML(getBarcode(p))}</td>
       <td>${escapeHTML(getName(p))}</td>
       <td>${escapeHTML(getSupplier(p) || '-')}</td>
@@ -3411,7 +3747,7 @@ function productRowsForDetail(items, mode){
       <td class="sell-price-cell">${sellPriceDisplayHTML(p)}</td>
       <td>${escapeHTML(getCategory(p) || '-')}</td>
       <td>${escapeHTML(formatStockQuantity(stockQuantityNumber(getQuantity(p))))}</td>
-      <td><button class="edit-btn" onclick="openEditModal(${item.index})">Modifica</button><button class="delete-btn" onclick="deleteProduct(${item.index})">Elimina</button></td>
+      <td><div class="action-buttons"><button class="edit-btn" data-product-edit="${item.index}" data-barcode="${escapeAttr(getBarcode(p))}">Modifica</button><button class="delete-btn" data-product-delete="${item.index}" data-barcode="${escapeAttr(getBarcode(p))}">Elimina</button></div></td>
     </tr>`;
   }).join('');
 }
@@ -3510,11 +3846,18 @@ function deselectAllSupplierProducts(){ document.querySelectorAll('.supplier-pro
 function selectAllCategoryProducts(){ document.querySelectorAll('.category-product-checkbox').forEach(cb => cb.checked = true); }
 function deselectAllCategoryProducts(){ document.querySelectorAll('.category-product-checkbox').forEach(cb => cb.checked = false); }
 
+function resolveProductIndex(index, barcode){
+  const code = textValue(barcode);
+  if(code) return productIndexByBarcode(code);
+  const number = Number(index);
+  return Number.isInteger(number) && number >= 0 && number < products.length && !getBarcode(products[number]) ? number : -1;
+}
+
 function selectedIndexes(selector){
-  return Array.from(document.querySelectorAll(selector))
+  return Array.from(new Set(Array.from(document.querySelectorAll(selector))
     .filter(cb => cb.checked)
-    .map(cb => Number(cb.dataset.index))
-    .filter(index => Number.isInteger(index) && index >= 0 && index < products.length);
+    .map(cb => resolveProductIndex(cb.dataset.index, cb.dataset.barcode))
+    .filter(index => index >= 0)));
 }
 
 async function deleteIndexes(indexes, label){
@@ -3963,9 +4306,10 @@ function normalizeSuggestedCategory(value){
 }
 
 async function requestChatGPTCategories(batch, categories){
+  const apiKey = textValue(inventoryStorage.getItem(CATEGORIZER_API_KEY_KEY));
   const response = await fetch(chatGPTCategoryEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(apiKey ? { 'X-Inventory-Key': apiKey } : {}) },
     body: JSON.stringify({ products: batch, categories })
   });
   let data = null;
@@ -3989,6 +4333,9 @@ function chatGPTSetupErrorMessage(error){
   const status = Number(error?.status || 0);
   if([404, 405, 501].includes(status)){
     return 'Funzione ChatGPT non trovata sul sito. Carica anche la cartella api con il file api/categorize-products.js, poi fai Redeploy su Vercel.';
+  }
+  if(status === 403 && /app/i.test(String(error?.message || ''))){
+    return 'Chiave app ChatGPT mancante o errata. Inseriscila in Impostazioni > ChatGPT categorie (la stessa di INVENTORY_API_KEY su Vercel).';
   }
   if(status === 401 || status === 403){
     return 'Chiave OpenAI non valida o senza permesso. Controlla la chiave salvata su Vercel e fai Redeploy.';
@@ -4209,6 +4556,7 @@ function openEditModal(index){
   updateProductFormOptions();
   editingIndex = index;
   const p = products[index];
+  editingBarcode = getBarcode(p);
   document.getElementById('editBarcode').value = getBarcode(p);
   document.getElementById('editName').value = getName(p);
   document.getElementById('editSupplier').value = getSupplier(p);
@@ -4224,6 +4572,7 @@ function openEditModal(index){
 function closeEditModal(){
   document.getElementById('editModal').style.display = 'none';
   editingIndex = null;
+  editingBarcode = '';
 }
 
 function productFromForm(prefix){
@@ -4254,6 +4603,15 @@ function validateProduct(product, ignoreIndex = -1){
 
 async function saveEditProduct(){
   if(editingIndex === null) return;
+  // Dopo una sincronizzazione la posizione nella lista puo cambiare: si usa il barcode.
+  if(editingBarcode){
+    const currentIndex = productIndexByBarcode(editingBarcode);
+    if(currentIndex < 0){
+      alert('Questo prodotto non e piu presente (aggiornato da un altro dispositivo). Chiudi e riapri il prodotto.');
+      return;
+    }
+    editingIndex = currentIndex;
+  }
   const previousProduct = canonicalProduct(products[editingIndex]);
   const oldBarcode = getBarcode(previousProduct);
   const formProduct = productFromForm('edit');
@@ -4532,7 +4890,7 @@ async function importExcel(event){
       });
 
       if(importedNow.length){
-        const importSessionId = 'imp_' + Date.now();
+        const importSessionId = uniqueRecordId('imp_');
         importSessions.unshift({
           id: importSessionId,
           fileName: file.name,
@@ -4704,6 +5062,16 @@ function clearDropboxToken(){
   setFolderPickerStatus('Dropbox scollegato. Collega account Dropbox per scegliere le cartelle.', 'err');
   setCloudStatus('☁ Token Dropbox rimosso', 'err');
   return true;
+}
+
+function saveCategorizerKey(){
+  const input = document.getElementById('categorizerApiKey');
+  const value = textValue(input?.value);
+  if(value) inventoryStorage.setItem(CATEGORIZER_API_KEY_KEY, value);
+  else inventoryStorage.removeItem(CATEGORIZER_API_KEY_KEY);
+  inventoryStorage.flush().catch(showStorageFailure);
+  const status = document.getElementById('categorizerKeyStatus');
+  if(status) status.textContent = value ? 'Chiave salvata su questo dispositivo.' : 'Nessuna chiave salvata.';
 }
 
 function logoutUser(){
@@ -5054,7 +5422,8 @@ function installClearSearchOnScan(){
       lastKey = now;
       return;
     }
-    if(s.value && now - lastKey > 1200){
+    // Svuota solo se il testo precedente era un barcode completo (scanner), non una ricerca scritta a mano.
+    if(s.value && now - lastKey > 1200 && /^\d{6,}$/.test(textValue(s.value))){
       s.value = '';
       currentPage = 1;
       handleScannerInput();
@@ -5148,7 +5517,22 @@ document.addEventListener('click', function(event){
 
   const saleAdd = event.target.closest('[data-sale-add-index]');
   if(saleAdd){
-    addProductIndexToSaleCart(Number(saleAdd.dataset.saleAddIndex));
+    if(saleAdd.dataset.barcode) addBarcodeToSaleCart(saleAdd.dataset.barcode);
+    else addProductIndexToSaleCart(Number(saleAdd.dataset.saleAddIndex));
+    return;
+  }
+
+  const productEdit = event.target.closest('[data-product-edit]');
+  if(productEdit){
+    const index = resolveProductIndex(productEdit.dataset.productEdit, productEdit.dataset.barcode);
+    if(index >= 0) openEditModal(index);
+    return;
+  }
+
+  const productDelete = event.target.closest('[data-product-delete]');
+  if(productDelete){
+    const index = resolveProductIndex(productDelete.dataset.productDelete, productDelete.dataset.barcode);
+    if(index >= 0) deleteProduct(index);
     return;
   }
 

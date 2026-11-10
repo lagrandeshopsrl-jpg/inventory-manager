@@ -173,6 +173,7 @@
       setItem(key, value){ queue(key, String(value)); },
       removeItem(key){ queue(key, null); },
       hasPending(){ return pending.size > 0 || Boolean(running); },
+      usesIndexedDB(){ return Boolean(database); },
       getError(){ return lastError; },
       configure(handlers){
         onError = handlers.onError || onError;
