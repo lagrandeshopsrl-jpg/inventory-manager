@@ -1,7 +1,36 @@
+const crypto = require('crypto');
+
+function sameSecret(a, b){
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function requestFromOtherSite(req){
+  const origin = req.headers.origin;
+  if(!origin) return false;
+  try{
+    return new URL(origin).host !== req.headers.host;
+  }catch(error){
+    return true;
+  }
+}
+
 module.exports = async function handler(req, res){
   if(req.method !== 'POST'){
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Metodo non consentito' });
+  }
+
+  // Blocca le richieste partite da pagine di altri siti.
+  if(requestFromOtherSite(req)){
+    return res.status(403).json({ error: 'Origine non consentita' });
+  }
+
+  // Se su Vercel e impostata INVENTORY_API_KEY, l'app deve inviare la stessa chiave.
+  const appKey = process.env.INVENTORY_API_KEY;
+  if(appKey && !sameSecret(req.headers['x-inventory-key'], appKey)){
+    return res.status(403).json({ error: 'Chiave app non valida' });
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -33,7 +62,7 @@ module.exports = async function handler(req, res){
     input: [
       {
         role: 'system',
-        content: 'Sei un assistente per un negozio. Devi assegnare categorie brevi in italiano ai prodotti. Preferisci categorie esistenti quando sono adatte. Se non sei sicuro usa "Da controllare". Rispondi solo con JSON valido nello schema richiesto.'
+        content: 'Sei un assistente per un negozio. Devi assegnare categorie brevi in italiano ai prodotti. Preferisci categorie esistenti quando sono adatte. Regole prioritarie: prodotti con doccetta, doccia, soffione, tubo doccia, rubinetto, filtro rubinetto, copriwater, sedile WC o sedile water vanno in "Bagno" e non in "Bellezza". Se non sei sicuro usa "Da controllare". Rispondi solo con JSON valido nello schema richiesto.'
       },
       {
         role: 'user',
@@ -74,14 +103,19 @@ module.exports = async function handler(req, res){
     max_output_tokens: 10000
   };
 
-  const openaiResponse = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
+  let openaiResponse;
+  try{
+    openaiResponse = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+  }catch(error){
+    return res.status(502).json({ error: 'OpenAI non raggiungibile' });
+  }
 
   const data = await openaiResponse.json().catch(() => null);
   if(!openaiResponse.ok){
