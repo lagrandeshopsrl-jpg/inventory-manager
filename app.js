@@ -29,8 +29,16 @@ const DROPBOX_OAUTH_REDIRECT_KEY = 'inventory_dropbox_oauth_redirect';
 const DEFAULT_DROPBOX_PATH = '/inventory_manager_snapshot.json';
 const DEFAULT_DROPBOX_BACKUP_FOLDER = '/inventory_manager_backups';
 const DROPBOX_AUTO_SYNC_INTERVAL_MS = 60 * 60 * 1000;
-const DROPBOX_NETWORK_RETRY_DELAYS = [800, 2200, 5000];
-const DROPBOX_RECOVERY_SYNC_DELAY_MS = 45000;
+const DROPBOX_INLINE_RETRIES = 3;
+const DROPBOX_INLINE_MAX_WAIT_MS = 30000;
+// Nuovi tentativi in background dopo un errore: 30 s, 1, 2, 5, 10 minuti (poi ogni 10).
+const DROPBOX_BACKGROUND_RETRY_STEPS_MS = [30000, 60000, 120000, 300000, 600000];
+// Le modifiche ravvicinate (es. piu import di seguito) diventano un solo upload.
+const DROPBOX_PUSH_DEBOUNCE_MS = 5000;
+const DROPBOX_PUSH_MAX_WAIT_MS = 30000;
+// Il backup orario e una copia fatta da Dropbox, qualche minuto dopo l'upload.
+const DROPBOX_BACKUP_DELAY_MS = 3 * 60 * 1000;
+const DROPBOX_PRUNE_DELAY_MS = 2 * 60 * 1000;
 // Backup: uno ogni ora al massimo; si tengono tutti quelli degli ultimi 2 giorni,
 // uno al giorno per 60 giorni e uno al mese oltre. Gli ultimi 10 non vengono mai cancellati.
 const DROPBOX_BACKUP_INTERVAL_MS = 60 * 60 * 1000;
@@ -348,20 +356,7 @@ function canonicalProduct(p){
     buyPriceTrend,
     buyPricePrevious,
     buyPriceChange,
-    buyPriceChangedAt,
-    prodotto: name,
-    fornitore: supplier,
-    categoria: category,
-    categoriaFonte: categorySource,
-    acquisto: buyPrice,
-    vendita: sellPrice,
-    quantita: quantity,
-    quantità: quantity,
-    prezzoBloccato: priceLocked,
-    andamentoAcquisto: buyPriceTrend,
-    acquistoPrecedente: buyPricePrevious,
-    variazioneAcquistoValore: buyPriceChange,
-    dataVariazioneAcquisto: buyPriceChangedAt
+    buyPriceChangedAt
   };
 }
 
@@ -789,6 +784,7 @@ async function recordDropboxSyncSuccess(){
   const previous = inventoryStorage.getItem(DROPBOX_LAST_SUCCESSFUL_SYNC_AT_KEY);
   const timestamp = String(Date.now());
   inventoryStorage.setItem(DROPBOX_LAST_SUCCESSFUL_SYNC_AT_KEY, timestamp);
+  resetCloudRetry();
   try{
     await inventoryStorage.flush();
   }catch(error){
@@ -961,8 +957,18 @@ async function getValidDropboxToken(forceRefresh = false){
   throw new Error('NO_DROPBOX_TOKEN');
 }
 
-function isRetryableDropboxStatus(status){
-  return [408, 429, 500, 502, 503, 504].includes(Number(status));
+function dropboxRetryAfterMs(response, bodyText){
+  let seconds = Number(response.headers.get('Retry-After'));
+  if(!Number.isFinite(seconds) || seconds <= 0){
+    try{ seconds = Number(JSON.parse(bodyText || '{}')?.error?.retry_after); }catch(error){ seconds = NaN; }
+  }
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 0;
+}
+
+// Attesa crescente con un po' di casualita: circa 2, 4, 8 secondi.
+function dropboxBackoffMs(attempt, minimumMs = 0){
+  const base = Math.min(60000, 1500 * Math.pow(2, attempt));
+  return Math.max(minimumMs, Math.round(base * (1 + Math.random() * 0.4)));
 }
 
 async function fetchDropboxWithToken(url, options, token){
@@ -978,44 +984,50 @@ async function fetchDropboxWithToken(url, options, token){
 async function dropboxFetch(url, options, retry = true){
   let token = await getValidDropboxToken(false);
   let canRetryAuth = retry;
-  let lastResponse = null;
 
-  for(let attempt = 0; attempt <= DROPBOX_NETWORK_RETRY_DELAYS.length; attempt++){
-    if(attempt > 0){
-      setCloudStatus('☁ Dropbox non raggiungibile, riprovo...', '');
-      await wait(DROPBOX_NETWORK_RETRY_DELAYS[attempt - 1]);
-    }
-
+  for(let attempt = 0; ; attempt++){
     let response;
     try{
       response = await fetchDropboxWithToken(url, options, token);
     }catch(error){
       if(options.signal?.aborted) throw error;
-      if(attempt < DROPBOX_NETWORK_RETRY_DELAYS.length) continue;
+      if(attempt < DROPBOX_INLINE_RETRIES){
+        setCloudStatus('☁ Dropbox non raggiungibile, riprovo...', '');
+        await wait(dropboxBackoffMs(attempt));
+        continue;
+      }
       throw new Error('DROPBOX_NETWORK');
     }
 
     if(response.status === 401 && canRetryAuth && canRefreshDropboxToken()){
       token = await getValidDropboxToken(true);
       canRetryAuth = false;
-      try{
-        response = await fetchDropboxWithToken(url, options, token);
-      }catch(error){
-        if(options.signal?.aborted) throw error;
-        if(attempt < DROPBOX_NETWORK_RETRY_DELAYS.length) continue;
-        throw new Error('DROPBOX_NETWORK');
-      }
+      attempt--;
+      continue;
     }
 
-    if(isRetryableDropboxStatus(response.status) && attempt < DROPBOX_NETWORK_RETRY_DELAYS.length){
-      lastResponse = response;
+    if(response.status === 429){
+      // Troppe richieste: si rispetta Retry-After e si aspetta sempre di piu.
+      const text = await response.text().catch(() => '');
+      const retryAfterMs = dropboxRetryAfterMs(response, text);
+      const delay = dropboxBackoffMs(attempt, retryAfterMs);
+      if(attempt < DROPBOX_INLINE_RETRIES && delay <= DROPBOX_INLINE_MAX_WAIT_MS){
+        setCloudStatus('☁ Dropbox occupato, riprovo tra ' + Math.ceil(delay / 1000) + ' s', '');
+        await wait(delay);
+        continue;
+      }
+      const error = new Error('DROPBOX_RATE_LIMIT');
+      error.retryAfterMs = Math.max(retryAfterMs, delay);
+      throw error;
+    }
+
+    if([408, 500, 502, 503, 504].includes(response.status) && attempt < DROPBOX_INLINE_RETRIES){
+      await wait(dropboxBackoffMs(attempt, dropboxRetryAfterMs(response, '')));
       continue;
     }
 
     return response;
   }
-
-  return lastResponse;
 }
 
 function getDropboxPath(){
@@ -1112,7 +1124,7 @@ function buildBackupPath(timestamp){
 function buildSnapshot(timestamp = Date.now(), meta = {}){
   pruneOldImportSessions(false);
   return {
-    version: 94,
+    version: 95,
     lastModified: timestamp,
     backupCreatedAt: meta.backupCreatedAt || '',
     backupLabel: meta.backupLabel || '',
@@ -1360,7 +1372,7 @@ async function dropboxDownloadSnapshot(){
   if(response.status === 401) throw new Error('DROPBOX_AUTH');
   if(!response.ok) throw new Error('DROPBOX_DOWNLOAD_' + response.status);
 
-  const text = await response.text();
+  const text = await readDropboxSnapshotText(response);
   let meta = {};
   try{
     meta = JSON.parse(response.headers.get('dropbox-api-result') || '{}');
@@ -1430,6 +1442,26 @@ async function dropboxListFolders(path = '', signal){
     .sort((a, b) => String(a.name).localeCompare(String(b.name)));
 }
 
+function canCompressSnapshot(){
+  return typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+}
+
+async function gzipText(text){
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+  return new Blob([await new Response(stream).arrayBuffer()], { type: 'application/octet-stream' });
+}
+
+/* Il file Dropbox puo essere JSON normale (versioni precedenti) o JSON compresso gzip. */
+async function readDropboxSnapshotText(response){
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if(bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b){
+    if(typeof DecompressionStream !== 'function') throw new Error('DROPBOX_GZIP_UNSUPPORTED');
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(stream).text();
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 /* mode: { '.tag': 'update', update: rev } | { '.tag': 'add' } */
 async function dropboxUploadJson(path, data, mode, autorename = false){
   const response = await dropboxFetch('https://content.dropboxapi.com/2/files/upload', {
@@ -1444,8 +1476,8 @@ async function dropboxUploadJson(path, data, mode, autorename = false){
         strict_conflict: true
       })
     },
-    // JSON compatto: circa il 40% piu leggero del formato indentato.
-    body: JSON.stringify(data)
+    // JSON compatto e, se il browser lo consente, compresso gzip (molto piu leggero).
+    body: canCompressSnapshot() ? await gzipText(JSON.stringify(data)) : JSON.stringify(data)
   });
 
   if(response.status === 401) throw new Error('DROPBOX_AUTH');
@@ -1474,32 +1506,63 @@ async function uploadCurrentState({ rev = '', create = false } = {}){
   const serverModified = parseDropboxTime(meta.server_modified) || timestamp;
   recordDropboxSyncedState(snapshot, meta.rev, serverModified, seq);
   await inventoryStorage.flush();
-  await maybeCreateDropboxBackup(snapshot);
+  scheduleDropboxBackup();
   return snapshot;
 }
 
 /* ---------- Backup: al massimo uno ogni ora, con pulizia automatica ---------- */
 
-async function maybeCreateDropboxBackup(snapshot, force = false){
+let dropboxBackupTimer = 0;
+let dropboxPruneTimer = 0;
+
+function cloudPushPending(){
+  return Boolean(pushDebounceTimer || queuedCloudPush || cloudBusyCount > 0);
+}
+
+/* Il backup non parte subito dopo l'upload: si aspetta qualche minuto e si fa
+   una copia lato Dropbox del file principale (nessun nuovo caricamento di dati). */
+function scheduleDropboxBackup(delayMs = DROPBOX_BACKUP_DELAY_MS){
+  if(dropboxBackupTimer || !hasDropboxCredentials()) return;
   const last = Number(inventoryStorage.getItem(DROPBOX_LAST_BACKUP_AT_KEY) || 0) || 0;
-  if(!force && Date.now() - last < DROPBOX_BACKUP_INTERVAL_MS) return false;
-  try{
-    const now = new Date();
-    const label = backupTimestamp(now);
-    const backupPath = buildBackupPath(label);
-    await dropboxUploadJson(backupPath, {
-      ...snapshot,
-      backupCreatedAt: now.toISOString(),
-      backupLabel: label,
-      backupPath
-    }, { '.tag': 'add' }, true);
-    inventoryStorage.setItem(DROPBOX_LAST_BACKUP_AT_KEY, String(Date.now()));
-    await pruneOldDropboxBackups();
-    return true;
-  }catch(error){
-    console.error('Backup Dropbox non riuscito', error);
-    return false;
-  }
+  const due = Math.max(delayMs, last + DROPBOX_BACKUP_INTERVAL_MS - Date.now());
+  dropboxBackupTimer = setTimeout(() => {
+    dropboxBackupTimer = 0;
+    if(cloudPushPending() || hasLocalUnsyncedChanges()){
+      // Upload in corso o in attesa: il backup si rimanda.
+      scheduleDropboxBackup(DROPBOX_BACKUP_DELAY_MS);
+      return;
+    }
+    runCloudTask(createDropboxBackupTask).catch(error => {
+      console.error('Backup Dropbox non riuscito', error);
+      scheduleDropboxBackup(Math.max(10 * 60 * 1000, error?.retryAfterMs || 0));
+    });
+  }, due);
+}
+
+async function createDropboxBackupTask(){
+  const last = Number(inventoryStorage.getItem(DROPBOX_LAST_BACKUP_AT_KEY) || 0) || 0;
+  if(Date.now() - last < DROPBOX_BACKUP_INTERVAL_MS) return false;
+  const label = backupTimestamp(new Date());
+  const response = await dropboxFetch('https://api.dropboxapi.com/2/files/copy_v2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from_path: getDropboxPath(), to_path: buildBackupPath(label), autorename: true })
+  });
+  if(response.status === 401) throw new Error('DROPBOX_AUTH');
+  if(!response.ok) throw new Error('DROPBOX_BACKUP_' + response.status);
+  inventoryStorage.setItem(DROPBOX_LAST_BACKUP_AT_KEY, String(Date.now()));
+  await inventoryStorage.flush().catch(() => {});
+  scheduleDropboxPrune();
+  return true;
+}
+
+function scheduleDropboxPrune(){
+  if(dropboxPruneTimer) return;
+  dropboxPruneTimer = setTimeout(() => {
+    dropboxPruneTimer = 0;
+    if(cloudPushPending()){ scheduleDropboxPrune(); return; }
+    runCloudTask(() => pruneOldDropboxBackups()).catch(error => console.error('Pulizia backup non riuscita', error));
+  }, DROPBOX_PRUNE_DELAY_MS);
 }
 
 function backupDateFromName(name){
@@ -1641,8 +1704,36 @@ async function pushLocalChangesTask(){
   }
 }
 
-/* Piu richieste ravvicinate (es. vendite in sequenza) diventano un solo upload. */
-function requestCloudPush(){
+/* Piu richieste ravvicinate (vendite, import di seguito) diventano un solo upload:
+   si aspettano 5 secondi di calma, al massimo 30 secondi dalla prima richiesta. */
+let pushDebounceTimer = 0;
+let pushDebounceStartedAt = 0;
+let pushDebounceWaiters = [];
+
+function requestCloudPush(options = {}){
+  if(options.immediate) return enqueueCloudPush();
+  return new Promise((resolve, reject) => {
+    pushDebounceWaiters.push({ resolve, reject });
+    const now = Date.now();
+    if(!pushDebounceStartedAt) pushDebounceStartedAt = now;
+    clearTimeout(pushDebounceTimer);
+    const delay = Math.max(0, Math.min(DROPBOX_PUSH_DEBOUNCE_MS, pushDebounceStartedAt + DROPBOX_PUSH_MAX_WAIT_MS - now));
+    pushDebounceTimer = setTimeout(firePendingCloudPush, delay);
+  });
+}
+
+function firePendingCloudPush(){
+  const waiters = pushDebounceWaiters;
+  pushDebounceWaiters = [];
+  pushDebounceStartedAt = 0;
+  pushDebounceTimer = 0;
+  enqueueCloudPush().then(
+    result => waiters.forEach(waiter => waiter.resolve(result)),
+    error => waiters.forEach(waiter => waiter.reject(error))
+  );
+}
+
+function enqueueCloudPush(){
   if(queuedCloudPush) return queuedCloudPush;
   const promise = runCloudTask(async () => {
     if(queuedCloudPush === promise) queuedCloudPush = null;
@@ -1683,6 +1774,8 @@ function dropboxErrorMessage(error){
   if(code === 'DROPBOX_REFRESH_BAD_RESPONSE') return 'Risposta Dropbox non valida';
   if(code.startsWith('DROPBOX_REFRESH_')) return 'Errore rinnovo token Dropbox';
   if(code === 'DROPBOX_NETWORK') return 'Dropbox non raggiungibile';
+  if(code === 'DROPBOX_RATE_LIMIT' || code.endsWith('_429')) return 'Dropbox occupato (troppe richieste)';
+  if(code === 'DROPBOX_GZIP_UNSUPPORTED') return 'Browser troppo vecchio per leggere il file Dropbox';
   if(code === 'DROPBOX_OAUTH_AUTH') return 'Collegamento Dropbox non autorizzato';
   if(code === 'DROPBOX_OAUTH_MISSING') return 'Dati collegamento Dropbox mancanti';
   if(code.startsWith('DROPBOX_OAUTH_')) return 'Errore collegamento Dropbox';
@@ -1702,7 +1795,8 @@ function dropboxErrorAdvice(error){
   if(code === 'DROPBOX_AUTH') return 'Ricollega Dropbox: il token non e piu valido.';
   if(code === 'DROPBOX_REFRESH_AUTH') return 'Ricollega Dropbox: il rinnovo automatico non e piu valido.';
   if(code === 'DROPBOX_NETWORK') return 'Riprovo automaticamente tra poco. Se internet e attivo, non serve chiudere e riaprire.';
-  if(code.startsWith('DROPBOX_UPLOAD_')) return 'I dati sono salvati sul dispositivo. Riprova Sincronizza dati tra poco.';
+  if(code === 'DROPBOX_GZIP_UNSUPPORTED') return 'Aggiorna iOS/Safari o il browser di questo dispositivo.';
+  if(isRetryableCloudError(error)) return 'I dati sono salvati sul dispositivo. Riprovo automaticamente, non serve premere Sincronizza dati.';
   if(error?.name === 'QuotaExceededError') return 'Riduci la cronologia importazioni o svuota dati vecchi.';
   return 'I dati restano salvati sul dispositivo; riprova Sincronizza dati.';
 }
@@ -1718,17 +1812,45 @@ function isDropboxNetworkError(error){
     || code.includes('NetworkError');
 }
 
-function scheduleDropboxRecoverySync(){
-  if(dropboxNetworkRetryTimer || !hasDropboxCredentials()) return;
+let cloudRetryAttempt = 0;
+
+function isRetryableCloudError(error){
+  const code = String(error?.message || '');
+  return isDropboxNetworkError(error)
+    || code === 'DROPBOX_RATE_LIMIT'
+    || code === 'DROPBOX_CONFLICT'
+    || /^DROPBOX_(UPLOAD|DOWNLOAD|LIST|BACKUP)_(408|429|5\d\d)$/.test(code);
+}
+
+function resetCloudRetry(){
+  clearTimeout(dropboxNetworkRetryTimer);
+  dropboxNetworkRetryTimer = 0;
+  cloudRetryAttempt = 0;
+}
+
+/* Dopo un errore temporaneo l'app riprova da sola, con attese sempre piu lunghe. */
+function scheduleCloudRetry(error){
+  if(!hasDropboxCredentials() || !isRetryableCloudError(error)) return 0;
+  if(dropboxNetworkRetryTimer) return -1;
+  const steps = DROPBOX_BACKGROUND_RETRY_STEPS_MS;
+  const base = steps[Math.min(cloudRetryAttempt, steps.length - 1)];
+  const delay = Math.max(base, Number(error?.retryAfterMs) || 0);
+  cloudRetryAttempt++;
   dropboxNetworkRetryTimer = setTimeout(async () => {
     dropboxNetworkRetryTimer = 0;
     if(typeof navigator !== 'undefined' && navigator.onLine === false){
-      scheduleDropboxRecoverySync();
+      cloudRetryAttempt = Math.max(0, cloudRetryAttempt - 1);
+      scheduleCloudRetry(error);
       return;
     }
     setCloudStatus('☁ Riprovo Dropbox automaticamente...', '');
-    await syncNow({ silentMissingToken: true, autoRecovery: true });
-  }, DROPBOX_RECOVERY_SYNC_DELAY_MS);
+    if(hasLocalUnsyncedChanges()){
+      await saveCloudAfterChange('Modifiche salvate', { silentDropboxError: true, immediate: true });
+    }else{
+      await syncNow({ silentMissingToken: true, autoRecovery: true });
+    }
+  }, delay);
+  return delay;
 }
 
 function handleDropboxError(error, showAlert = true){
@@ -1736,12 +1858,16 @@ function handleDropboxError(error, showAlert = true){
   if(['DROPBOX_AUTH', 'DROPBOX_REFRESH_AUTH', 'NO_DROPBOX_TOKEN'].includes(error?.message)) setDropboxConnectionState('auth-error');
   else if(isDropboxNetworkError(error)) setDropboxConnectionState('network-error');
   console.error(error);
-  if(isDropboxNetworkError(error)){
-    scheduleDropboxRecoverySync();
-    setCloudStatus('☁ ' + message + ': riprovo automaticamente', 'err');
-  }else{
-    setCloudStatus('☁ ' + message, 'err');
+  const retryIn = scheduleCloudRetry(error);
+  if(retryIn){
+    const text = retryIn > 0
+      ? 'nuovo tentativo automatico tra ' + (retryIn >= 60000 ? Math.round(retryIn / 60000) + ' min' : Math.ceil(retryIn / 1000) + ' s')
+      : 'nuovo tentativo automatico in programma';
+    // Errore temporaneo: l'app riprova da sola, senza interrompere il lavoro con un avviso.
+    setCloudStatus('☁ ' + message + ': ' + text, 'err');
+    return;
   }
+  setCloudStatus('☁ ' + message, 'err');
   if(showAlert) alert(dropboxAlertMessage(error));
 }
 
@@ -1760,8 +1886,8 @@ async function saveCloudAfterChange(label, options = {}){
     return { synced: false, skipped: true, localSaved, message: localSaved ? 'Dropbox non collegato' : 'Salvataggio sul dispositivo non riuscito' };
   }
   try{
-    setCloudStatus('☁ Salvo su Dropbox...', '');
-    const result = await requestCloudPush();
+    setCloudStatus(options.immediate ? '☁ Salvo su Dropbox...' : '☁ Salvo su Dropbox tra pochi secondi...', '');
+    const result = await requestCloudPush({ immediate: Boolean(options.immediate) });
     await recordDropboxSyncSuccess();
     setDropboxConnectionState('verified');
     setCloudStatus(cloudResultMessage(result, '☁ ' + label + ' su Dropbox'), 'ok');
@@ -1824,10 +1950,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('online', () => {
-  if(dropboxNetworkRetryTimer){
-    clearTimeout(dropboxNetworkRetryTimer);
-    dropboxNetworkRetryTimer = 0;
-  }
+  resetCloudRetry();
   syncDropboxAutomatically();
 });
 
